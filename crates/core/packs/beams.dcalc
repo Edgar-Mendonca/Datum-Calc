@@ -1,0 +1,245 @@
+{
+ "format": 1,
+ "name": "Beams: deflection and bending stress",
+ "title": {
+  "project": "",
+  "number": "PACK-08",
+  "title": "Beams: deflection and bending stress",
+  "by": "",
+  "checked": "",
+  "date": "",
+  "rev": "A",
+  "company": "",
+  "client": "",
+  "logo": ""
+ },
+ "page": {
+  "paper": "A4",
+  "margins": [
+   15.0,
+   15.0,
+   15.0,
+   20.0
+  ]
+ },
+ "units": "SI",
+ "digits": 4,
+ "regions": [
+  {
+   "id": 1,
+   "kind": "text",
+   "text": "Beams: deflection and bending stress",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 2,
+   "kind": "text",
+   "text": "Steel I-beam (IPE 300 properties) in elastic bending about its strong axis.",
+   "unit": "",
+   "style": "note",
+   "data": null
+  },
+  {
+   "id": 3,
+   "kind": "text",
+   "text": "Section and material",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 4,
+   "kind": "math",
+   "text": "E = 200 GPa  # Young's modulus of steel",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 5,
+   "kind": "math",
+   "text": "I = 8356 cm^4  # second moment of area",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 6,
+   "kind": "math",
+   "text": "W_el = 557.1 cm^3  # elastic section modulus",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 7,
+   "kind": "math",
+   "text": "f_y = 275 MPa  # yield strength",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 8,
+   "kind": "math",
+   "text": "sigma_allow = 0.66*f_y  # allowable bending stress",
+   "unit": "MPa",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 9,
+   "kind": "text",
+   "text": "Simply supported beam, uniform load",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 10,
+   "kind": "math",
+   "text": "w = 12 kN/m",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 11,
+   "kind": "math",
+   "text": "L = 6 m",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 12,
+   "kind": "math",
+   "text": "M_max = w*L^2/8",
+   "unit": "kN*m",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 13,
+   "kind": "math",
+   "text": "sigma = M_max/W_el",
+   "unit": "MPa",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 14,
+   "kind": "math",
+   "text": "delta = 5*w*L^4/(384*E*I)",
+   "unit": "mm",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 15,
+   "kind": "check",
+   "text": "check delta <= L/250",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 16,
+   "kind": "check",
+   "text": "check sigma <= sigma_allow",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 17,
+   "kind": "text",
+   "text": "Cantilever, end load",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 18,
+   "kind": "math",
+   "text": "F = 10 kN",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 19,
+   "kind": "math",
+   "text": "L_c = 2.5 m",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 20,
+   "kind": "math",
+   "text": "M_c = F*L_c",
+   "unit": "kN*m",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 21,
+   "kind": "math",
+   "text": "sigma_c = M_c/W_el",
+   "unit": "MPa",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 22,
+   "kind": "math",
+   "text": "delta_c = F*L_c^3/(3*E*I)",
+   "unit": "mm",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 23,
+   "kind": "check",
+   "text": "check delta_c <= L_c/180",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 24,
+   "kind": "check",
+   "text": "check sigma_c <= sigma_allow",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 25,
+   "kind": "text",
+   "text": "Ref: J. M. Gere, B. J. Goodno, Mechanics of Materials, 8th ed., Appendix H, Tables H-1 and H-2: beam deflections.",
+   "unit": "",
+   "style": "ref",
+   "data": null
+  },
+  {
+   "id": 26,
+   "kind": "text",
+   "text": "Ref: W. C. Young, R. G. Budynas, Roark's Formulas for Stress and Strain, 8th ed., Table 8.1.",
+   "unit": "",
+   "style": "ref",
+   "data": null
+  }
+ ],
+ "next_id": 27,
+ "ui": {
+  "pack": {
+   "id": "beams",
+   "field": "Mechanical",
+   "desc": "A simply supported beam with a uniform load and a cantilever with an end load: moments, stresses and deflections against limits."
+  }
+ }
+}

@@ -2,6 +2,7 @@
 import { act, call, loadOut, out, selId, setBackstage, setEditId, setOut, setSelId, setZoom, toast, zoom, setVarsPanel, varsPanel, S } from "./store";
 import { Kind, Out } from "./api";
 import * as D from "./dialogs";
+import { outs } from "./calc";
 
 const GH = "https://github.com/Edgar-Mendonca/Datum-Calc";
 /** Where a new region goes: below the selected one, or at the end. */
@@ -51,6 +52,31 @@ export const C = {
   save: async (asNew = false) => { const o = await call<Out | null>("save", { asNew }); if (o) { setOut(o); toast("Saved.", true); } },
   open: () => loadOut("open", { path: null }),
   newSheet: () => loadOut("new_sheet"),
+  pack: (id: string) => loadOut("new_from_pack", { id }),
+  /** The selected region's result ("19.61 kW"), to paste into a spreadsheet or a report. */
+  copyResult: async () => {
+    const o = outs().get(selId());
+    const t = o?.check ? o.result : o?.value ? `${o.value}${o.unit ? ` ${o.unit}` : ""}` : "";
+    if (!t) return toast("Select a region with a result first.");
+    await navigator.clipboard?.writeText(t).catch(() => {});
+    toast(`Copied ${t}`, true);
+  },
+  copyLatex: async () => { const o = outs().get(selId()); if (!o?.latex) return toast("Select a math region first."); await navigator.clipboard?.writeText(o.result_tex && !o.input ? `${o.latex} = ${o.result_tex}` : o.latex).catch(() => {}); toast("Copied as LaTeX.", true); },
+  /** Inputs, results and checks as CSV (name, value, unit, kind, description). */
+  csv: async () => {
+    if (!out()) return;
+    const q = (x: string) => /[",\n]/.test(x) ? `"${x.replace(/"/g, '""')}"` : x;
+    const rows = [["Name", "Value", "Unit", "Kind", "Description"]];
+    for (const r of S().regions) {
+      const o = outs().get(r.id);
+      if (!o) continue;
+      if (o.check) rows.push([r.text.split("#")[0].replace(/^check\s*/, "").trim(), o.check.pass ? "PASS" : "FAIL", o.check.ratio === null ? "" : o.check.ratio.toFixed(3), "check", o.note]);
+      else if (o.name && o.value && !o.error) rows.push([o.name, o.value, o.unit, r.style === "input" ? "input" : "result", o.note]);
+      for (const d of o.defs ?? []) rows.push([d.name, d.value, d.unit, "table", ""]);
+    }
+    const path = await call<string | null>("save_file", { name: `${S().name}.csv`, data: rows.map(r => r.map(x => q(x ?? "")).join(",")).join("\r\n") + "\r\n" });
+    if (path) toast(`Saved ${path}`, true);
+  },
   print: () => { setEditId(0); setBackstage("print"); },
   units: (u: "SI" | "US") => act({ SheetSet: { field: "units", value: u } }),
   zoomIn: () => setZoom(Math.min(200, zoom() + 10)),
@@ -65,7 +91,7 @@ export const C = {
 export const ALL_CMDS: [string, () => void, string?][] = [
   ["Insert math region", () => C.insert("math"), "Ctrl+M"], ["Insert text region", () => C.insert("text"), "Ctrl+T"], ["Insert check", () => C.insert("check")], ["Insert table", () => C.insert("table")], ["Insert picture", () => C.picture()], ["Units list", () => D.unitsList()], ["Functions and constants", () => D.unitsList("functions")], ["Insert solve", () => C.insert("solve")], ["Insert plot", () => C.insert("plot")],
   ["Delete region", C.del, "Delete"], ["Move region up", () => C.move(true), "Alt+↑"], ["Move region down", () => C.move(false), "Alt+↓"],
-  ["Copy", C.copy, "Ctrl+C"], ["Paste", () => C.paste(), "Ctrl+V"], ["Undo", C.undo, "Ctrl+Z"], ["Redo", C.redo, "Ctrl+Y"],
+  ["Copy", C.copy, "Ctrl+C"], ["Copy result", C.copyResult], ["Copy as LaTeX", C.copyLatex], ["Export CSV (inputs and results)", C.csv], ["New from pack", () => C.file("new")], ["Paste", () => C.paste(), "Ctrl+V"], ["Undo", C.undo, "Ctrl+Z"], ["Redo", C.redo, "Ctrl+Y"],
   ["Save", () => C.save(), "Ctrl+S"], ["Save as", () => C.save(true)], ["Open", C.open, "Ctrl+O"], ["New sheet", C.newSheet, "Ctrl+N"], ["Print / PDF", C.print, "Ctrl+P"],
   ["Title block", () => D.titleBlock()], ["SI units", () => C.units("SI")], ["US units", () => C.units("US")],
   ["Zoom in", C.zoomIn], ["Zoom out", C.zoomOut], ["Options", C.options], ["Check for updates", () => C.file("about")], ["Roadmap", () => C.file("roadmap")],

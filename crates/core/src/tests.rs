@@ -441,3 +441,157 @@ fn tables_define_columns_and_work_out_formulas() {
         let _ = eval::run(&s);
     }
 }
+
+#[test]
+fn notes_after_hash_describe_a_line() {
+    let o = run(&["Q = 120 m^3/h  # design flow, from the process data sheet", "x = Q*2 # twice"]);
+    assert_eq!(o.regions[0].note, "design flow, from the process data sheet");
+    assert_eq!(o.regions[0].latex, "Q = 120\\,\\mathrm{m^{3}/h}");
+    assert_eq!(o.regions[1].result, "240 m³/h");
+    let o = run(&["x = 2 +  # broken"]);
+    assert_eq!(o.regions[0].error.as_ref().unwrap().from, 7, "error positions count from the start of the line");
+}
+
+/// Every calc pack is a test: its results are compared with a hand calculation worked out before
+/// running (the same formulas evaluated independently), quoted with the source in each pack.
+mod packs {
+    use super::close;
+    use crate::eval::{self, Fmt};
+
+    fn run(id: &str) -> (eval::SheetOut, eval::Env) {
+        let s = crate::packs::sheet(id).unwrap_or_else(|| panic!("{id} does not open"));
+        let r = eval::run_env(&s, &Fmt { digits: 4, eng: false, us: false });
+        let errs: Vec<String> = r.0.regions.iter().filter_map(|o| o.error.as_ref().map(|e| format!("region {}: {}", o.id, e.msg))).collect();
+        assert!(errs.is_empty(), "{id}: {errs:?}");
+        assert!(r.0.regions.iter().all(|o| o.warn.is_empty()), "{id}: a unit cannot show its value");
+        r
+    }
+    fn v(env: &eval::Env, name: &str) -> f64 { env.vars.get(&eval::canon(name)).unwrap_or_else(|| panic!("{name} missing")).x() }
+    fn checks(o: &eval::SheetOut) -> Vec<(bool, f64)> { o.regions.iter().filter_map(|r| r.check.as_ref().map(|c| (c.pass, c.ratio.unwrap_or(f64::NAN)))).collect() }
+
+    #[test]
+    fn all_packs_open_and_list() {
+        let cards = crate::packs::cards();
+        assert_eq!(cards.len(), 10);
+        for c in &cards { assert!(!c.name.is_empty() && !c.desc.is_empty() && !c.field.is_empty() && c.checks > 0, "{}", c.id); }
+    }
+
+    #[test]
+    fn pump_power() {
+        // P_h = 998 × 9.80665 × (120/3600) × 45 = 14 680.6 W; /0.75 = 19 574.1 W; /0.93 = 21 047.4 W; ×1.15 = 22 510.2 W.
+        let (o, e) = run("pump-power");
+        assert!(close(v(&e, "P_h"), 14_680.555, 1e-6));
+        assert!(close(v(&e, "P_shaft"), 19_574.073, 1e-6));
+        assert!(close(v(&e, "P_in"), 21_047.391, 1e-6));
+        assert!(close(v(&e, "P_req"), 22_510.184, 1e-6));
+        assert_eq!(checks(&o).len(), 1);
+        assert!(checks(&o)[0].0 && close(checks(&o)[0].1, 0.750_34, 1e-4));
+        assert!(o.regions.iter().any(|r| r.result == "14.68 kW"));
+    }
+
+    #[test]
+    fn npsh() {
+        // NPSHa = (101 325 − 7 385)/(992.2 × 9.80665) + 2 − 0.8 = 10.855 m ≥ 4.5 + 1 m.
+        let (o, e) = run("npsh");
+        assert!(close(v(&e, "NPSH_a"), 10.854_52, 1e-6));
+        assert!(checks(&o)[0].0 && close(checks(&o)[0].1, 0.506_70, 1e-4));
+    }
+
+    #[test]
+    fn pipe_pressure_drop() {
+        // v = 0.03333/(π 0.1541²/4) = 1.7872 m/s; Re = 274 863; Colebrook (ε/D = 2.92×10⁻⁴) f = 0.017067
+        // (the Moody chart reads about 0.017); Δp = (f L/D + K) ρ v²/2 = 57.68 kPa; h_L = 5.894 m.
+        let (o, e) = run("pipe-dp");
+        assert!(close(v(&e, "v"), 1.787_243, 1e-6));
+        assert!(close(v(&e, "Re"), 274_863.3, 1e-6));
+        assert!(close(v(&e, "f"), 0.017_066_69, 1e-6));
+        assert!(close(v(&e, "dp"), 57_680.44, 1e-5));
+        assert!(close(v(&e, "h_L"), 5.893_55, 1e-5));
+        assert!(checks(&o)[0].0);
+    }
+
+    #[test]
+    fn operating_point() {
+        // Between 120 and 160 m³/h the pump line is 46 − 13 (q − 120)/40; with 20 + 0.0012 q² they meet at q = 133.85 m³/h, H = 41.50 m.
+        let (o, e) = run("operating-point");
+        assert!(close(v(&e, "Q_op") * 3600.0, 133.849_63, 1e-6));
+        assert!(close(v(&e, "H_op"), 41.498_87, 1e-6));
+        assert!(checks(&o)[0].0);
+        let plot = o.regions.iter().find_map(|r| r.plot.clone()).unwrap();
+        assert_eq!(plot.series.len(), 2);
+        assert!(close(plot.series[0].ys[0], 62.0, 1e-9) && close(plot.series[1].ys[0], 20.0, 1e-9));
+    }
+
+    #[test]
+    fn compressor() {
+        // (n−1)/n = 0.27/(1.27 × 0.78) = 0.272562; H_p = 8314.46/18.5 × 303.15/0.272562 × (3^0.272562 − 1) = 174.51 kJ/kg;
+        // T2 = 303.15 × 3^0.272562 = 135.83 °C; P_gas = 2.5 × 174.51/0.78 = 559.3 kW; P_shaft = 570.7 kW.
+        let (o, e) = run("compressor");
+        assert!(close(v(&e, "x"), 0.272_562_08, 1e-7));
+        assert!(close(v(&e, "H_p"), 174_505.2, 1e-6));
+        assert!(close(v(&e, "T_2") - 273.15, 135.830_6, 1e-6));
+        assert!(close(v(&e, "P_shaft"), 570_726.07, 1e-6));
+        assert!(o.regions.iter().any(|r| r.result == "135.8 °C"), "the discharge temperature shows in °C");
+        assert!(checks(&o).iter().all(|c| c.0));
+    }
+
+    #[test]
+    fn heat_exchanger() {
+        // Q = 3 × 2200 × 50 = 330 kW; m_c = 330 000/(4180 × 20) = 3.947 kg/s; LMTD = 30/ln(75/45) = 58.73 K; A = 330 000/(350 × 58.73) = 16.05 m².
+        let (o, e) = run("hx-lmtd");
+        assert!(close(v(&e, "Q"), 330_000.0, 1e-9));
+        assert!(close(v(&e, "m_c"), 3.947_368, 1e-6));
+        assert!(close(v(&e, "LMTD"), 58.728_456, 1e-6));
+        assert!(close(v(&e, "A_req"), 16.054_52, 1e-6));
+        assert!(checks(&o)[0].0 && close(checks(&o)[0].1, 0.802_73, 1e-4));
+    }
+
+    #[test]
+    fn pressure_vessel() {
+        // σ_h = 1.5 × 1200/(2 × 10.5) = 85.71 MPa; σ_l = 42.86 MPa; t = 1.5 × 600/(138 × 0.85 − 0.9) + 1.5 = 9.232 mm.
+        let (o, e) = run("pressure-vessel");
+        assert!(close(v(&e, "sigma_h"), 85.714_286e6, 1e-6));
+        assert!(close(v(&e, "sigma_l"), 42.857_143e6, 1e-6));
+        assert!(close(v(&e, "t_req"), 9.231_959e-3, 1e-6));
+        assert_eq!(checks(&o).iter().filter(|c| c.0).count(), 3);
+    }
+
+    #[test]
+    fn beams() {
+        // M = 12 × 6²/8 = 54 kN·m; σ = 54e3/557.1e-6 = 96.93 MPa; δ = 5 × 12e3 × 6⁴/(384 × 200e9 × 8356e-8) = 12.12 mm ≤ 24 mm.
+        // Cantilever: M = 25 kN·m; δ = 10e3 × 2.5³/(3 × 200e9 × 8356e-8) = 3.117 mm ≤ 13.9 mm.
+        let (o, e) = run("beams");
+        assert!(close(v(&e, "M_max"), 54_000.0, 1e-9));
+        assert!(close(v(&e, "sigma"), 96.930_533e6, 1e-6));
+        assert!(close(v(&e, "delta"), 12.117_042e-3, 1e-6));
+        assert!(close(v(&e, "delta_c"), 3.116_523e-3, 1e-6));
+        assert!(o.regions.iter().any(|r| r.result == "54 kN·m"), "moments show in kN·m");
+        assert!(checks(&o).iter().all(|c| c.0));
+        assert!(close(checks(&o)[0].1, 0.504_88, 1e-4));
+    }
+
+    #[test]
+    fn bolt() {
+        // A_s = π/4 (16 − 1.8764)² = 156.67 mm² (ISO table: 157); F_i = 0.75 × 156.67 × 580 = 68.15 kN; T = 0.2 × 68.15 × 0.016 = 218.1 N·m;
+        // F_b = 68.15 + 0.25 × 30 = 75.65 kN ≤ 90.87 kN.
+        let (o, e) = run("bolt");
+        assert!(close(v(&e, "A_s"), 156.668_14e-6, 1e-6));
+        assert!(close(v(&e, "F_i"), 68_150.64, 1e-6));
+        assert!(close(v(&e, "T"), 218.082_06, 1e-6));
+        assert!(close(v(&e, "sigma_b"), 482.871_9e6, 1e-6));
+        assert!(o.regions.iter().any(|r| r.result == "218.1 N·m"));
+        assert!(checks(&o).iter().all(|c| c.0));
+    }
+
+    #[test]
+    fn motor() {
+        // P_in = 75/0.95 = 78.95 kW; I = 78 947/(√3 × 400 × 0.86) = 132.5 A; S = 91.80 kVA; Q = 46.84 kvar; I_start = 927.5 A.
+        let (o, e) = run("motor");
+        assert!(close(v(&e, "I_FL"), 132.500_83, 1e-6));
+        assert!(close(v(&e, "S"), 91_799.27, 1e-6));
+        assert!(close(v(&e, "Q_r"), 46_844.62, 1e-6));
+        assert!(close(v(&e, "I_start"), 927.505_8, 1e-6));
+        assert!(o.regions.iter().any(|r| r.result == "91.8 kVA") && o.regions.iter().any(|r| r.result == "46.84 kvar"));
+        assert!(checks(&o)[0].0 && close(checks(&o)[0].1, 0.828_13, 1e-4));
+    }
+}

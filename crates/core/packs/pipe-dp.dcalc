@@ -1,0 +1,205 @@
+{
+ "format": 1,
+ "name": "Pipe pressure drop (Darcy–Weisbach)",
+ "title": {
+  "project": "",
+  "number": "PACK-03",
+  "title": "Pipe pressure drop (Darcy–Weisbach)",
+  "by": "",
+  "checked": "",
+  "date": "",
+  "rev": "A",
+  "company": "",
+  "client": "",
+  "logo": ""
+ },
+ "page": {
+  "paper": "A4",
+  "margins": [
+   15.0,
+   15.0,
+   15.0,
+   20.0
+  ]
+ },
+ "units": "SI",
+ "digits": 4,
+ "regions": [
+  {
+   "id": 1,
+   "kind": "text",
+   "text": "Pipe pressure drop (Darcy–Weisbach, Colebrook)",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 2,
+   "kind": "text",
+   "text": "Turbulent flow of water in a commercial steel pipe. The Colebrook equation is solved for the Darcy friction factor; fittings are added as a total loss coefficient K.",
+   "unit": "",
+   "style": "note",
+   "data": null
+  },
+  {
+   "id": 3,
+   "kind": "text",
+   "text": "Inputs",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 4,
+   "kind": "math",
+   "text": "Q = 120 m^3/h  # flow",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 5,
+   "kind": "math",
+   "text": "D = 154.1 mm  # inside diameter (6 in schedule 40)",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 6,
+   "kind": "math",
+   "text": "L = 250 m  # straight length",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 7,
+   "kind": "math",
+   "text": "eps = 0.045 mm  # roughness of commercial steel",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 8,
+   "kind": "math",
+   "text": "rho = 998 kg/m^3  # water at 20 °C",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 9,
+   "kind": "math",
+   "text": "mu = 1 cP  # viscosity of water at 20 °C",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 10,
+   "kind": "math",
+   "text": "K = 8.5  # sum of fitting loss coefficients",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 11,
+   "kind": "math",
+   "text": "v_max = 3 m/s  # velocity limit for this service",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 12,
+   "kind": "text",
+   "text": "Results",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 13,
+   "kind": "math",
+   "text": "A = pi*D^2/4",
+   "unit": "mm^2",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 14,
+   "kind": "math",
+   "text": "v = Q/A  # mean velocity",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 15,
+   "kind": "math",
+   "text": "Re = rho*v*D/mu  # Reynolds number",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 16,
+   "kind": "solve",
+   "text": "solve 1/sqrt(f) = -2*log(eps/(3.7*D) + 2.51/(Re*sqrt(f))) for f in 0.005 .. 0.1",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 17,
+   "kind": "math",
+   "text": "dp = (f*L/D + K)*rho*v^2/2  # pressure drop",
+   "unit": "kPa",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 18,
+   "kind": "math",
+   "text": "h_L = dp/(rho*g)  # head loss",
+   "unit": "m",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 19,
+   "kind": "check",
+   "text": "check v <= v_max",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 20,
+   "kind": "text",
+   "text": "Ref: C. F. Colebrook, J. Inst. Civil Eng. 11 (1939) 133–156: the friction factor equation.",
+   "unit": "",
+   "style": "ref",
+   "data": null
+  },
+  {
+   "id": 21,
+   "kind": "text",
+   "text": "Ref: F. M. White, Fluid Mechanics, 8th ed., §6.6–6.9: Darcy–Weisbach, roughness of commercial steel, minor losses.",
+   "unit": "",
+   "style": "ref",
+   "data": null
+  }
+ ],
+ "next_id": 22,
+ "ui": {
+  "pack": {
+   "id": "pipe-dp",
+   "field": "Process",
+   "desc": "Friction factor from the Colebrook equation (solved), pressure drop and head loss in a straight pipe with fittings."
+  }
+ }
+}

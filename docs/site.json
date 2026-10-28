@@ -16,16 +16,20 @@
     { "title": "Print the calc sheet", "text": "Fill in the title block and print or save a PDF with page numbers and references." }
   ],
   "highlights": [
-    "Equations with real units: SI with prefixes and US customary, absolute and difference temperatures, dimension errors caught on the line.",
+    "Equations with real units: about 200 units, SI with prefixes and US customary, absolute and difference temperatures, dimension errors caught on the line.",
     "Readable maths: what is shown is drawn from the same expression the engine computes.",
     "Checks with PASS or FAIL and the utilisation ratio.",
-    "Solve for the value that makes an equation zero within a range, and plot functions such as a pump curve against the system curve.",
+    "Solve for the value that makes an equation zero within a range, plot functions such as a pump curve against the system curve, and tables with units per column.",
     "Ten ready calc packs, each with its reference and a test against a worked example.",
-    "A printable calc sheet with a title block, page numbers and references."
+    "A printable calc sheet with a title block, page numbers and references; inputs and results export as CSV."
   ],
-  "screenshots": [],
+  "screenshots": [
+    "docs/images/pack.png",
+    "docs/images/print.png",
+    "docs/images/units.png"
+  ],
   "roadmap": [
-    { "v": "0.1.3", "title": "Calc packs", "when": "Next", "items": ["Ten ready calc packs: pump power, NPSH, pipe pressure drop, pump operating point, compressor head, heat exchanger LMTD, pressure vessel, beams, bolt torque, motor current", "File › New from pack", "Export inputs and results as CSV"] },
+    { "v": "0.1.4", "title": "Polish after the convention", "when": "Next", "items": ["Fixes from trying every pack on a clean Windows PC", "A Getting Started sheet", "Thousands separators and more number formats"] },
     { "v": "0.2", "title": "Materials and more packs", "when": "Later", "items": ["Material properties from Datum Atlas", "More calc packs", "Equations shown with their numbers substituted", "Symbolic simplify"] },
     { "v": "0.3", "title": "Matrices and ODEs", "when": "Later", "items": ["Matrices and linear systems", "Solve ordinary differential equations", "Tables from CSV"] },
     { "v": "0.4", "title": "Programs and templates", "when": "Later", "items": ["Loops and conditions inside a region", "Sheet templates", "A company title block"] },

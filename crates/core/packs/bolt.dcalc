@@ -1,0 +1,197 @@
+{
+ "format": 1,
+ "name": "Bolt preload and tightening torque",
+ "title": {
+  "project": "",
+  "number": "PACK-09",
+  "title": "Bolt preload and tightening torque",
+  "by": "",
+  "checked": "",
+  "date": "",
+  "rev": "A",
+  "company": "",
+  "client": "",
+  "logo": ""
+ },
+ "page": {
+  "paper": "A4",
+  "margins": [
+   15.0,
+   15.0,
+   15.0,
+   20.0
+  ]
+ },
+ "units": "SI",
+ "digits": 4,
+ "regions": [
+  {
+   "id": 1,
+   "kind": "text",
+   "text": "Bolt preload and tightening torque",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 2,
+   "kind": "text",
+   "text": "ISO metric coarse thread, property class 8.8, dry steel (torque coefficient 0.2). Preload at 75 % of the proof load.",
+   "unit": "",
+   "style": "note",
+   "data": null
+  },
+  {
+   "id": 3,
+   "kind": "text",
+   "text": "Inputs",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 4,
+   "kind": "math",
+   "text": "d = 16 mm  # nominal diameter (M16)",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 5,
+   "kind": "math",
+   "text": "p = 2 mm  # thread pitch (coarse)",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 6,
+   "kind": "math",
+   "text": "S_p = 580 MPa  # proof stress, class 8.8, d ≤ 16 mm",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 7,
+   "kind": "math",
+   "text": "K_t = 0.2  # torque coefficient, dry steel",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 8,
+   "kind": "math",
+   "text": "F_ext = 30 kN  # external tensile load per bolt",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 9,
+   "kind": "math",
+   "text": "C = 0.25  # joint constant (bolt share of the external load)",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 10,
+   "kind": "text",
+   "text": "Results",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 11,
+   "kind": "math",
+   "text": "A_s = pi/4*(d - 0.9382*p)^2  # tensile stress area",
+   "unit": "mm^2",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 12,
+   "kind": "math",
+   "text": "F_proof = A_s*S_p  # proof load",
+   "unit": "kN",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 13,
+   "kind": "math",
+   "text": "F_i = 0.75*F_proof  # preload",
+   "unit": "kN",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 14,
+   "kind": "math",
+   "text": "T = K_t*F_i*d  # tightening torque",
+   "unit": "N*m",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 15,
+   "kind": "math",
+   "text": "F_b = F_i + C*F_ext  # bolt load in service",
+   "unit": "kN",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 16,
+   "kind": "math",
+   "text": "sigma_b = F_b/A_s",
+   "unit": "MPa",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 17,
+   "kind": "check",
+   "text": "check F_b <= F_proof",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 18,
+   "kind": "check",
+   "text": "check (1 - C)*F_ext <= F_i  # the joint does not separate",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 19,
+   "kind": "text",
+   "text": "Ref: R. G. Budynas, J. K. Nisbett, Shigley's Mechanical Engineering Design, 10th ed., §8-7 to §8-9: preload, torque, joint constant.",
+   "unit": "",
+   "style": "ref",
+   "data": null
+  },
+  {
+   "id": 20,
+   "kind": "text",
+   "text": "Ref: ISO 898-1 (proof stress of class 8.8), ISO 724 (stress area A_s = π/4 (d − 0.9382 p)²).",
+   "unit": "",
+   "style": "ref",
+   "data": null
+  }
+ ],
+ "next_id": 21,
+ "ui": {
+  "pack": {
+   "id": "bolt",
+   "field": "Mechanical",
+   "desc": "Stress area, preload, tightening torque and the bolt load under an external tension, with the proof-load and separation checks."
+  }
+ }
+}

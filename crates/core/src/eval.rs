@@ -333,6 +333,8 @@ pub struct RegionOut {
     pub defs: Vec<VarOut>,
     /// Units this result can be shown in (same dimension), for the unit menu.
     pub units: Vec<String>,
+    /// The description after `#` on the line.
+    pub note: String,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -422,13 +424,16 @@ pub fn run(s: &Sheet) -> SheetOut {
     run_with(s, &f)
 }
 
-pub fn run_with(s: &Sheet, f: &Fmt) -> SheetOut {
+pub fn run_with(s: &Sheet, f: &Fmt) -> SheetOut { run_env(s, f).0 }
+
+/// The sheet worked out, with the final symbol table (the packs' tests read values from it).
+pub fn run_env(s: &Sheet, f: &Fmt) -> (SheetOut, Env) {
     let mut env = Env::new();
     // Names defined anywhere, so a name used too early gets a helpful message.
     for r in &s.regions {
         if r.kind == Kind::Table {
             for c in serde_json::from_value::<TableData>(r.data.clone()).unwrap_or_default().cols { if !c.name.trim().is_empty() { env.later.insert(canon(c.name.trim()), false); } }
-        } else if let Some(n) = defined_name(&r.text) { env.later.insert(canon(&n), false); }
+        } else if let Some(n) = defined_name(split_note(&r.text).0) { env.later.insert(canon(&n), false); }
     }
     let mut out = SheetOut::default();
     let mut known: Vec<String> = vec![];
@@ -444,7 +449,7 @@ pub fn run_with(s: &Sheet, f: &Fmt) -> SheetOut {
         }
         out.regions.push(o);
     }
-    out
+    (out, env)
 }
 
 /// The name a line defines (`x = …`, `f(x) = …`, `solve … for x in …`), without parsing it fully.
@@ -461,18 +466,21 @@ fn region(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>) -> Region
     let mut o = RegionOut { id: r.id, ..Default::default() };
     if r.kind == Kind::Table { table(env, r, f, known, &mut o); return o; }
     if !matches!(r.kind, Kind::Math | Kind::Check | Kind::Solve | Kind::Plot) || r.text.trim().is_empty() { return o; }
-    let st = match parse::statement(&r.text, known) {
+    // Text after # describes the line: `Q = 120 m^3/h  # design flow`.
+    let (code, note) = split_note(&r.text);
+    o.note = note.into();
+    let st = match parse::statement(code, known) {
         Ok(s) => s,
         Err(e) => {
             o.error = Some(ErrOut { msg: e.msg, from: e.at.0, to: e.at.1 });
-            o.latex = latex::escape_text(&r.text);
-            if let Some(n) = defined_name(&r.text) { o.name = canon(&n); }
+            o.latex = latex::escape_text(code);
+            if let Some(n) = defined_name(code) { o.name = canon(&n); }
             return o;
         }
     };
     if r.kind == Kind::Check && !matches!(st, Stmt::Check { .. } | Stmt::Empty) {
         o.latex = latex::stmt(&st);
-        o.error = Some(ErrOut { msg: "A check starts with “check”, such as check sigma <= sigma_allow.".into(), from: 0, to: r.text.chars().count() });
+        o.error = Some(ErrOut { msg: "A check starts with “check”, such as check sigma <= sigma_allow.".into(), from: 0, to: code.chars().count() });
         return o;
     }
     o.latex = latex::stmt(&st);
@@ -677,4 +685,9 @@ fn table(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>, o: &mut Re
     }
     if let Some(m) = first_err { o.error = Some(ErrOut { msg: m, from: 0, to: 0 }); }
     o.table = Some(t);
+}
+
+/// The code of a line and its description after `#`.
+pub fn split_note(t: &str) -> (&str, &str) {
+    match t.split_once('#') { Some((c, n)) => (c, n.trim()), None => (t, "") }
 }

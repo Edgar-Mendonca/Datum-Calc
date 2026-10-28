@@ -95,7 +95,7 @@ const setStyle = (s: string) => { const r = sel(); if (r) act({ Set: { id: r.id,
 export const Ribbon = () => (
   <section class="ribbon" ref={fitRibbon}>
     <Show when={tab() === "home"}>
-      <G l="Clipboard" h="clipboard"><B big i="paste" l="Paste" run={() => C.paste()} /><S_><B i="copy" l="Copy" run={C.copy} /><B i="cut" l="Cut" run={() => C.copy().then(C.del)} /></S_></G>
+      <G l="Clipboard" h="clipboard"><B big i="paste" l="Paste" run={() => C.paste()} /><S_><B i="copy" l="Copy" run={C.copy} /><B i="cut" l="Cut" run={() => C.copy().then(C.del)} /><B i="copy" l="Copy Result" run={C.copyResult} /></S_></G>
       <G l="Regions" h="regions"><B big i="math" l="Math" title="New math region (Ctrl+M)" run={() => C.insert("math")} /><B big i="text" l="Text" title="New text region (Ctrl+T)" run={() => C.insert("text")} /><B big i="check" l="Check" run={() => C.insert("check")} /></G>
       <G l="Arrange" h="arrange"><S_><B i="up" l="Move Up" run={() => C.move(true)} /><B i="down" l="Move Down" run={() => C.move(false)} /><B i="del" l="Delete" run={C.del} /></S_></G>
       <G l="Sheet" h="sheetset"><B big i="title" l="Title Block" run={() => D.titleBlock()} /><S_><B i="units" l="SI units" on={out()?.sheet.units === "SI"} run={() => C.units("SI")} /><B i="units" l="US units" on={out()?.sheet.units === "US"} run={() => C.units("US")} /></S_></G>

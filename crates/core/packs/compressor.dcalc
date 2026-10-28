@@ -1,0 +1,221 @@
+{
+ "format": 1,
+ "name": "Compressor polytropic head and power",
+ "title": {
+  "project": "",
+  "number": "PACK-05",
+  "title": "Compressor polytropic head and power",
+  "by": "",
+  "checked": "",
+  "date": "",
+  "rev": "A",
+  "company": "",
+  "client": "",
+  "logo": ""
+ },
+ "page": {
+  "paper": "A4",
+  "margins": [
+   15.0,
+   15.0,
+   15.0,
+   20.0
+  ]
+ },
+ "units": "SI",
+ "digits": 4,
+ "regions": [
+  {
+   "id": 1,
+   "kind": "text",
+   "text": "Compressor polytropic head and power (ideal gas)",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 2,
+   "kind": "text",
+   "text": "Ideal gas (Z = 1) compressed with a polytropic efficiency. (n − 1)/n = (k − 1)/(k η_p); H_p = Z R T1/MW · n/(n − 1) · ((p2/p1)^((n−1)/n) − 1).",
+   "unit": "",
+   "style": "note",
+   "data": null
+  },
+  {
+   "id": 3,
+   "kind": "text",
+   "text": "Inputs",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 4,
+   "kind": "math",
+   "text": "MW = 18.5 kg/kmol  # molar mass of the natural gas",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 5,
+   "kind": "math",
+   "text": "k = 1.27  # ratio of specific heats",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 6,
+   "kind": "math",
+   "text": "Z = 1  # compressibility (ideal gas)",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 7,
+   "kind": "math",
+   "text": "T_1 = 30 °C  # suction temperature",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 8,
+   "kind": "math",
+   "text": "p_1 = 5 bar  # suction pressure (absolute)",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 9,
+   "kind": "math",
+   "text": "p_2 = 15 bar  # discharge pressure (absolute)",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 10,
+   "kind": "math",
+   "text": "m = 2.5 kg/s  # mass flow",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 11,
+   "kind": "math",
+   "text": "eta_p = 0.78  # polytropic efficiency",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 12,
+   "kind": "math",
+   "text": "eta_mech = 0.98  # mechanical efficiency (bearings, seals, gear)",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 13,
+   "kind": "math",
+   "text": "T_max = 150 °C  # discharge temperature limit",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 14,
+   "kind": "math",
+   "text": "P_driver = 650 kW  # driver rating",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 15,
+   "kind": "text",
+   "text": "Results",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 16,
+   "kind": "math",
+   "text": "x = (k - 1)/(k*eta_p)  # polytropic exponent (n − 1)/n",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 17,
+   "kind": "math",
+   "text": "H_p = Z*R*T_1/MW/x*((p_2/p_1)^x - 1)  # polytropic head",
+   "unit": "kJ/kg",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 18,
+   "kind": "math",
+   "text": "T_2 = T_1*(p_2/p_1)^x  # discharge temperature",
+   "unit": "°C",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 19,
+   "kind": "math",
+   "text": "P_gas = m*H_p/eta_p  # gas power",
+   "unit": "kW",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 20,
+   "kind": "math",
+   "text": "P_shaft = P_gas/eta_mech",
+   "unit": "kW",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 21,
+   "kind": "check",
+   "text": "check T_2 <= T_max",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 22,
+   "kind": "check",
+   "text": "check P_shaft <= P_driver",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 23,
+   "kind": "text",
+   "text": "Ref: R. N. Brown, Compressors: Selection and Sizing, 3rd ed., ch. 2: polytropic head and power for an ideal gas.",
+   "unit": "",
+   "style": "ref",
+   "data": null
+  }
+ ],
+ "next_id": 24,
+ "ui": {
+  "pack": {
+   "id": "compressor",
+   "field": "Rotating equipment",
+   "desc": "Polytropic head, discharge temperature and gas and shaft power of a centrifugal compressor on an ideal gas."
+  }
+ }
+}

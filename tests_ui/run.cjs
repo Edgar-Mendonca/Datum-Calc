@@ -33,6 +33,12 @@ const check = (name, ok, info = "") => { console.log(`${ok ? "ok  " : "FAIL"} ${
   const bg = await p.$eval(".bs aside", el => getComputedStyle(el).backgroundColor);
   check("File sidebar is amber", bg === "rgb(168, 101, 15)", bg);
   check("File page offers a blank sheet", (await p.textContent(".tiles")).includes("Blank Sheet"));
+  // 1b. File › New lists the ten calc packs by field; a click opens one (0.1.3).
+  await p.click(".bs aside button:has-text('New')"); await p.waitForTimeout(200);
+  check("New lists the ten calc packs", (await p.$$(".tiles.packs .tile")).length === 10 && (await p.$$eval("h3.packf", h => h.map(x => x.textContent))).join() === "Rotating equipment,Process,Mechanical,Electrical");
+  await p.click(".tiles.packs .tile:has-text('Pump power')"); await p.waitForTimeout(200);
+  check("a pack tile opens that pack", JSON.stringify(await p.evaluate(() => window.__calls.filter(c => c[0] === "new_from_pack").pop())).includes("pump-power"));
+  await p.click(".tabs .file").catch(() => {}); await p.waitForTimeout(100);
   await p.click(".bs aside .back"); await p.waitForTimeout(300);
 
   // 2. The sheet: title block and every region, in order.
@@ -137,6 +143,18 @@ const check = (name, ok, info = "") => { console.log(`${ok ? "ok  " : "FAIL"} ${
   await p.click(".tabs > button:text-is('Math')"); await p.waitForTimeout(150);
   check("Math tab fits at 960 px", (await p.$eval(".ribbon", r => r.scrollWidth - r.clientWidth)) <= 1);
   await p.setViewportSize({ width: 1440, height: 900 });
+
+  // 5b. Right-click a region: Copy Result; Export › CSV holds the inputs, results and checks (0.1.3).
+  await p.evaluate(() => { window.__clip = ""; navigator.clipboard.writeText = async t => { window.__clip = t; }; });
+  await (await R(5)).click({ button: "right" }); await p.waitForTimeout(120);
+  await p.click(".menu button:has-text('Copy Result')"); await p.waitForTimeout(120);
+  check("Copy Result copies the value with its unit", (await p.evaluate(() => window.__clip)) === "19.61 kW", await p.evaluate(() => window.__clip));
+  await p.click(".tabs .file"); await p.waitForTimeout(120);
+  await p.click(".bs aside button:has-text('Export')"); await p.waitForTimeout(150);
+  await p.click(".tile:has-text('Inputs and results')"); await p.waitForTimeout(200);
+  const csv = await p.evaluate(() => window.__calls.filter(c => c[0] === "save_file").pop()?.[1]);
+  check("CSV export lists inputs, results and checks", !!csv && csv.name.endsWith(".csv") && csv.data.startsWith("Name,Value,Unit,Kind") && csv.data.includes("Q,120,m³/h,input") && csv.data.includes("P,19.61,kW,result") && csv.data.includes("PASS"), JSON.stringify(csv).slice(0, 300));
+  await p.click(".bs aside .back"); await p.waitForTimeout(150);
 
   // 6. ? help opens a card.
   await p.click(".tabs > button:text-is('Home')");

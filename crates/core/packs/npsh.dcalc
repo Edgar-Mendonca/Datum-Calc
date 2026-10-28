@@ -1,0 +1,165 @@
+{
+ "format": 1,
+ "name": "NPSH available against NPSH required",
+ "title": {
+  "project": "",
+  "number": "PACK-02",
+  "title": "NPSH available against NPSH required",
+  "by": "",
+  "checked": "",
+  "date": "",
+  "rev": "A",
+  "company": "",
+  "client": "",
+  "logo": ""
+ },
+ "page": {
+  "paper": "A4",
+  "margins": [
+   15.0,
+   15.0,
+   15.0,
+   20.0
+  ]
+ },
+ "units": "SI",
+ "digits": 4,
+ "regions": [
+  {
+   "id": 1,
+   "kind": "text",
+   "text": "NPSH available against NPSH required",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 2,
+   "kind": "text",
+   "text": "Suction from an open tank with the liquid level above the pump centreline. NPSHa = (p_surface − p_vapour)/(ρ g) + static head − suction losses.",
+   "unit": "",
+   "style": "note",
+   "data": null
+  },
+  {
+   "id": 3,
+   "kind": "text",
+   "text": "Inputs",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 4,
+   "kind": "math",
+   "text": "p_atm = 101.325 kPa  # pressure on the liquid surface (open tank, sea level)",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 5,
+   "kind": "math",
+   "text": "p_v = 7.385 kPa  # vapour pressure of water at 40 °C (IAPWS-IF97)",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 6,
+   "kind": "math",
+   "text": "rho = 992.2 kg/m^3  # water at 40 °C",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 7,
+   "kind": "math",
+   "text": "z_s = 2 m  # liquid level above the pump centreline",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 8,
+   "kind": "math",
+   "text": "h_f = 0.8 m  # suction line losses at rated flow",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 9,
+   "kind": "math",
+   "text": "NPSH_r = 4.5 m  # from the pump curve at rated flow",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 10,
+   "kind": "math",
+   "text": "M = 1 m  # margin over NPSHr",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 11,
+   "kind": "text",
+   "text": "Results",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 12,
+   "kind": "math",
+   "text": "h_p = (p_atm - p_v)/(rho*g)  # pressure head above vapour pressure",
+   "unit": "m",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 13,
+   "kind": "math",
+   "text": "NPSH_a = h_p + z_s - h_f",
+   "unit": "m",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 14,
+   "kind": "check",
+   "text": "check NPSH_a >= NPSH_r + M",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 15,
+   "kind": "text",
+   "text": "Ref: I. J. Karassik et al., Pump Handbook, 4th ed., §2.2: net positive suction head.",
+   "unit": "",
+   "style": "ref",
+   "data": null
+  },
+  {
+   "id": 16,
+   "kind": "text",
+   "text": "Ref: IAPWS-IF97 (open standard): vapour pressure of water, 7.385 kPa at 40 °C.",
+   "unit": "",
+   "style": "ref",
+   "data": null
+  }
+ ],
+ "next_id": 17,
+ "ui": {
+  "pack": {
+   "id": "npsh",
+   "field": "Rotating equipment",
+   "desc": "Net positive suction head available from an open tank, checked against the pump's NPSH required with a margin."
+  }
+ }
+}

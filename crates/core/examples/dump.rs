@@ -30,5 +30,5 @@ fn main() {
     d.apply(Op::Insert { at, kind: Kind::Table, text: "Pump curve".into(), data: table }).unwrap();
     d.apply(Op::Insert { at: at + 1, kind: Kind::Image, text: "Free-body diagram".into(), data: serde_json::json!({ "src": png, "width": 40 }) }).unwrap();
     let state = serde_json::json!({ "sheet": d.s, "calc": eval::run(&d.s), "path": null, "dirty": false, "undo": true, "redo": false, "rev": d.rev() });
-    println!("{}", serde_json::json!({ "state": state }));
+    println!("{}", serde_json::json!({ "state": state, "packs": datum_core::packs::cards() }));
 }

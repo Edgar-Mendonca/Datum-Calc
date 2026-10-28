@@ -1,0 +1,213 @@
+{
+ "format": 1,
+ "name": "Heat exchanger duty and LMTD",
+ "title": {
+  "project": "",
+  "number": "PACK-06",
+  "title": "Heat exchanger duty and LMTD",
+  "by": "",
+  "checked": "",
+  "date": "",
+  "rev": "A",
+  "company": "",
+  "client": "",
+  "logo": ""
+ },
+ "page": {
+  "paper": "A4",
+  "margins": [
+   15.0,
+   15.0,
+   15.0,
+   20.0
+  ]
+ },
+ "units": "SI",
+ "digits": 4,
+ "regions": [
+  {
+   "id": 1,
+   "kind": "text",
+   "text": "Heat exchanger duty and LMTD",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 2,
+   "kind": "text",
+   "text": "Counter-current exchanger cooling oil with water. Duty from the hot side; LMTD from the terminal differences; area from Q = U A F LMTD.",
+   "unit": "",
+   "style": "note",
+   "data": null
+  },
+  {
+   "id": 3,
+   "kind": "text",
+   "text": "Inputs",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 4,
+   "kind": "math",
+   "text": "m_h = 3 kg/s  # oil flow",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 5,
+   "kind": "math",
+   "text": "cp_h = 2.2 kJ/(kg*K)  # oil specific heat",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 6,
+   "kind": "math",
+   "text": "T_hi = 120 °C  # oil in",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 7,
+   "kind": "math",
+   "text": "T_ho = 70 °C  # oil out",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 8,
+   "kind": "math",
+   "text": "cp_c = 4.18 kJ/(kg*K)  # water specific heat",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 9,
+   "kind": "math",
+   "text": "T_ci = 25 °C  # water in",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 10,
+   "kind": "math",
+   "text": "T_co = 45 °C  # water out",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 11,
+   "kind": "math",
+   "text": "U = 350 W/(m^2*K)  # overall heat transfer coefficient (fouled)",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 12,
+   "kind": "math",
+   "text": "F = 1  # LMTD correction (true counter-current)",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 13,
+   "kind": "math",
+   "text": "A_avail = 20 m^2  # area of the selected exchanger",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 14,
+   "kind": "text",
+   "text": "Results",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 15,
+   "kind": "math",
+   "text": "Q = m_h*cp_h*(T_hi - T_ho)  # duty",
+   "unit": "kW",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 16,
+   "kind": "math",
+   "text": "m_c = Q/(cp_c*(T_co - T_ci))  # cooling water flow",
+   "unit": "kg/s",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 17,
+   "kind": "math",
+   "text": "dT_1 = T_hi - T_co  # hot end",
+   "unit": "K",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 18,
+   "kind": "math",
+   "text": "dT_2 = T_ho - T_ci  # cold end",
+   "unit": "K",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 19,
+   "kind": "math",
+   "text": "LMTD = (dT_1 - dT_2)/ln(dT_1/dT_2)",
+   "unit": "K",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 20,
+   "kind": "math",
+   "text": "A_req = Q/(U*F*LMTD)",
+   "unit": "m^2",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 21,
+   "kind": "check",
+   "text": "check A_req <= A_avail",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 22,
+   "kind": "text",
+   "text": "Ref: F. P. Incropera et al., Fundamentals of Heat and Mass Transfer, 7th ed., §11.3: the log mean temperature difference.",
+   "unit": "",
+   "style": "ref",
+   "data": null
+  }
+ ],
+ "next_id": 23,
+ "ui": {
+  "pack": {
+   "id": "hx-lmtd",
+   "field": "Process",
+   "desc": "Duty from the hot side, cooling water flow, log mean temperature difference and the area needed against the area available."
+  }
+ }
+}

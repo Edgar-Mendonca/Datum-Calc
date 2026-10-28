@@ -21,7 +21,7 @@ export interface CheckOut { pass: boolean; ratio: number | null; lhs: string; rh
 export interface PlotOut { xs: number[]; xlabel: string; xunit: string; series: { label: string; ys: number[] }[]; yunit: string }
 export interface RegionOut {
   id: number; latex: string; result_tex: string; result: string; value: string; unit: string; name: string; input: boolean;
-  error: { msg: string; from: number; to: number } | null; warn: string; check: CheckOut | null; plot: PlotOut | null; units: string[];
+  error: { msg: string; from: number; to: number } | null; warn: string; check: CheckOut | null; plot: PlotOut | null; units: string[]; note: string;
   table: TableOut | null; defs: VarOut[];
 }
 export interface VarOut { name: string; tex: string; value: string; unit: string; id: number }
@@ -29,3 +29,4 @@ export interface SheetOut { regions: RegionOut[]; vars: VarOut[]; checks: number
 export interface Lists { units: [string, string, string, string][]; constants: [string, string][]; functions: [string, string][] }
 export interface TableOut { cols: { name: string; tex: string; unit: string; formula: string; cells: string[]; error: string }[]; rows: number }
 export interface TableData { cols: { name: string; unit: string; formula: string }[]; rows: string[][] }
+export interface PackCard { id: string; name: string; field: string; desc: string; checks: number; regions: number }

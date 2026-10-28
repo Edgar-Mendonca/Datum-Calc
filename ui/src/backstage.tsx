@@ -2,7 +2,7 @@
 import { For, Show, createSignal, createResource, onMount, JSX } from "solid-js";
 import { PrintPage, PAPERS } from "./print";
 import { RoadmapPage } from "./roadmap";
-import { Options, Out } from "./api";
+import { Options, Out, PackCard } from "./api";
 import { backstage, setBackstage, call, loadOut, out, setOut, opts, setOpts, toast, setThemeRaw, applyTheme } from "./store";
 import { C } from "./cmds";
 import * as D from "./dialogs";
@@ -32,6 +32,22 @@ const md = (s: string) => s.split("\n").map(l => {
   return l.startsWith("## ") ? `<h3>${e.slice(3)}</h3>` : l.startsWith("- ") ? `<li>${e.slice(2)}</li>` : e.trim() ? `<p>${e}</p>` : "";
 }).join("");
 
+/** File › New: a blank sheet or one of the calc packs, grouped by field. */
+const NewPage = () => {
+  const [packs] = createResource(() => call<PackCard[]>("packs"));
+  const fields = () => [...new Set((packs() ?? []).map(p => p.field))];
+  return (
+    <div><h1>New</h1>
+      <div class="tiles"><button class="tile" onClick={C.newSheet}><div class="pic"><svg class="ic"><use href="#i-new" /></svg></div><b>Blank Sheet</b><span>An empty calc sheet with your title block.</span></button></div>
+      <h2>Calc packs</h2>
+      <p class="muted">Ready sheets with the inputs at the top (highlighted), the results and checks below and the references at the end. Change the inputs to your case. Each pack is checked against a hand calculation in Datum Calc's tests.</p>
+      <For each={fields()}>{f => <><h3 class="packf">{f}</h3><div class="tiles packs">
+        <For each={(packs() ?? []).filter(p => p.field === f)}>{p => <button class="tile" onClick={() => C.pack(p.id)}><div class="pic"><svg class="ic"><use href="#i-math" /></svg><small>{p.checks} check{p.checks > 1 ? "s" : ""}</small></div><b>{p.name}</b><span>{p.desc}</span></button>}</For>
+      </div></>}</For>
+    </div>
+  );
+};
+
 const Home = () => {
   const [recent] = createResource(() => call<{ path: string; name: string; modified: string }[]>("recent"));
   return (
@@ -40,6 +56,7 @@ const Home = () => {
         <h1>Good {new Date().getHours() < 12 ? "morning" : new Date().getHours() < 18 ? "afternoon" : "evening"}</h1>
         <div class="tiles">
           <button class="tile" onClick={C.newSheet}><div class="pic"><svg class="ic"><use href="#i-new" /></svg></div><b>Blank Sheet</b><span>An empty calc sheet with your title block.</span></button>
+          <button class="tile" onClick={() => setBackstage("new")}><div class="pic"><svg class="ic"><use href="#i-math" /></svg><small>10 packs</small></div><b>New from Pack</b><span>Ready, referenced calc sheets: pumps, pipes, compressors, vessels, beams, bolts, motors.</span></button>
           <button class="tile" onClick={C.open}><div class="pic"><svg class="ic"><use href="#i-open" /></svg></div><b>Open</b><span>A Datum Calc sheet (.dcalc) on this computer.</span></button>
           <button class="tile" onClick={() => D.gettingStarted()}><div class="pic"><svg class="ic"><use href="#i-report" /></svg></div><b>Getting Started</b><span>Write the equations, check the results, print the calc sheet.</span></button>
           <button class="tile" onClick={() => setBackstage("roadmap")}><div class="pic"><svg class="ic"><use href="#i-list" /></svg></div><b>Roadmap</b><span>Everything Datum Calc will do, and when.</span></button>
@@ -81,6 +98,7 @@ const Export = () => (
   <div><h1>Export</h1>
     <div class="tiles">
       <button class="tile" onClick={() => setBackstage("print")}><div class="pic"><svg class="ic"><use href="#i-print" /></svg></div><b>PDF</b><span>Print the calc sheet and choose “Save as PDF” as the printer.</span></button>
+      <button class="tile" onClick={() => C.csv()}><div class="pic"><svg class="ic"><use href="#i-table" /></svg><small>.csv</small></div><b>Inputs and results (CSV)</b><span>Every named value with its unit, and every check: opens in any spreadsheet.</span></button>
       <button class="tile" onClick={async () => { await navigator.clipboard?.writeText(asText()).catch(() => {}); toast("The sheet was copied as text.", true); }}><div class="pic"><svg class="ic"><use href="#i-copy" /></svg></div><b>Copy as text</b><span>Every region as a line of text, to paste anywhere.</span></button>
       <button class="tile" onClick={async () => { const p = await call<string | null>("save_file", { name: `${out()!.sheet.name}.txt`, data: asText() }); if (p) toast(`Saved ${p}`, true); }}><div class="pic"><svg class="ic"><use href="#i-export" /></svg><small>.txt</small></div><b>Text file</b><span>The same text, saved as a file.</span></button>
     </div>
@@ -130,7 +148,7 @@ export const Backstage = () => (
       <button class="back" onClick={() => out() && setBackstage(null)} title="Back">←</button>
       <For each={[["home", "home", "Home"], ["new", "new", "New"], ["open", "open", "Open"], ["save", "save", "Save"], ["saveas", "save", "Save As"], ["export", "export", "Export"], ["print", "print", "Print"], ["roadmap", "list", "Roadmap"]]}>{([k, i, l]) =>
         <button classList={{ on: backstage() === k }} onClick={() => {
-          if (k === "open") C.open(); else if (k === "save") C.save(); else if (k === "saveas") C.save(true); else if (k === "new") C.newSheet();
+          if (k === "open") C.open(); else if (k === "save") C.save(); else if (k === "saveas") C.save(true);
           else setBackstage(k);
         }}><Icon n={i} size={22} />{l}</button>}</For>
       <span class="grow" />
@@ -139,6 +157,7 @@ export const Backstage = () => (
     </aside>
     <section class="bsmain">
       <Show when={backstage() === "home"}><Home /></Show>
+      <Show when={backstage() === "new"}><NewPage /></Show>
       <Show when={backstage() === "export"}><Export /></Show>
       <Show when={backstage() === "options"}><OptionsPage /></Show>
       <Show when={backstage() === "print"}><PrintPage /></Show>

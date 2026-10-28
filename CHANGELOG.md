@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.1.3 — 2026-10-28
+
+Ten ready calc packs, notes on every line, copying results and CSV export: the convention build.
+
+**Calc packs** (File › New from pack)
+- Rotating equipment: pump power, efficiency and motor size; NPSH available against NPSH required; pump curve against system curve (the operating point, plotted and solved); compressor polytropic head and power.
+- Process: pipe pressure drop (Darcy–Weisbach with the Colebrook friction factor solved); heat exchanger duty and LMTD.
+- Mechanical: thin-walled pressure vessel (hoop and longitudinal stress, required thickness); beams (simply supported and cantilever deflection and bending stress); bolt preload and tightening torque.
+- Electrical: motor full-load current, apparent and reactive power, starting current.
+- Each pack has its inputs at the top (highlighted), results and checks below, and its textbook or standard at the end. Each is checked against a hand calculation in Datum Calc's tests.
+
+**Notes on a line**
+- Text after `#` describes the line and shows beside it: `Q = 120 m^3/h  # rated flow`.
+
+**Exchange**
+- Right-click a region: Copy Result (`19.61 kW`, to paste into a spreadsheet or a report), Copy as LaTeX, Mark as Input, Move, Delete.
+- File › Export › Inputs and results (CSV): every named value with its unit and whether it is an input or a result, and every check with PASS or FAIL and its utilisation.
+
 ## 0.1.2 — 2026-10-28
 
 Tables, pictures and the list of every unit; a fix for gravity after a unit.

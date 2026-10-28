@@ -1,0 +1,181 @@
+{
+ "format": 1,
+ "name": "Electric motor: current and power factor",
+ "title": {
+  "project": "",
+  "number": "PACK-10",
+  "title": "Electric motor: current and power factor",
+  "by": "",
+  "checked": "",
+  "date": "",
+  "rev": "A",
+  "company": "",
+  "client": "",
+  "logo": ""
+ },
+ "page": {
+  "paper": "A4",
+  "margins": [
+   15.0,
+   15.0,
+   15.0,
+   20.0
+  ]
+ },
+ "units": "SI",
+ "digits": 4,
+ "regions": [
+  {
+   "id": 1,
+   "kind": "text",
+   "text": "Electric motor: current, power factor and starting current",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 2,
+   "kind": "text",
+   "text": "Three-phase induction motor on a 400 V supply. I = P_in/(√3 V cos φ); starting current as a multiple of full-load current.",
+   "unit": "",
+   "style": "note",
+   "data": null
+  },
+  {
+   "id": 3,
+   "kind": "text",
+   "text": "Inputs",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 4,
+   "kind": "math",
+   "text": "P_out = 75 kW  # rated output",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 5,
+   "kind": "math",
+   "text": "V_L = 400 V  # line voltage",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 6,
+   "kind": "math",
+   "text": "eta = 0.95  # efficiency at full load",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 7,
+   "kind": "math",
+   "text": "PF = 0.86  # power factor at full load",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 8,
+   "kind": "math",
+   "text": "LRC = 7  # locked-rotor current / full-load current",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 9,
+   "kind": "math",
+   "text": "I_cable = 160 A  # cable current rating as installed",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 10,
+   "kind": "text",
+   "text": "Results",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 11,
+   "kind": "math",
+   "text": "P_in = P_out/eta  # electrical input",
+   "unit": "kW",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 12,
+   "kind": "math",
+   "text": "I_FL = P_in/(sqrt(3)*V_L*PF)  # full-load current",
+   "unit": "A",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 13,
+   "kind": "math",
+   "text": "S = P_in/PF  # apparent power",
+   "unit": "kVA",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 14,
+   "kind": "math",
+   "text": "Q_r = sqrt(S^2 - P_in^2)  # reactive power",
+   "unit": "kvar",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 15,
+   "kind": "math",
+   "text": "I_start = LRC*I_FL  # starting current",
+   "unit": "A",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 16,
+   "kind": "check",
+   "text": "check I_FL <= I_cable",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 17,
+   "kind": "text",
+   "text": "Ref: S. J. Chapman, Electric Machinery Fundamentals, 5th ed., ch. 6: induction motor power and current.",
+   "unit": "",
+   "style": "ref",
+   "data": null
+  },
+  {
+   "id": 18,
+   "kind": "text",
+   "text": "Ref: IEC 60034-1: rating and performance of rotating electrical machines.",
+   "unit": "",
+   "style": "ref",
+   "data": null
+  }
+ ],
+ "next_id": 19,
+ "ui": {
+  "pack": {
+   "id": "motor",
+   "field": "Electrical",
+   "desc": "Full-load current, apparent and reactive power and starting current of a three-phase induction motor, checked against the cable rating."
+  }
+ }
+}

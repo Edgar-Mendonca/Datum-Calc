@@ -1,6 +1,7 @@
 //! Datum Calc core: everything except the window. No UI or OS code lives here.
 pub mod eval;
 pub mod latex;
+pub mod packs;
 pub mod parse;
 pub mod sheet;
 pub mod solve;

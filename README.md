@@ -22,7 +22,7 @@
 
 </div>
 
-<img src="docs/images/sheet.png" alt="Datum Calc: a calc sheet with its title block" width="100%">
+<img src="docs/images/pack.png" alt="Datum Calc: a pump curve against the system curve, with the operating point solved and checked" width="100%">
 
 ## What it does
 
@@ -32,17 +32,27 @@ Datum Calc is a desktop app for engineering calculation sheets. You write the ca
 2. **Check the results.** Every answer carries its unit, and `check sigma <= sigma_allow` shows PASS or FAIL with the utilisation ratio.
 3. **Print the calc sheet.** Fill in the title block (project, calc number, by, checked, date, revision) and save a PDF.
 
+**Ten calc packs** start you off (File › New from pack), each with its inputs at the top, its results and checks below and its references at the end, and each checked against a hand calculation in the tests:
+
+| Rotating equipment | Process | Mechanical | Electrical |
+| --- | --- | --- | --- |
+| Pump power, efficiency and motor size · NPSH available against required · Pump curve against system curve (operating point) · Compressor polytropic head and power | Pipe pressure drop (Darcy–Weisbach, Colebrook) · Heat exchanger duty and LMTD | Thin-walled pressure vessel · Beams: deflection and bending stress · Bolt preload and tightening torque | Electric motor: current, power factor and starting current |
+
+<table><tr>
+<td width="50%"><img src="docs/images/print.png" alt="The printed calc sheet with its title block"><br><sub>The printed calc sheet: title block, maths, results, PASS/FAIL checks, page numbers.</sub></td>
+<td width="50%"><img src="docs/images/units.png" alt="Equations with units and the Variables panel"><br><sub>Inputs with units and descriptions; every name, value and unit in the Variables panel.</sub></td>
+</tr></table>
+
 It is for mechanical, process, structural and electrical engineers, students and lecturers: everyone who writes calculations. It is part of the [Datum family](https://edgar-mendonca.github.io/Datum/) of free, open-source desktop tools for engineers and scientists; its page on the family site is [edgar-mendonca.github.io/Datum/apps/calc](https://edgar-mendonca.github.io/Datum/apps/calc).
 
 ## Where it is going
 
 | Version | What |
 | --- | --- |
-| 0.1.0 | The window, the calc sheet with its title block, saving and opening, printing, the updater |
-| 0.1.1 | The engine: units, equations, results and checks worked out; maths shown as you would write it |
-| 0.1.2 | Solve, plot and table regions; print to PDF |
-| 0.1.3 | Ten ready calc packs (pumps, pipes, compressors, heat exchangers, vessels, beams, bolts, motors) |
-| 0.2 – 1.0 | Materials from Datum Atlas, matrices and ODEs, templates, a validation report |
+| 0.1.0 – 0.1.3 ✅ | The calc sheet and its printing; units, equations, checks, solve and plot; tables and pictures; ten calc packs |
+| 0.1.4 | Fixes from trying every pack on a clean Windows PC; a Getting Started sheet |
+| 0.2 | Materials from Datum Atlas, more packs, equations shown with their numbers substituted |
+| 0.3 – 1.0 | Matrices and ODEs, templates, a validation report, a signed installer |
 
 File › Roadmap in the app shows the full list; it comes from [`docs/site.json`](docs/site.json).
 

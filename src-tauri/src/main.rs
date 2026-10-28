@@ -118,6 +118,20 @@ fn new_sheet(st: State<St>) -> Out {
     out(&a)
 }
 
+/// The calc packs for File › New from pack.
+#[tauri::command]
+fn packs() -> Vec<datum_core::packs::Card> { datum_core::packs::cards() }
+
+#[tauri::command]
+fn new_from_pack(st: State<St>, id: String) -> R<Out> {
+    let s = datum_core::packs::sheet(&id).ok_or("That calc pack is not in this version.")?;
+    let mut a = st.lock();
+    let mut s = fresh(&a, s);
+    s.units = "SI".into();
+    a.doc = Doc::new(s);
+    Ok(out(&a))
+}
+
 fn pick(app: &AppHandle, name: &str, exts: &[&str]) -> Option<PathBuf> {
     app.dialog().file().add_filter(name, exts).blocking_pick_file().and_then(|f| f.into_path().ok())
 }
@@ -366,7 +380,7 @@ fn main() {
             }
         })
         .invoke_handler(tauri::generate_handler![
-            state, apply, history, new_sheet, open, save, save_file, pick_image,
+            state, apply, history, new_sheet, packs, new_from_pack, open, save, save_file, pick_image,
             lists, options, set_options, autosave, recovery, recover, recent, startup_file, version, open_url, quit, check_update, install_update
         ])
         .run(tauri::generate_context!())

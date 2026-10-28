@@ -5,7 +5,7 @@
 | | |
 | --- | --- |
 | **Product** | Datum Calc: engineering calculation sheets with real units, readable maths, checks (PASS/FAIL with utilisation) and a printable calc sheet with a title block |
-| **Current version** | **0.1.2** (released 2026-10-28). Earlier: 0.1.0, 0.1.1 |
+| **Current version** | **0.1.3** (released 2026-10-28, the convention build). Earlier: 0.1.0, 0.1.1, 0.1.2 |
 | **Repo** | `Edgar-Mendonca/Datum-Calc` · working branch `claude/festive-fermi-ir7jyi` (the first branch pushed, so also the default branch) |
 | **Stack** | Rust (engine `crates/core` + shell `src-tauri`), Tauri 2, WebView2, SolidJS + Vite UI in strict TypeScript (TSX), plain CSS with light/dark tokens, IBM Plex fonts; KaTeX for maths from 0.1.1; Chart.js for plots from 0.1.2. No Python |
 | **Code size** | About 4,000 lines at 0.1.1: core 2,000 (with 600 lines of tests), shell 350, UI 1,600 TSX + CSS |
@@ -46,7 +46,9 @@ crates/core/src/parse.rs       lexer and Pratt parser: assignments, user functio
 crates/core/src/eval.rs        values (SI + dimension + abs temperature + vector), operators with dimension rules, built-in functions and constants, the sheet top to bottom (RegionOut: LaTeX, result, unit choices, check, plot, error), Variables, number formatting
 crates/core/src/latex.rs       expression tree → LaTeX (fractions, roots, subscripts, Greek, units in roman)
 crates/core/src/solve.rs       Brent's method after a 200-step scan for a sign change
-crates/core/src/tests.rs       every unit factor vs NIST, temperatures, dimension errors, display, formatting, parser, functions, vectors, checks, solve (Colebrook), plot, LaTeX, a whole pump sheet
+crates/core/src/packs.rs       the ten calc packs (include_str! of crates/core/packs/*.dcalc), cards for File › New
+crates/core/packs/*.dcalc      the packs themselves (open and edit them in the app; `ui.pack` holds id, field, description)
+crates/core/src/tests.rs       every unit factor vs NIST, temperatures, dimension errors, display, formatting, parser, functions, vectors, checks, solve (Colebrook), plot, LaTeX, a whole pump sheet; `tests::packs`: every pack against its hand calculation
 crates/core/src/hardening.rs   FAMILY §11: failed edits change nothing, random edits keep invariants and undo restores, damaged files, speed gate
 crates/core/examples/dump.rs   the UI test fixture (a small pump sheet as `state` returns it)
 src-tauri/src/main.rs          commands: state, apply, history, new_sheet, open, save, save_file, pick_image, options, set_options, autosave, recovery, recover, recent, startup_file, version, open_url, quit, check_update, install_update
@@ -113,6 +115,10 @@ tests_ui/run.cjs               Playwright UI tests against ui/dist with a mocked
 | 0.1.2 | A table is columns (name, unit, optional formula) over rows of typed cells; each column becomes a vector; formula columns are evaluated with the columns to their left | Pump curves and data-sheet values are tables; vectors plug into interp, sum, max and plots |
 | 0.1.2 | The table editor keeps its edits local and saves them as one change when it closes | Every save re-renders the sheet; typing from cell to cell must not lose focus, and undo should undo the whole edit |
 | 0.1.2 | After a unit, `*` and `/` never read the constants (g, e, R, c_0), a function's parameters or a `for` variable as units | 0.1.1 read `kg/m^3*g` as grams (found when checking the table formula in the real app) |
+| 0.1.3 | Packs are plain .dcalc files embedded with include_str!, each with a test comparing its results with hand values worked out independently (in the test comments) before running | The brief: every pack is a test; the files stay editable in the app |
+| 0.1.3 | Text after `#` on a line is its description (shown beside it, printed) | A calc sheet describes its inputs; packs needed it |
+| 0.1.3 | Pack units are set per region where the automatic choice would mislead (kN·m for moments, N·m for torque, kVA/kvar) | Energy and torque share a dimension; apparent power shares watts |
+| 0.1.3 | Pack references cite textbooks and standards (White, Karassik, Colebrook, Brown, Incropera, Roark, Gere, Shigley, Chapman; IAPWS-IF97, ASME VIII-1 UG-27, ISO 898-1/724, IEC 60034-1) | The brief: each pack cites its textbook or open standard |
 | 0.1.1 | `release.yml` ran once on a push trigger to register it (tag pushes are blocked from the session); later releases use workflow_dispatch | A workflow needs one run before GitHub lists it |
 
 ## 3. Roadmap
@@ -128,8 +134,8 @@ tests_ui/run.cjs               Playwright UI tests against ui/dist with a mocked
 | 0.1.1 | Engine: units (about 200, NIST factors), parser, evaluator, LaTeX, solve (Brent), plot sampling; 23 test functions with about 450 assertions | ✅ |
 | 0.1.1 | Worksheet: KaTeX maths, results with units and a unit menu, checks (PASS/FAIL, utilisation), solve and plot regions, Variables panel, errors on the line | ✅ |
 | 0.1.2 | Table region (with formula columns), picture region (insert, paste, size), units/constants/functions list, print of tables and pictures | ✅ |
-| 0.1.3 | The 10 calc packs with their tests; File › New from pack; CSV export; screenshots; README; site.json | 🔜 |
-| 0.1.4 | Fixes from trying every pack; a Getting Started sheet; polish | ⬜ |
+| 0.1.3 | The 10 calc packs with their tests; File › New from pack; notes after #; Copy Result, Copy as LaTeX; CSV export; screenshots; README; site.json | ✅ |
+| 0.1.4 | Fixes from trying every pack on a clean Windows PC; a Getting Started sheet; polish | 🔜 |
 | 0.2 | Materials from Datum Atlas, more packs, unit menus on results, symbolic simplify | ⬜ |
 | 0.3 | Matrices and linear systems, ODE solve, tables from CSV | ⬜ |
 | 0.4 | Programs inside a region, templates, a company title block | ⬜ |
@@ -145,7 +151,7 @@ tests_ui/run.cjs               Playwright UI tests against ui/dist with a mocked
 - Released 0.1.0 (the release workflow had to run once on a push trigger to be registered; tag pushes are blocked from the session).
 
 ### 2026-10-28: Session 1, continued (0.1.1, the engine)
-- Engine: `units.rs` (about 200 units, NIST factors, absolute temperatures, display ladders), `parse.rs` (Pratt parser, units after numbers, statements), `eval.rs` (dimensions, functions, constants, vectors, checks, solve, plot, Variables), `latex.rs`, `solve.rs` (Brent). Tests: every unit factor, temperatures, dimension errors, display, LaTeX, Colebrook by solve, a whole pump sheet; fuzz and speed hardening tests.
+- Engine: `units.rs` (about 200 units, NIST factors, absolute temperatures, display ladders), `parse.rs` (Pratt parser, units after numbers, statements), `eval.rs` (dimensions, functions, constants, vectors, checks, solve, plot, Variables), `latex.rs`, `solve.rs` (Brent). Tests: every unit factor, temperatures, dimension errors, display, LaTeX, Colebrook by solve, a whole pump sheet; `tests::packs`: every pack against its hand calculation; fuzz and speed hardening tests.
 - Window: KaTeX maths with results, a unit menu on every result, PASS/FAIL badges with utilisation, errors with the wrong part underlined, Chart.js plots, the Variables panel, counts in the status bar; printed sheets show the same.
 - Checked in the real app with a full pump sheet (results, check, a dimension error, plot and the solved operating point 115.5 m³/h = √(40/0.003), worked by hand).
 - Checks: clippy clean, 23 engine tests, 50 UI tests.
@@ -157,6 +163,13 @@ tests_ui/run.cjs               Playwright UI tests against ui/dist with a mocked
 - Checked in the real app: a pump curve table (editing a cell, Enter down, Done) and its formula column in kW; the print preview over two pages.
 - Checks: clippy clean, 24 engine tests, 63 UI tests.
 - Released 0.1.2.
+
+### 2026-10-28: Session 1, continued (0.1.3, the convention build)
+- Ten calc packs with hand values worked out first (independent Python evaluation of the same formulas) and a test each: all ten matched on the first run.
+- Notes after # on a line; File › New with the packs grouped by field; right-click menu (Copy Result, Copy as LaTeX, Mark as Input); CSV export of inputs, results and checks.
+- Screenshots (1440×900) of a pack, the printed sheet and the units in the real app; README and site.json updated.
+- Checks: clippy clean, 36 engine tests (11 for the packs), 67 UI tests, cargo deny.
+- Released 0.1.3.
 
 ## 5. Known limits and next steps
 

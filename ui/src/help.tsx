@@ -40,6 +40,8 @@ export const HELP: Record<string, Topic> = {
     how: ["Click ▾ after a result to show it in another unit (hp instead of kW, psi instead of MPa).", "Automatic goes back to the unit Datum Calc chooses."] },
   theme: { t: "Theme", what: "Light, dark, or Auto (follows Windows). Printed sheets are always black on white." },
   // Pages and panels
+  packs: { t: "Calc packs", what: "Ready, referenced calc sheets: pumps, NPSH, pipe pressure drop, the pump operating point, compressors, heat exchangers, pressure vessels, beams, bolts and motors.",
+    how: ["File › New › pick a pack.", "Change the highlighted inputs at the top to your case; everything below follows.", "Each pack is checked against a hand calculation in Datum Calc's own tests."] },
   page: { t: "The calc sheet", what: "The page as it will print. Regions are worked out from top to bottom.",
     how: ["Click a region to select it; double-click (or Enter) to edit its text; Esc or a click outside finishes.", "Insert adds a region below the selected one."] },
   titleblock: { t: "Title block", what: "The block at the top of every printed page: project, calc number, title, prepared by, checked by, date and revision, plus your company and its logo.",

@@ -51,6 +51,7 @@ export const MathView = (p: { r: Region; paper?: boolean }) => {
         <Show when={!p.paper && o().units.length && !o().check}>
           <button class="unitbtn" title="Show the result in another unit" onMouseDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); unitMenu(e, p.r, o()); }}>{p.r.unit ? "unit ▾" : "▾"}</button>
         </Show>
+        <Show when={o().note}><span class="note">{o().note}</span></Show>
         <Show when={o().check}>{c => <span class="checkout"><Badge pass={c().pass} /><Show when={c().ratio !== null}><span class="ratio">utilisation <b>{c().ratio!.toFixed(2)}</b></span></Show></span>}</Show>
       </div>
       <Show when={o().check}>{c => <div class="checkvals">{c().lhs} {({ "<=": "≤", ">=": "≥", "!=": "≠", "==": "=" } as Record<string, string>)[c().op] ?? c().op} {c().rhs}</div>}</Show>

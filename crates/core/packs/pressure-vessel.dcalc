@@ -1,0 +1,197 @@
+{
+ "format": 1,
+ "name": "Thin-walled pressure vessel",
+ "title": {
+  "project": "",
+  "number": "PACK-07",
+  "title": "Thin-walled pressure vessel",
+  "by": "",
+  "checked": "",
+  "date": "",
+  "rev": "A",
+  "company": "",
+  "client": "",
+  "logo": ""
+ },
+ "page": {
+  "paper": "A4",
+  "margins": [
+   15.0,
+   15.0,
+   15.0,
+   20.0
+  ]
+ },
+ "units": "SI",
+ "digits": 4,
+ "regions": [
+  {
+   "id": 1,
+   "kind": "text",
+   "text": "Thin-walled pressure vessel: stresses and required thickness",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 2,
+   "kind": "text",
+   "text": "Cylindrical shell under internal pressure. Membrane stresses σ_h = P D/(2t) and σ_l = P D/(4t) on the corroded thickness; required thickness t = P R/(S E − 0.6 P) + c (circumferential stress).",
+   "unit": "",
+   "style": "note",
+   "data": null
+  },
+  {
+   "id": 3,
+   "kind": "text",
+   "text": "Inputs",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 4,
+   "kind": "math",
+   "text": "P = 1.5 MPa  # design pressure",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 5,
+   "kind": "math",
+   "text": "D_i = 1200 mm  # inside diameter",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 6,
+   "kind": "math",
+   "text": "t = 12 mm  # nominal shell thickness",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 7,
+   "kind": "math",
+   "text": "c = 1.5 mm  # corrosion allowance",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 8,
+   "kind": "math",
+   "text": "S = 138 MPa  # allowable stress at design temperature",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 9,
+   "kind": "math",
+   "text": "E_j = 0.85  # joint efficiency (spot radiography)",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 10,
+   "kind": "text",
+   "text": "Results",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 11,
+   "kind": "math",
+   "text": "t_c = t - c  # corroded thickness",
+   "unit": "mm",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 12,
+   "kind": "math",
+   "text": "R_i = D_i/2",
+   "unit": "mm",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 13,
+   "kind": "math",
+   "text": "sigma_h = P*D_i/(2*t_c)  # hoop stress",
+   "unit": "MPa",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 14,
+   "kind": "math",
+   "text": "sigma_l = P*D_i/(4*t_c)  # longitudinal stress",
+   "unit": "MPa",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 15,
+   "kind": "math",
+   "text": "t_req = P*R_i/(S*E_j - 0.6*P) + c  # required thickness",
+   "unit": "mm",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 16,
+   "kind": "check",
+   "text": "check t_req <= t",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 17,
+   "kind": "check",
+   "text": "check sigma_h <= S*E_j",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 18,
+   "kind": "check",
+   "text": "check t_c <= R_i/10  # thin-wall assumption",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 19,
+   "kind": "text",
+   "text": "Ref: W. C. Young, R. G. Budynas, Roark's Formulas for Stress and Strain, 8th ed., Table 13.1 case 1: thin-walled cylinders.",
+   "unit": "",
+   "style": "ref",
+   "data": null
+  },
+  {
+   "id": 20,
+   "kind": "text",
+   "text": "Ref: ASME Boiler and Pressure Vessel Code, Section VIII Division 1, UG-27(c)(1): thickness for circumferential stress.",
+   "unit": "",
+   "style": "ref",
+   "data": null
+  }
+ ],
+ "next_id": 21,
+ "ui": {
+  "pack": {
+   "id": "pressure-vessel",
+   "field": "Mechanical",
+   "desc": "Hoop and longitudinal stress in a cylindrical shell, and the required thickness with corrosion allowance."
+  }
+ }
+}

@@ -1,0 +1,181 @@
+{
+ "format": 1,
+ "name": "Pump power, efficiency and motor size",
+ "title": {
+  "project": "",
+  "number": "PACK-01",
+  "title": "Pump power, efficiency and motor size",
+  "by": "",
+  "checked": "",
+  "date": "",
+  "rev": "A",
+  "company": "",
+  "client": "",
+  "logo": ""
+ },
+ "page": {
+  "paper": "A4",
+  "margins": [
+   15.0,
+   15.0,
+   15.0,
+   20.0
+  ]
+ },
+ "units": "SI",
+ "digits": 4,
+ "regions": [
+  {
+   "id": 1,
+   "kind": "text",
+   "text": "Pump power, efficiency and motor size",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 2,
+   "kind": "text",
+   "text": "Hydraulic power from flow and head; shaft power from the pump efficiency; electrical input from the motor efficiency; the motor must cover the shaft power with a service margin.",
+   "unit": "",
+   "style": "note",
+   "data": null
+  },
+  {
+   "id": 3,
+   "kind": "text",
+   "text": "Inputs",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 4,
+   "kind": "math",
+   "text": "Q = 120 m^3/h  # rated flow",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 5,
+   "kind": "math",
+   "text": "H = 45 m  # total differential head",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 6,
+   "kind": "math",
+   "text": "rho = 998 kg/m^3  # water at 20 °C",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 7,
+   "kind": "math",
+   "text": "eta_p = 0.75  # pump efficiency at the rated point",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 8,
+   "kind": "math",
+   "text": "eta_m = 0.93  # motor efficiency",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 9,
+   "kind": "math",
+   "text": "SF = 1.15  # sizing margin over the rated shaft power",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 10,
+   "kind": "math",
+   "text": "P_motor = 30 kW  # selected motor rating",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 11,
+   "kind": "text",
+   "text": "Results",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 12,
+   "kind": "math",
+   "text": "P_h = rho*g*Q*H  # hydraulic power",
+   "unit": "kW",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 13,
+   "kind": "math",
+   "text": "P_shaft = P_h/eta_p  # shaft power",
+   "unit": "kW",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 14,
+   "kind": "math",
+   "text": "P_in = P_shaft/eta_m  # electrical input",
+   "unit": "kW",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 15,
+   "kind": "math",
+   "text": "P_req = SF*P_shaft  # motor power required",
+   "unit": "kW",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 16,
+   "kind": "check",
+   "text": "check P_req <= P_motor",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 17,
+   "kind": "text",
+   "text": "Ref: F. M. White, Fluid Mechanics, 8th ed., §11.2: hydraulic power P = ρ g Q H; brake power P/η.",
+   "unit": "",
+   "style": "ref",
+   "data": null
+  },
+  {
+   "id": 18,
+   "kind": "text",
+   "text": "Ref: I. J. Karassik et al., Pump Handbook, 4th ed., ch. 2: driver sizing margins over the rated power.",
+   "unit": "",
+   "style": "ref",
+   "data": null
+  }
+ ],
+ "next_id": 19,
+ "ui": {
+  "pack": {
+   "id": "pump-power",
+   "field": "Rotating equipment",
+   "desc": "Hydraulic, shaft and electrical power of a centrifugal pump, and the motor size with a margin."
+  }
+ }
+}

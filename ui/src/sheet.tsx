@@ -2,7 +2,7 @@
 // Click selects a region; double-click or Enter edits it; Esc or a click outside finishes.
 import { For, Index, Show, createEffect, createSignal, onMount } from "solid-js";
 import { Region, TableData } from "./api";
-import { act, call, out, S, selId, setSelId, editId, setEditId, zoom } from "./store";
+import { act, call, out, S, selId, setSelId, editId, setEditId, zoom, openMenu } from "./store";
 import { C, setField } from "./cmds";
 import * as D from "./dialogs";
 import { Help } from "./help";
@@ -97,7 +97,14 @@ const RegionView = (p: { r: Region }) => {
   return (
     <div class={`region k-${p.r.kind}`} classList={{ sel: selId() === p.r.id, editing: editing(), [`s-${p.r.style}`]: !!p.r.style }} data-id={p.r.id}
       onMouseDown={e => { if (!editing()) { e.preventDefault(); setSelId(p.r.id); (document.querySelector(".cpage") as HTMLElement | null)?.focus(); } }}
-      onDblClick={() => { setSelId(p.r.id); setEditId(p.r.id); }}>
+      onDblClick={() => { setSelId(p.r.id); setEditId(p.r.id); }}
+      onContextMenu={e => { if (editing()) return; setSelId(p.r.id); openMenu(e, [
+        { label: "Edit", keys: "Enter", run: () => setEditId(p.r.id) }, "-",
+        { label: "Copy Result", run: C.copyResult, off: !outs().get(p.r.id)?.value && !outs().get(p.r.id)?.check }, { label: "Copy as LaTeX", run: C.copyLatex, off: !outs().get(p.r.id)?.latex }, { label: "Copy Text", keys: "Ctrl+C", run: C.copy }, "-",
+        { label: "Insert Math Below", run: () => C.insert("math") }, { label: "Insert Text Below", run: () => C.insert("text") }, "-",
+        { label: "Mark as Input", on: p.r.style === "input", run: () => act({ Set: { id: p.r.id, field: "style", value: p.r.style === "input" ? "" : "input" } }) },
+        { label: "Move Up", keys: "Alt+↑", run: () => C.move(true) }, { label: "Move Down", keys: "Alt+↓", run: () => C.move(false) }, { label: "Delete", keys: "Delete", icon: "del", run: C.del },
+      ]); }}>
       <span class="rtag">{KIND[p.r.kind]}</span>
       <Show when={editing()} fallback={
         p.r.kind === "image" ? <ImageView r={p.r} />

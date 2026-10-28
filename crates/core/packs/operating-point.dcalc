@@ -1,0 +1,224 @@
+{
+ "format": 1,
+ "name": "Pump curve against system curve",
+ "title": {
+  "project": "",
+  "number": "PACK-04",
+  "title": "Pump curve against system curve",
+  "by": "",
+  "checked": "",
+  "date": "",
+  "rev": "A",
+  "company": "",
+  "client": "",
+  "logo": ""
+ },
+ "page": {
+  "paper": "A4",
+  "margins": [
+   15.0,
+   15.0,
+   15.0,
+   20.0
+  ]
+ },
+ "units": "SI",
+ "digits": 4,
+ "regions": [
+  {
+   "id": 1,
+   "kind": "text",
+   "text": "Pump curve against system curve: the operating point",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 2,
+   "kind": "text",
+   "text": "The pump curve comes from points read off the data sheet (straight lines between them). The system curve is the static head plus friction rising with the square of the flow. They meet at the operating point.",
+   "unit": "",
+   "style": "note",
+   "data": null
+  },
+  {
+   "id": 3,
+   "kind": "text",
+   "text": "Inputs",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 4,
+   "kind": "table",
+   "text": "Pump curve (data sheet points)",
+   "unit": "",
+   "style": "",
+   "data": {
+    "cols": [
+     {
+      "name": "Q_c",
+      "unit": "m^3/h",
+      "formula": ""
+     },
+     {
+      "name": "H_c",
+      "unit": "m",
+      "formula": ""
+     }
+    ],
+    "rows": [
+     [
+      "0",
+      "62"
+     ],
+     [
+      "40",
+      "60"
+     ],
+     [
+      "80",
+      "55"
+     ],
+     [
+      "120",
+      "46"
+     ],
+     [
+      "160",
+      "33"
+     ]
+    ]
+   }
+  },
+  {
+   "id": 5,
+   "kind": "math",
+   "text": "H_st = 20 m  # static head (levels and pressures)",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 6,
+   "kind": "math",
+   "text": "k_s = 0.0012 m/(m^3/h)^2  # friction coefficient of the system",
+   "unit": "m/(m^3/h)^2",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 7,
+   "kind": "math",
+   "text": "rho = 998 kg/m^3",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 8,
+   "kind": "math",
+   "text": "eta = 0.72  # pump efficiency near the operating point",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 9,
+   "kind": "math",
+   "text": "Q_design = 100 m^3/h  # flow the process needs",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 10,
+   "kind": "text",
+   "text": "Curves",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 11,
+   "kind": "math",
+   "text": "H_pump(q) = interp(q, Q_c, H_c)",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 12,
+   "kind": "math",
+   "text": "H_sys(q) = H_st + k_s*q^2",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 13,
+   "kind": "plot",
+   "text": "plot H_pump(q), H_sys(q) for q in 0 m^3/h .. 160 m^3/h",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 14,
+   "kind": "text",
+   "text": "Operating point",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 15,
+   "kind": "solve",
+   "text": "solve H_pump(Q_op) = H_sys(Q_op) for Q_op in 1 m^3/h .. 160 m^3/h",
+   "unit": "m^3/h",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 16,
+   "kind": "math",
+   "text": "H_op = H_sys(Q_op)",
+   "unit": "m",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 17,
+   "kind": "math",
+   "text": "P_op = rho*g*Q_op*H_op/eta  # shaft power at the operating point",
+   "unit": "kW",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 18,
+   "kind": "check",
+   "text": "check Q_op >= Q_design",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 19,
+   "kind": "text",
+   "text": "Ref: I. J. Karassik et al., Pump Handbook, 4th ed., §2.3: pump and system curves, the operating point.",
+   "unit": "",
+   "style": "ref",
+   "data": null
+  }
+ ],
+ "next_id": 20,
+ "ui": {
+  "pack": {
+   "id": "operating-point",
+   "field": "Rotating equipment",
+   "desc": "The pump's operating point where its curve (from data sheet points) meets the system curve: plot and solve."
+  }
+ }
+}

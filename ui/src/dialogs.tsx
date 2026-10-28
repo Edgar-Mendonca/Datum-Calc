@@ -29,9 +29,12 @@ export const gettingStarted = () => openDialog(() => (
       <dl><dt>1. Write the equations</dt><dd>Insert a math region (Ctrl+M) and type an equation with its units, such as <code>Q = 120 m^3/h</code>. Each line can use the names defined above it: <code>P = rho*g*Q*H/eta</code>.</dd>
         <dt>2. Check the results</dt><dd>Insert a check such as <code>check sigma &lt;= sigma_allow</code>. It shows PASS or FAIL and how much of the limit is used.</dd>
         <dt>3. Print the calc sheet</dt><dd>Fill in the title block (Home › Title Block) and press Ctrl+P. Choose Save as PDF to make a PDF to hand in.</dd></dl>
+      <h4>Start from a calc pack</h4>
+      <dl><dt>File › New from pack</dt><dd>Ten ready sheets for pumps, pipes, compressors, heat exchangers, pressure vessels, beams, bolts and motors. Change the highlighted inputs at the top; the results and checks follow.</dd></dl>
       <h4>Typing maths</h4>
       <dl><dt>Names</dt><dd>Greek letters by name (<code>sigma</code>, <code>rho</code>, <code>eta</code>); a subscript after an underscore (<code>sigma_allow</code>).</dd>
         <dt>Operators</dt><dd><code>+ - * / ^</code> and brackets; <code>sqrt(x)</code>, <code>sin(30 deg)</code>, <code>ln</code>, <code>exp</code>, <code>min</code>, <code>max</code>, <code>abs</code>, <code>if(a &gt; b, x, y)</code>.</dd>
+        <dt>Notes</dt><dd>Text after # describes the line: <code>Q = 120 m^3/h  # rated flow</code>.</dd>
         <dt>Units</dt><dd>Put the unit after the number: <code>2.5 kN*m</code>, <code>9.81 m/s^2</code>, <code>20 °C</code>. Results keep their units; mixing metres and seconds is an error shown on that line.</dd></dl>
       <h4>Finding things</h4>
       <dl><dt>Tell me (Ctrl+K)</dt><dd>Type what you want to do, such as “print”, “check”, “units”.</dd><dt>The ? beside each tool</dt><dd>Says what the tool is for and how to use it.</dd></dl>
