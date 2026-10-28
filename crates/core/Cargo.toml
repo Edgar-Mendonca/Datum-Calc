@@ -1,6 +1,6 @@
 [package]
 name = "datum-core"
-version = "0.1.3"
+version = "0.1.4"
 license = "MIT"
 edition = "2021"
 description = "Datum Calc engine: units, expressions, evaluation, solving, LaTeX and the calc sheet document."

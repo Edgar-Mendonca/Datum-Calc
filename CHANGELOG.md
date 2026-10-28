@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.1.4 — 2026-10-28
+
+A Getting Started sheet, inputs that keep their units, clearer numbers, and calc packs that convert to US units.
+
+**Getting started**
+- File › Home › Getting Started (and Help › Getting Started) opens a short sheet that shows how Datum Calc works by example: inputs with units, equations and results, temperatures, a check, a function with solve and plot, and a table. Change any line and watch the rest follow.
+
+**Results**
+- An input keeps the unit you typed it in: `I = 8356 cm^4` shows 8356 cm⁴, not 83.56×10⁶ mm⁴. In a sheet set to US units, metric inputs are shown in US units (and the other way round).
+- Large numbers keep only their significant figures and are grouped in threes: a Reynolds number shows as 274 900.
+
+**Calc packs**
+- In a sheet set to US units, every pack result converts (psi, ksi, in, ft, gpm, hp, °F). Moments stay in kN·m, torque in N·m and apparent and reactive power in kVA and kvar, because those units cannot be told apart from energy and power automatically.
+
 ## 0.1.3 — 2026-10-28
 
 Ten ready calc packs, notes on every line, copying results and CSV export: the convention build.

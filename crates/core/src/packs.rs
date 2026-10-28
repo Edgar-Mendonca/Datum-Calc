@@ -22,8 +22,11 @@ pub static PACKS: [Pack; 10] = [
 #[derive(Serialize)]
 pub struct Card { pub id: &'static str, pub name: String, pub field: String, pub desc: String, pub checks: usize, pub regions: usize }
 
+/// The Getting Started sheet (Help › Getting Started, File › Home): it teaches the app by example.
+pub static GETTING_STARTED: Pack = Pack { id: "getting-started", json: include_str!("../packs/getting-started.dcalc") };
+
 pub fn sheet(id: &str) -> Option<Sheet> {
-    PACKS.iter().find(|p| p.id == id).and_then(|p| Sheet::from_json(p.json).ok())
+    PACKS.iter().chain(std::iter::once(&GETTING_STARTED)).find(|p| p.id == id).and_then(|p| Sheet::from_json(p.json).ok())
 }
 
 pub fn cards() -> Vec<Card> {

@@ -5,7 +5,7 @@
 | | |
 | --- | --- |
 | **Product** | Datum Calc: engineering calculation sheets with real units, readable maths, checks (PASS/FAIL with utilisation) and a printable calc sheet with a title block |
-| **Current version** | **0.1.3** (released 2026-10-28, the convention build). Earlier: 0.1.0, 0.1.1, 0.1.2 |
+| **Current version** | **0.1.4** (released 2026-10-28). Earlier: 0.1.0, 0.1.1, 0.1.2, 0.1.3 (the convention build) |
 | **Repo** | `Edgar-Mendonca/Datum-Calc` · working branch `claude/festive-fermi-ir7jyi` (the first branch pushed, so also the default branch) |
 | **Stack** | Rust (engine `crates/core` + shell `src-tauri`), Tauri 2, WebView2, SolidJS + Vite UI in strict TypeScript (TSX), plain CSS with light/dark tokens, IBM Plex fonts; KaTeX for maths from 0.1.1; Chart.js for plots from 0.1.2. No Python |
 | **Code size** | About 4,000 lines at 0.1.1: core 2,000 (with 600 lines of tests), shell 350, UI 1,600 TSX + CSS |
@@ -47,6 +47,8 @@ crates/core/src/eval.rs        values (SI + dimension + abs temperature + vector
 crates/core/src/latex.rs       expression tree → LaTeX (fractions, roots, subscripts, Greek, units in roman)
 crates/core/src/solve.rs       Brent's method after a 200-step scan for a sign change
 crates/core/src/packs.rs       the ten calc packs (include_str! of crates/core/packs/*.dcalc), cards for File › New
+crates/core/packs/getting-started.dcalc  the Getting Started sheet (packs::GETTING_STARTED, opened from File › Home and Help)
+crates/core/examples/packs.rs  prints every pack worked out in SI and US units, for checking by eye
 crates/core/packs/*.dcalc      the packs themselves (open and edit them in the app; `ui.pack` holds id, field, description)
 crates/core/src/tests.rs       every unit factor vs NIST, temperatures, dimension errors, display, formatting, parser, functions, vectors, checks, solve (Colebrook), plot, LaTeX, a whole pump sheet; `tests::packs`: every pack against its hand calculation
 crates/core/src/hardening.rs   FAMILY §11: failed edits change nothing, random edits keep invariants and undo restores, damaged files, speed gate
@@ -119,6 +121,9 @@ tests_ui/run.cjs               Playwright UI tests against ui/dist with a mocked
 | 0.1.3 | Text after `#` on a line is its description (shown beside it, printed) | A calc sheet describes its inputs; packs needed it |
 | 0.1.3 | Pack units are set per region where the automatic choice would mislead (kN·m for moments, N·m for torque, kVA/kvar) | Energy and torque share a dimension; apparent power shares watts |
 | 0.1.3 | Pack references cite textbooks and standards (White, Karassik, Colebrook, Brown, Incropera, Roark, Gere, Shigley, Chapman; IAPWS-IF97, ASME VIII-1 UG-27, ISO 898-1/724, IEC 60034-1) | The brief: each pack cites its textbook or open standard |
+| 0.1.4 | An input literal shows in its typed unit when that unit belongs to the sheet's system (or to both); otherwise the ladder converts it | 8356 cm⁴ must not read 83.56×10⁶ mm⁴; a US sheet should still show US units |
+| 0.1.4 | Numbers ≥ 10⁴ are rounded to the significant figures and grouped with thin spaces | 274863 showed six figures with digits = 4 |
+| 0.1.4 | Getting Started is a sheet (like a pack), not only a dialog | People learn by changing a working example |
 | 0.1.1 | `release.yml` ran once on a push trigger to register it (tag pushes are blocked from the session); later releases use workflow_dispatch | A workflow needs one run before GitHub lists it |
 
 ## 3. Roadmap
@@ -135,7 +140,8 @@ tests_ui/run.cjs               Playwright UI tests against ui/dist with a mocked
 | 0.1.1 | Worksheet: KaTeX maths, results with units and a unit menu, checks (PASS/FAIL, utilisation), solve and plot regions, Variables panel, errors on the line | ✅ |
 | 0.1.2 | Table region (with formula columns), picture region (insert, paste, size), units/constants/functions list, print of tables and pictures | ✅ |
 | 0.1.3 | The 10 calc packs with their tests; File › New from pack; notes after #; Copy Result, Copy as LaTeX; CSV export; screenshots; README; site.json | ✅ |
-| 0.1.4 | Fixes from trying every pack on a clean Windows PC; a Getting Started sheet; polish | 🔜 |
+| 0.1.4 | Getting Started sheet; inputs keep their units; grouped numbers; packs convert in US units | ✅ |
+| 0.1.5 | Fixes from trying every pack on a clean Windows PC and from the convention | 🔜 |
 | 0.2 | Materials from Datum Atlas, more packs, unit menus on results, symbolic simplify | ⬜ |
 | 0.3 | Matrices and linear systems, ODE solve, tables from CSV | ⬜ |
 | 0.4 | Programs inside a region, templates, a company title block | ⬜ |
@@ -170,6 +176,13 @@ tests_ui/run.cjs               Playwright UI tests against ui/dist with a mocked
 - Screenshots (1440×900) of a pack, the printed sheet and the units in the real app; README and site.json updated.
 - Checks: clippy clean, 36 engine tests (11 for the packs), 67 UI tests, cargo deny.
 - Released 0.1.3.
+
+### 2026-10-28: Session 1, continued (0.1.4)
+- The user asked to stop after 0.1.3 and assess, then to build 0.1.4 first.
+- Went through every pack in SI and US units (`--example packs`): inputs now keep their typed units, large numbers are rounded and grouped, packs pin units only for moments, torque, kVA and kvar.
+- The Getting Started sheet (with its own test) opened from File › Home and Help.
+- Checked in the real app: the sheet opens and works out with no errors; the updater found 0.1.3 as the latest release.
+- Released 0.1.4. Not tested: a clean Windows PC, the real Save as PDF dialog, an update from one release to the next on Windows.
 
 ## 5. Known limits and next steps
 

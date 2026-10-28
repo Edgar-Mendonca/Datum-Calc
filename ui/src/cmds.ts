@@ -95,6 +95,6 @@ export const ALL_CMDS: [string, () => void, string?][] = [
   ["Save", () => C.save(), "Ctrl+S"], ["Save as", () => C.save(true)], ["Open", C.open, "Ctrl+O"], ["New sheet", C.newSheet, "Ctrl+N"], ["Print / PDF", C.print, "Ctrl+P"],
   ["Title block", () => D.titleBlock()], ["SI units", () => C.units("SI")], ["US units", () => C.units("US")],
   ["Zoom in", C.zoomIn], ["Zoom out", C.zoomOut], ["Options", C.options], ["Check for updates", () => C.file("about")], ["Roadmap", () => C.file("roadmap")],
-  ["Keyboard shortcuts", () => D.shortcuts(), "F1"], ["Getting started", () => D.gettingStarted()], ["Glossary", () => D.glossary()],
+  ["Keyboard shortcuts", () => D.shortcuts(), "F1"], ["Getting started sheet", () => C.pack("getting-started")], ["Getting started summary", () => D.gettingStarted()], ["Glossary", () => D.glossary()],
   ["GitHub page", () => C.github()], ["Report an issue", () => C.github("/issues/new")],
 ];

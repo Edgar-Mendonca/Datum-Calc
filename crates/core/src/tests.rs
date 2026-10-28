@@ -491,6 +491,17 @@ mod packs {
     }
 
     #[test]
+    fn getting_started_works_out_with_no_errors() {
+        // The sheet that teaches the app must itself be right: M = 12 × 6²/8 = 54 kN·m; Wallis's cubic root 2.0946.
+        let (o, e) = run("getting-started");
+        assert!(close(v(&e, "M"), 54_000.0, 1e-9));
+        assert!(close(v(&e, "r"), 2.094_551_48, 1e-7));
+        assert!(close(v(&e, "H_75"), 37.5, 1e-9));
+        assert_eq!(o.regions.iter().find(|r| r.name == "dT").unwrap().result, "15 K");
+        assert!(checks(&o)[0].0);
+    }
+
+    #[test]
     fn pump_power() {
         // P_h = 998 × 9.80665 × (120/3600) × 45 = 14 680.6 W; /0.75 = 19 574.1 W; /0.93 = 21 047.4 W; ×1.15 = 22 510.2 W.
         let (o, e) = run("pump-power");
