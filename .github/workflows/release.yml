@@ -5,6 +5,9 @@ name: Release
 on:
   push:
     tags: ["v*"]
+    # One-off: registers this workflow on a new repository (removed after the first run).
+    branches: ["claude/festive-fermi-ir7jyi"]
+    paths: [".github/workflows/release.yml"]
   workflow_dispatch:
 
 permissions:
