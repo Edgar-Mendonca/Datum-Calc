@@ -18,8 +18,8 @@ export const HELP: Record<string, Topic> = {
   print: { t: "Print", what: "Print the calc sheet or save it as a PDF, with the title block, page numbers “Page x of y” and the references at the end.",
     how: ["Print / PDF (Ctrl+P) shows the pages first.", "In the print window choose your printer, or Save as PDF."] },
   // Insert tab
-  insert: { t: "Insert", what: "Every kind of region: math, text, check, solve and plot. Table and picture regions arrive in the next release.",
-    how: ["Select the region the new one goes below, then click a kind.", "Solve: solve 1/sqrt(f) = -2*log(eps/3.7 + 2.51/(Re*sqrt(f))) for f in 0.005 .. 0.1 finds the f that makes both sides equal in that range.", "Plot: plot H_pump(Q), H_sys(Q) for Q in 0 m^3/h .. 150 m^3/h draws both curves."] },
+  insert: { t: "Insert", what: "Every kind of region: math, text, check, solve, plot, table and picture.",
+    how: ["Select the region the new one goes below, then click a kind.", "Solve: solve 1/sqrt(f) = -2*log(eps/3.7 + 2.51/(Re*sqrt(f))) for f in 0.005 .. 0.1 finds the f that makes both sides equal in that range.", "Plot: plot H_pump(Q), H_sys(Q) for Q in 0 m^3/h .. 150 m^3/h draws both curves.", "Table: a grid with a name and a unit per column; each column becomes a vector. A column with a formula is worked out from the others.", "Picture: a sketch or a photo, such as a free-body diagram. Paste a picture (Ctrl+V) to add it straight away."] },
   // Math tab
   symbols: { t: "Symbols", what: "Greek letters and operators. They type into the region you are editing.",
     how: ["Or type the name: sigma becomes σ, sigma_allow becomes σ with “allow” as a subscript, sqrt(x) becomes a root.", "Powers: x^2. Multiplication: *. Division: /."] },

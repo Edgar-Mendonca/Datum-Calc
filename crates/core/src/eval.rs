@@ -289,6 +289,22 @@ pub struct Series { pub label: String, pub ys: Vec<f64> }
 #[derive(Debug, Clone, Serialize, PartialEq, Default)]
 pub struct PlotOut { pub xs: Vec<f64>, pub xlabel: String, pub xunit: String, pub series: Vec<Series>, pub yunit: String }
 
+/// A table region worked out: each column's heading (LaTeX), unit and cells as shown.
+#[derive(Debug, Clone, Serialize, PartialEq, Default)]
+pub struct TableOut { pub cols: Vec<ColOut>, pub rows: usize }
+
+#[derive(Debug, Clone, Serialize, PartialEq, Default)]
+pub struct ColOut { pub name: String, pub tex: String, pub unit: String, pub formula: String, pub cells: Vec<String>, pub error: String }
+
+/// The data of a table region: columns with a name, a unit and either typed cells or a formula.
+#[derive(Debug, Clone, serde::Deserialize, Default)]
+#[serde(default)]
+pub struct TableData { pub cols: Vec<TableCol>, pub rows: Vec<Vec<String>> }
+
+#[derive(Debug, Clone, serde::Deserialize, Default)]
+#[serde(default)]
+pub struct TableCol { pub name: String, pub unit: String, pub formula: String }
+
 #[derive(Debug, Clone, Serialize, PartialEq, Default)]
 pub struct ErrOut { pub msg: String, pub from: usize, pub to: usize }
 
@@ -312,6 +328,9 @@ pub struct RegionOut {
     pub warn: String,
     pub check: Option<CheckOut>,
     pub plot: Option<PlotOut>,
+    pub table: Option<TableOut>,
+    /// Names a table defines (one per column), for the Variables panel.
+    pub defs: Vec<VarOut>,
     /// Units this result can be shown in (same dimension), for the unit menu.
     pub units: Vec<String>,
 }
@@ -407,7 +426,9 @@ pub fn run_with(s: &Sheet, f: &Fmt) -> SheetOut {
     let mut env = Env::new();
     // Names defined anywhere, so a name used too early gets a helpful message.
     for r in &s.regions {
-        if let Some(n) = defined_name(&r.text) { env.later.insert(canon(&n), false); }
+        if r.kind == Kind::Table {
+            for c in serde_json::from_value::<TableData>(r.data.clone()).unwrap_or_default().cols { if !c.name.trim().is_empty() { env.later.insert(canon(c.name.trim()), false); } }
+        } else if let Some(n) = defined_name(&r.text) { env.later.insert(canon(&n), false); }
     }
     let mut out = SheetOut::default();
     let mut known: Vec<String> = vec![];
@@ -415,6 +436,8 @@ pub fn run_with(s: &Sheet, f: &Fmt) -> SheetOut {
         let o = region(&mut env, r, f, &mut known);
         if let Some(c) = &o.check { out.checks += 1; if !c.pass { out.failed += 1; } }
         if o.error.is_some() { out.errors += 1; if !o.name.is_empty() { env.later.insert(canon(&o.name), true); } }
+        for v in &o.defs { out.vars.retain(|x| x.name != v.name); out.vars.push(v.clone()); }
+        if let Some(t) = &o.table { for c in t.cols.iter().filter(|c| !c.error.is_empty() && !c.name.is_empty()) { env.later.insert(canon(&c.name), true); } }
         if o.error.is_none() && !o.name.is_empty() && !o.value.is_empty() {
             out.vars.retain(|v| v.name != o.name);
             out.vars.push(VarOut { name: o.name.clone(), tex: latex::name(&o.name), value: o.value.clone(), unit: o.unit.clone(), id: r.id });
@@ -436,6 +459,7 @@ fn defined_name(t: &str) -> Option<String> {
 
 fn region(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>) -> RegionOut {
     let mut o = RegionOut { id: r.id, ..Default::default() };
+    if r.kind == Kind::Table { table(env, r, f, known, &mut o); return o; }
     if !matches!(r.kind, Kind::Math | Kind::Check | Kind::Solve | Kind::Plot) || r.text.trim().is_empty() { return o; }
     let st = match parse::statement(&r.text, known) {
         Ok(s) => s,
@@ -591,4 +615,66 @@ fn set_result(o: &mut RegionOut, v: &Val, r: &Region, f: &Fmt) {
     o.value = val;
     o.unit = unit;
     o.units = unit_choices(&v.dim, v.abs);
+}
+
+/// A table: typed columns become vectors (a cell without a unit takes the column's unit); formula
+/// columns are worked out from the columns to their left and from names above, value by value.
+fn table(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>, o: &mut RegionOut) {
+    let d: TableData = serde_json::from_value(r.data.clone()).unwrap_or_default();
+    let n = d.rows.iter().rposition(|row| row.iter().any(|c| !c.trim().is_empty())).map(|i| i + 1).unwrap_or(0);
+    let mut t = TableOut { cols: vec![], rows: n };
+    let mut first_err: Option<String> = None;
+    for (j, c) in d.cols.iter().enumerate() {
+        let name = c.name.trim();
+        let mut co = ColOut { name: name.into(), tex: if name.is_empty() { String::new() } else { latex::name(name) }, unit: String::new(), formula: c.formula.clone(), cells: vec![String::new(); n], error: String::new() };
+        let unit = if c.unit.trim().is_empty() { None } else { match units::parse(c.unit.trim()) { Ok(u) => Some(u), Err(e) => { co.error = e; None } } };
+        let val: Result<Val, String> = if !c.formula.trim().is_empty() {
+            let src = c.formula.trim().trim_start_matches('=');
+            parse::statement(src, known).map_err(|e| e.msg).and_then(|st| match st { Stmt::Show { e } => env.eval(&e).map_err(|e| e.msg), _ => Err("A formula column holds an expression, such as rho*g*Q*H.".into()) })
+                .map(|v| if v.vec || n == 0 { v } else { Val { v: vec![v.x(); n], vec: true, ..v } })
+        } else {
+            let mut vals = Vec::with_capacity(n);
+            let mut dim: Option<units::Dim> = None;
+            let mut res = Ok(());
+            let mut abs = false;
+            for (i, row) in d.rows.iter().take(n).enumerate() {
+                let cell = row.get(j).map(|x| x.trim()).unwrap_or("");
+                if cell.is_empty() { vals.push(f64::NAN); continue; }
+                let v = match parse::statement(cell, known) { Ok(Stmt::Show { e }) => env.eval(&e).map_err(|e| e.msg), Ok(_) => Err("a cell holds a value".into()), Err(e) => Err(e.msg) };
+                let v = match (v, &unit) {
+                    (Ok(v), Some(u)) if units::is_none(&v.dim) && !units::is_none(&u.dim) => Ok(Val { v: vec![v.x() * u.factor + u.offset], dim: u.dim, abs: u.offset != 0.0, vec: false, logic: false }),
+                    (v, _) => v,
+                };
+                match v {
+                    Ok(v) if v.vec => { res = Err(format!("Row {}: a cell holds one value.", i + 1)); break; }
+                    Ok(v) => {
+                        if let Some(d0) = &dim { if !units::same(d0, &v.dim) { res = Err(format!("Row {}: {} does not match the rest of the column.", i + 1, dim_name(&v.dim))); break; } } else { dim = Some(v.dim); abs = v.abs; }
+                        vals.push(v.x());
+                    }
+                    Err(m) => { res = Err(format!("Row {}: {m}", i + 1)); break; }
+                }
+            }
+            res.map(|_| Val { v: vals, dim: dim.or(unit.as_ref().map(|u| u.dim)).unwrap_or(units::NONE), abs, vec: true, logic: false })
+        };
+        match val {
+            Ok(v) => {
+                if v.v.len() != n && n > 0 { co.error = format!("{} values for {} rows.", v.v.len(), n); }
+                let big = v.v.iter().copied().filter(|x| x.is_finite()).fold(0.0f64, |m, x| m.max(x.abs()));
+                let (k, off, label) = units::display(big, &v.dim, v.abs, &c.unit, f.us);
+                co.unit = label;
+                co.cells = (0..n).map(|i| v.v.get(i).filter(|x| x.is_finite()).map(|x| fmt_num((x - off) / k, f.digits, f.eng).0).unwrap_or_default()).collect();
+                if !name.is_empty() && co.error.is_empty() {
+                    let (_, _, value, unit) = show_val(&v, &c.unit, f);
+                    o.defs.push(VarOut { name: canon(name), tex: latex::name(name), value, unit, id: r.id });
+                    env.vars.insert(canon(name), v);
+                    known.push(name.into());
+                }
+            }
+            Err(m) => co.error = m,
+        }
+        if !co.error.is_empty() && first_err.is_none() { first_err = Some(format!("{}: {}", if name.is_empty() { format!("Column {}", j + 1) } else { name.to_string() }, co.error)); }
+        t.cols.push(co);
+    }
+    if let Some(m) = first_err { o.error = Some(ErrOut { msg: m, from: 0, to: 0 }); }
+    o.table = Some(t);
 }

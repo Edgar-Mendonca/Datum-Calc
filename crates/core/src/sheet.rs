@@ -142,7 +142,7 @@ impl Sheet {
 #[derive(Debug, Clone, Deserialize)]
 pub enum Op {
     /// A new region before position `at` (at the end when past it).
-    Insert { at: usize, kind: Kind, text: String },
+    Insert { at: usize, kind: Kind, text: String, #[serde(default)] data: serde_json::Value },
     /// Sets one field of a region: text, unit, style, kind or data (JSON).
     Set { id: u32, field: String, value: serde_json::Value },
     Delete { ids: Vec<u32> },
@@ -158,12 +158,12 @@ pub enum Op {
 
 fn exec(s: &mut Sheet, op: Op) -> Result<(), String> {
     match op {
-        Op::Insert { at, kind, text } => {
+        Op::Insert { at, kind, text, data } => {
             if s.regions.len() >= 5000 { return Err("A sheet holds at most 5,000 regions.".into()); }
             let id = s.next_id;
             s.next_id += 1;
             let at = at.min(s.regions.len());
-            s.regions.insert(at, Region { id, kind, text, ..Default::default() });
+            s.regions.insert(at, Region { id, kind, text, data, ..Default::default() });
         }
         Op::Set { id, field, value } => {
             let i = s.idx(id).ok_or("That region no longer exists.")?;

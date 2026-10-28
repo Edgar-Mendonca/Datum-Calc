@@ -268,6 +268,10 @@ fn units_after_numbers() {
     assert!(close(val(&["t = 4", "x = 2*t"]), 8.0, 1e-12), "a unit must follow the number directly");
     assert!(close(val(&["t = 4", "x = 2 m*t"]), 8.0, 1e-12), "a name on the sheet is not taken as a unit");
     assert!(close(val(&["x = 2 m*t"]), 2000.0, 1e-12), "without a name t is the tonne");
+    assert!(close(val(&["x = 1000 kg/m^3*g"]), 9806.65, 1e-12), "g after a unit is gravity, not grams");
+    assert!(close(val(&["f(t) = 2 m*t", "x = f(3)"]), 6.0, 1e-12), "a parameter is not a unit");
+    assert_eq!(result(&["plot 2 m*t for t in 0 .. 1"]), "", "the plotted variable is not a unit");
+    assert!(run(&["plot 2 m*t for t in 0 .. 1"]).regions[0].plot.as_ref().unwrap().yunit == "m");
     assert!(close(val(&["x = 10 m/s / 2"]), 5.0, 1e-12));
     assert!(close(val(&["v = 3 m/s", "x = 9 m / v"]), 3.0, 1e-12));
     assert!(error(&["x = 2 metres"]).contains("not a unit"));
@@ -405,4 +409,35 @@ fn whole_sheet_pump_power() {
     let f = Fmt { digits: 3, eng: false, us: true };
     let o = eval::run_with(&s, &f);
     assert_eq!(o.regions[5].result, "26.3 hp");
+}
+
+#[test]
+fn tables_define_columns_and_work_out_formulas() {
+    let mut s = sheet(&["rho = 1000 kg/m^3"]);
+    s.regions.push(Region { id: 2, kind: Kind::Table, data: serde_json::json!({
+        "cols": [{ "name": "Q", "unit": "m^3/h" }, { "name": "H", "unit": "m" }, { "name": "P_h", "unit": "kW", "formula": "rho*g*Q*H" }],
+        "rows": [["0", "60"], ["50", "55"], ["100", "40"], ["150", "15 m"], ["", ""]] }), ..Default::default() });
+    s.regions.push(Region { id: 3, kind: Kind::Math, text: "H_at(q) = interp(q, Q, H)".into(), ..Default::default() });
+    s.regions.push(Region { id: 4, kind: Kind::Math, text: "H_75 = H_at(75 m^3/h)".into(), ..Default::default() });
+    let o = eval::run(&s);
+    let t = o.regions[1].table.as_ref().unwrap();
+    assert!(o.regions[1].error.is_none(), "{:?}", o.regions[1].error);
+    assert_eq!(t.rows, 4, "trailing empty rows are left out");
+    assert_eq!(t.cols[0].cells, ["0", "50", "100", "150"]);
+    assert_eq!(t.cols[0].unit, "m³/h");
+    // ρgQH: 1000 × 9.80665 × (100/3600) × 40 = 10 896 W.
+    assert_eq!(t.cols[2].cells[2], "10.9");
+    assert_eq!(t.cols[2].unit, "kW");
+    assert_eq!(o.regions[3].result, "47.5 m", "interpolated halfway between 55 m and 40 m");
+    assert_eq!(o.vars.iter().map(|v| v.name.as_str()).collect::<Vec<_>>(), ["ρ", "Q", "H", "P_h", "H_75"]);
+    // A cell with the wrong kind of unit is an error on that column, not a crash.
+    s.regions[1].data["rows"][1][1] = serde_json::json!("55 s");
+    let o = eval::run(&s);
+    assert!(o.regions[1].error.as_ref().unwrap().msg.starts_with("H: Row 2"), "{:?}", o.regions[1].error);
+    assert!(o.regions[3].error.as_ref().unwrap().msg.contains("error on its own line"));
+    // Damaged table data never panics.
+    for bad in [serde_json::json!(null), serde_json::json!({"cols": 3}), serde_json::json!({"cols": [{"name": "x"}], "rows": [[1, 2]]}), serde_json::json!({"cols": [{"name": "y", "formula": "=("}], "rows": [["1"]]})] {
+        s.regions[1].data = bad;
+        let _ = eval::run(&s);
+    }
 }

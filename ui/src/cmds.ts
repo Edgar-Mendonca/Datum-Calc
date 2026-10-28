@@ -21,10 +21,15 @@ export const typeText = (t: string, back = 0) => {
 };
 
 export const C = {
-  insert: async (kind: Kind, text?: string) => {
+  insert: async (kind: Kind, text?: string, data: unknown = null) => {
     if (!out()) return;
     const at = below();
-    if (await act({ Insert: { at, kind, text: text ?? STARTER[kind] } })) { const r = S().regions[at]; if (r) { setSelId(r.id); setEditId(r.id); } }
+    if (kind === "table" && !data) data = { cols: [{ name: "Q", unit: "m^3/h", formula: "" }, { name: "H", unit: "m", formula: "" }], rows: [["0", ""], ["", ""], ["", ""]] };
+    if (await act({ Insert: { at, kind, text: text ?? STARTER[kind], data } })) { const r = S().regions[at]; if (r) { setSelId(r.id); if (kind !== "image" || !data) setEditId(r.id); } }
+  },
+  picture: async (src?: string) => {
+    src = src ?? await call<string | null>("pick_image") ?? undefined;
+    if (src) C.insert("image", "", { src, width: 60 });
   },
   del: () => { const id = selId(); if (!id) return toast("Select a region first."); const i = S().regions.findIndex(r => r.id === id); act({ Delete: { ids: [id] } }).then(ok => { if (ok) setSelId(S().regions[Math.min(i, S().regions.length - 1)]?.id ?? 0); }); },
   move: (up: boolean) => { const id = selId(); if (id) act({ Move: { ids: [id], up } }); },
@@ -34,8 +39,8 @@ export const C = {
     await navigator.clipboard?.writeText(r.text).catch(() => {});
     toast("Copied.", true);
   },
-  paste: async () => {
-    const t = await navigator.clipboard?.readText().catch(() => "");
+  paste: async (given?: string) => {
+    const t = given ?? await navigator.clipboard?.readText().catch(() => "");
     if (!t) return toast("The clipboard has no text.");
     const lines = t.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
     const at = below();
@@ -58,9 +63,9 @@ export const C = {
 
 /** Every command with a name, for Tell Me and the shortcut list. */
 export const ALL_CMDS: [string, () => void, string?][] = [
-  ["Insert math region", () => C.insert("math"), "Ctrl+M"], ["Insert text region", () => C.insert("text"), "Ctrl+T"], ["Insert check", () => C.insert("check")], ["Insert solve", () => C.insert("solve")], ["Insert plot", () => C.insert("plot")],
+  ["Insert math region", () => C.insert("math"), "Ctrl+M"], ["Insert text region", () => C.insert("text"), "Ctrl+T"], ["Insert check", () => C.insert("check")], ["Insert table", () => C.insert("table")], ["Insert picture", () => C.picture()], ["Units list", () => D.unitsList()], ["Functions and constants", () => D.unitsList("functions")], ["Insert solve", () => C.insert("solve")], ["Insert plot", () => C.insert("plot")],
   ["Delete region", C.del, "Delete"], ["Move region up", () => C.move(true), "Alt+↑"], ["Move region down", () => C.move(false), "Alt+↓"],
-  ["Copy", C.copy, "Ctrl+C"], ["Paste", C.paste, "Ctrl+V"], ["Undo", C.undo, "Ctrl+Z"], ["Redo", C.redo, "Ctrl+Y"],
+  ["Copy", C.copy, "Ctrl+C"], ["Paste", () => C.paste(), "Ctrl+V"], ["Undo", C.undo, "Ctrl+Z"], ["Redo", C.redo, "Ctrl+Y"],
   ["Save", () => C.save(), "Ctrl+S"], ["Save as", () => C.save(true)], ["Open", C.open, "Ctrl+O"], ["New sheet", C.newSheet, "Ctrl+N"], ["Print / PDF", C.print, "Ctrl+P"],
   ["Title block", () => D.titleBlock()], ["SI units", () => C.units("SI")], ["US units", () => C.units("US")],
   ["Zoom in", C.zoomIn], ["Zoom out", C.zoomOut], ["Options", C.options], ["Check for updates", () => C.file("about")], ["Roadmap", () => C.file("roadmap")],

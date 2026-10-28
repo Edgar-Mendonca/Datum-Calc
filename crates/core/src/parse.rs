@@ -257,13 +257,23 @@ impl P<'_> {
 
 fn lhs_is_num(n: &Node) -> bool { matches!(n.e, E::Num(..)) }
 
+/// Names that are never read as a unit after `*` or `/`: the built-in constants (g is gravity, not grams).
+const NOT_UNITS: [&str; 4] = ["g", "e", "R", "c_0"];
+
 /// Parses one region's text. `known` are the names defined above it (they stop unit continuation).
 pub fn statement(s: &str, known: &[String]) -> Result<Stmt, Error> {
     let s2 = s.trim_end();
     let s2 = s2.strip_suffix('=').unwrap_or(s2);
     let t = lex(s2)?;
     if t.is_empty() { return Ok(Stmt::Empty); }
-    let mut p = P { end: s2.chars().count(), t, i: 0, known };
+    // A function's parameters and the variable after "for" are names too, though defined on this line.
+    let mut names: Vec<String> = known.to_vec();
+    names.extend(NOT_UNITS.iter().map(|x| x.to_string()));
+    if let (Some(Tok::Id(_)), Some(Tok::Op("("))) = (t.first().map(|x| &x.0), t.get(1).map(|x| &x.0)) {
+        if is_def(&t) { names.extend(t.iter().skip(2).take_while(|x| x.0 != Tok::Op(")")).filter_map(|x| if let Tok::Id(n) = &x.0 { Some(n.clone()) } else { None })); }
+    }
+    if let Some(k) = t.iter().position(|x| x.0 == Tok::Id("for".into())) { if let Some((Tok::Id(n), _)) = t.get(k + 1) { names.push(n.clone()); } }
+    let mut p = P { end: s2.chars().count(), t, i: 0, known: &names };
     let st = match (&p.t[0].0, p.t.get(1).map(|x| &x.0)) {
         (Tok::Id(w), Some(_)) if w == "check" => { p.i = 1; Stmt::Check { e: p.expr(0)? } }
         (Tok::Id(w), Some(_)) if w == "solve" => {

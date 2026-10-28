@@ -52,6 +52,16 @@ const App = () => {
       listen("close-requested", () => D.confirmClose(() => invoke("quit")));
     } catch (e) { toast(String(e)); }
   });
+  /** Paste outside an editor: a picture becomes a picture region, text becomes regions (one per line). */
+  const paste = (e: ClipboardEvent) => {
+    const typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
+    if (typing || backstage() || editId() || dialogs().length || !out()) return;
+    const img = [...(e.clipboardData?.items ?? [])].find(i => i.type.startsWith("image/"))?.getAsFile();
+    e.preventDefault();
+    if (img) { const fr = new FileReader(); fr.onload = () => C.picture(String(fr.result)); fr.readAsDataURL(img); return; }
+    const t = e.clipboardData?.getData("text/plain");
+    if (t) C.paste(t);
+  };
   const keys = (e: KeyboardEvent) => {
     const ctrl = e.ctrlKey || e.metaKey, k = e.key.toLowerCase();
     if (dialogs().length) return;
@@ -66,12 +76,12 @@ const App = () => {
     else if (ctrl && k === "z" && !typing) { e.preventDefault(); C.undo(); }
     else if (ctrl && k === "y" && !typing) { e.preventDefault(); C.redo(); }
     else if (ctrl && k === "c" && !typing && !backstage() && !editId()) { e.preventDefault(); C.copy(); }
-    else if (ctrl && k === "v" && !typing && !backstage() && !editId()) { e.preventDefault(); C.paste(); }
+
     else if (e.key === "F1") { e.preventDefault(); D.shortcuts(); }
     else if (e.key === "Escape" && backstage() && out()) setBackstage(null);
   };
   return (
-    <div class="app" ref={() => document.addEventListener("keydown", keys)}>
+    <div class="app" ref={() => { document.addEventListener("keydown", keys); document.addEventListener("paste", paste); }}>
       <TitleBar update={update()?.available ? update()!.latest : null} />
       <Ribbon />
       <main class="work">

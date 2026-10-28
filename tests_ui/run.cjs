@@ -37,7 +37,7 @@ const check = (name, ok, info = "") => { console.log(`${ok ? "ok  " : "FAIL"} ${
 
   // 2. The sheet: title block and every region, in order.
   check("title block shows the calc number", (await p.textContent(".tblock")).includes("CALC-001"));
-  check("every region shows", (await p.$$(".region")).length === 11);
+  check("every region shows", (await p.$$(".region")).length === 13);
   check("maths is drawn with KaTeX", (await p.$$(".region .katex")).length >= 9);
   check("the heading shows as text", (await p.textContent(".region.s-heading .rtxt")) === "Pump power and motor size");
   check("inputs are highlighted", (await p.$$(".region.s-input")).length === 4);
@@ -83,11 +83,41 @@ const check = (name, ok, info = "") => { console.log(`${ok ? "ok  " : "FAIL"} ${
   await p.click(".menu button:has-text('hp')"); await p.waitForTimeout(120);
   check("choosing a unit sets the region's unit", (await lastApply()).includes('"field":"unit"') && (await lastApply()).includes('"hp"'), await lastApply());
   const vars = await p.$$eval(".vars tr", rs => rs.map(r => r.textContent));
-  check("the Variables panel lists every name with its value", vars.length === 6 && vars.some(v => v.includes("19.61") && v.includes("kW")), JSON.stringify(vars));
+  check("the Variables panel lists every name with its value", vars.length === 9 && vars.some(v => v.includes("19.61") && v.includes("kW")), JSON.stringify(vars));
   check("the panel counts the checks and errors", (await p.textContent(".vars")).includes("1 of 1 pass") && (await p.textContent(".vars")).includes("1 line with errors"));
   await p.click(".vars tr:nth-child(2)"); await p.waitForTimeout(100);
   check("clicking a variable selects its line", await (await R(2)).evaluate(e => e.classList.contains("sel")));
   check("the status bar counts the checks", (await p.textContent(".status")).includes("1/1 checks pass"));
+
+  // 4c. Tables, pictures, paste and the units list (0.1.2).
+  const tb = await R(10);
+  check("a table shows its headings, units and worked-out column", (await tb.$$("thead .katex")).length === 3 && (await tb.textContent()).includes("(kW)") && (await tb.$$eval("tbody tr:nth-child(3) td", t => t.map(x => x.textContent))).join("|") === "100|40|10.9");
+  await tb.dblclick(); await p.waitForTimeout(150);
+  check("double-click opens the table editor", !!(await p.$(".teditor")));
+  const c = await p.$('.teditor input[data-r="1"][data-c="1"]'); await c.fill("57"); await p.keyboard.press("Enter"); await p.waitForTimeout(80);
+  check("Enter moves down a row in the table", await p.evaluate(() => document.activeElement?.dataset.r === "2"));
+  await p.keyboard.press("Enter"); await p.waitForTimeout(80);
+  check("Enter on the last row adds a row", (await p.$$(".teditor tbody tr")).length === 4);
+  await p.click(".teditor .btn.pri"); await p.waitForTimeout(150);
+  const ta = await lastApply();
+  check("Done saves the table as one change", ta.includes('"Batch"') && ta.includes('"57"') && ta.includes('"field":"data"'), ta);
+  check("a picture shows with its caption", !!(await (await R(11)).$("img")) && (await (await R(11)).textContent()).includes("Free-body diagram"));
+  await (await R(11)).click(); await p.waitForTimeout(80);
+  await p.click(".ctxgrp button"); await p.waitForTimeout(80);
+  await p.click(".ribbon button:has-text('75 %')"); await p.waitForTimeout(100);
+  check("Format › Picture sets its size", (await lastApply()).includes('"width":75'), await lastApply());
+  await p.evaluate(() => { const dt = new DataTransfer(); dt.setData("text/plain", "a = 2 m\ncheck a < 3 m"); document.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true })); }); await p.waitForTimeout(150);
+  const pa = await lastApply();
+  check("pasting text adds one region per line", pa.includes('"a = 2 m"') && pa.includes('"kind":"check"'), pa);
+  await p.evaluate(async () => { const dt = new DataTransfer(); const b = await (await fetch("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==")).blob(); dt.items.add(new File([b], "p.png", { type: "image/png" })); document.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true })); }); await p.waitForTimeout(300);
+  check("pasting a picture adds a picture region", (await lastApply()).includes('"kind":"image"') && (await lastApply()).includes("data:image/png"), (await lastApply()).slice(0, 120));
+  await p.click(".tabs > button:text-is('Units')"); await p.waitForTimeout(80);
+  await p.evaluate(() => { window.__TAURI__.core.invoke = ((orig) => async (c, a) => c === "lists" ? { units: [["kW", "kilowatt", "Power", "m²·kg/s³"], ["hp", "horsepower (mechanical)", "Power", "m²·kg/s³"], ["psi", "pound-force per square inch", "Pressure", "kg/(m·s²)"]], constants: [["g", "standard gravity"]], functions: [["sqrt(x)", "square root"]] } : orig(c, a))(window.__TAURI__.core.invoke); });
+  await p.click(".ribbon button:has-text('All Units')"); await p.waitForTimeout(200);
+  check("the units list groups units by kind", (await p.$$eval(".ulist h4", h => h.map(x => x.textContent))).join() === "Power,Pressure");
+  await p.fill(".ulhead .find", "psi"); await p.waitForTimeout(80);
+  check("the units list searches", (await p.$$(".ulist tr")).length === 1);
+  await p.keyboard.press("Escape");
   await p.keyboard.press("Escape");
 
   // 5. Ribbon: the seven tabs, symbols type into the editor, no sideways scrolling.
@@ -129,8 +159,9 @@ const check = (name, ok, info = "") => { console.log(`${ok ? "ok  " : "FAIL"} ${
   // 9. Print: a preview page with the title block; printing lays out the same pages at A4.
   await p.click(".bs aside button:has-text('Print')"); await p.waitForTimeout(500);
   const n = (await p.$$(".pprev .ppage")).length;
-  check("print preview shows the page with its title block", n === 1 && (await p.textContent(".pprev .ptb")).includes("CALC-001") && (await p.textContent(".pprev .pcfoot")).includes("Page 1 of 1"), String(n));
-  check("references print at the end under their heading", (await p.textContent(".pprev .pbody")).includes("References"));
+  check("print preview shows the pages with the title block on each", n >= 2 && (await p.$$(".pprev .ptb")).length === n && (await p.textContent(".pprev .ptb")).includes("CALC-001") && (await p.textContent(".pprev .pcfoot")).includes(`Page 1 of ${n}`), String(n));
+  check("references print at the end under their heading", (await p.$$eval(".pprev .ppage", ps => ps[ps.length - 1].textContent)).includes("References"));
+  check("no region is cut at a page edge", await p.$$eval(".pprev .pbody", bs => bs.every(b => b.scrollHeight <= b.clientHeight + 1)));
   check("the printed sheet shows the maths and the PASS badge", (await p.$$(".pprev .katex")).length >= 9 && (await p.textContent(".pprev")).includes("PASS"));
   check("the printed sheet hides the unit buttons", (await p.$$(".pprev .unitbtn, .pprev .pngbtn")).length === 0);
   await p.evaluate(() => { window.print = () => { window.__printed = [document.querySelectorAll("#printroot .ppage").length, [...document.querySelectorAll("style")].map(s => s.textContent).find(t => t.includes("@page")) || ""]; }; });

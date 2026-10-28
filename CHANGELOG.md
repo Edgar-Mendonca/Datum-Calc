@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.1.2 — 2026-10-28
+
+Tables, pictures and the list of every unit; a fix for gravity after a unit.
+
+**Tables**
+- Insert › Table: a small grid with a name and a unit for each column, such as a pump curve from its data sheet. Each column becomes a vector you can use below it: `H_at(q) = interp(q, Q_d, H_d)`.
+- A cell without a unit takes the column's unit; a column with a formula (`rho*g*Q_d*H_d`) is worked out value by value and shown in its unit.
+- Double-click a table to edit it: type from cell to cell, Enter moves down (and adds a row at the bottom), + Row and + Column grow it, Done saves it as one change you can undo.
+
+**Pictures**
+- Insert › Picture adds a sketch or a photo, such as a free-body diagram, with a caption. Paste a picture (Ctrl+V) to add it straight away. Format › Picture sets its size.
+
+**Units, constants and functions**
+- Units › All Units lists every unit by kind with its name and SI units; Math › All Functions lists the functions and constants. Search, then click one to type it into the region you are editing.
+
+**Printing**
+- Tables and pictures print with the sheet; a region that does not fit moves to the next page instead of being cut.
+
+**Fixed**
+- `1000 kg/m^3*g` read the g as grams; it is now gravity. The constants, a function's own parameters and the variable after `for` are never read as units.
+
 ## 0.1.1 — 2026-10-28
 
 The engine arrives: every equation is worked out with its units, shown as maths, and checked.

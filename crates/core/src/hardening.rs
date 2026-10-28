@@ -16,7 +16,7 @@ const KINDS: [Kind; 7] = [Kind::Math, Kind::Text, Kind::Check, Kind::Solve, Kind
 fn random_op(r: &mut Rng, s: &Sheet) -> Op {
     let id = if s.regions.is_empty() || r.below(8) == 0 { r.next() as u32 } else { s.regions[r.below(s.regions.len())].id };
     match r.below(9) {
-        0 | 1 => Op::Insert { at: r.below(s.regions.len() + 3), kind: KINDS[r.below(7)], text: r.text(b"x=12 m*+-/^()abc", 12) },
+        0 | 1 => Op::Insert { at: r.below(s.regions.len() + 3), kind: KINDS[r.below(7)], text: r.text(b"x=12 m*+-/^()abc", 12), data: Default::default() },
         2 => Op::Set { id, field: ["text", "unit", "style", "kind", "data", "nope"][r.below(6)].into(), value: [json!("kN"), json!(3), json!("math"), json!(null), json!({"a": 1})][r.below(5)].clone() },
         3 => Op::Delete { ids: vec![id] },
         4 => Op::Move { ids: vec![id], up: r.below(2) == 0 },
@@ -40,11 +40,11 @@ fn invariants(s: &Sheet) {
 #[test]
 fn failed_edit_changes_nothing() {
     let mut d = Doc::new(Sheet::new("T"));
-    d.apply(Op::Insert { at: 0, kind: Kind::Math, text: "a = 2 m".into() }).unwrap();
+    d.apply(Op::Insert { at: 0, kind: Kind::Math, text: "a = 2 m".into(), data: Default::default() }).unwrap();
     let before = d.s.clone();
     let (u, r) = (d.can_undo(), d.can_redo());
     // The first op succeeds, the second fails: the batch as a whole must leave nothing behind.
-    let bad = Op::Batch(vec![Op::Insert { at: 9, kind: Kind::Text, text: "x".into() }, Op::Set { id: 999, field: "text".into(), value: json!("y") }]);
+    let bad = Op::Batch(vec![Op::Insert { at: 9, kind: Kind::Text, text: "x".into(), data: Default::default() }, Op::Set { id: 999, field: "text".into(), value: json!("y") }]);
     assert!(d.apply(bad).is_err());
     for op in [Op::Set { id: 1, field: "colour".into(), value: json!("red") }, Op::Title { field: "nope".into(), value: "x".into() }, Op::SheetSet { field: "digits".into(), value: json!(40) }, Op::Delete { ids: vec![77] }] {
         assert!(d.apply(op).is_err());
@@ -79,7 +79,7 @@ fn random_edits_keep_invariants_and_undo_restores() {
 #[test]
 fn damaged_files_open_or_fail_clearly() {
     let mut d = Doc::new(Sheet::new("Damaged"));
-    for k in 0..30 { d.apply(Op::Insert { at: k, kind: KINDS[k % 7], text: format!("x{k} = {k} m") }).unwrap(); }
+    for k in 0..30 { d.apply(Op::Insert { at: k, kind: KINDS[k % 7], text: format!("x{k} = {k} m"), data: Default::default() }).unwrap(); }
     let good = d.s.json();
     let mut r = Rng(42);
     for n in 0..2000 {
@@ -115,7 +115,7 @@ fn damaged_files_open_or_fail_clearly() {
 fn speed_gate_large_sheet() {
     let t = std::time::Instant::now();
     let mut d = Doc::new(Sheet::new("Big"));
-    for k in 0..2000 { d.apply(Op::Insert { at: k, kind: Kind::Math, text: format!("x{k} = {k} kN*m") }).unwrap(); }
+    for k in 0..2000 { d.apply(Op::Insert { at: k, kind: Kind::Math, text: format!("x{k} = {k} kN*m"), data: Default::default() }).unwrap(); }
     let s = Sheet::from_json(&d.s.json()).unwrap();
     assert_eq!(s.regions.len(), 2000);
     let limit = if cfg!(debug_assertions) { 20.0 } else { 3.0 };

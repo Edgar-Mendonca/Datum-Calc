@@ -6,7 +6,7 @@ import { Portal } from "solid-js/web";
 import { Region } from "./api";
 import { S, out, act } from "./store";
 import { Pick } from "./ui";
-import { MathView } from "./calc";
+import { MathView, ImageView } from "./calc";
 
 /** Paper sizes in millimetres (portrait). */
 export const PAPERS: [string, number, number][] = [["A4", 210, 297], ["Letter", 215.9, 279.4], ["A3", 297, 420], ["Legal", 215.9, 355.6]];
@@ -15,7 +15,7 @@ export const MM = 96 / 25.4;
 /** How a region looks on paper. Shared by the measuring pass, the preview and the print. */
 export const PrintRegion = (p: { r: Region }) => (
   <div class={`pr k-${p.r.kind}`} classList={{ [`s-${p.r.style}`]: !!p.r.style }}>
-    <Show when={p.r.kind !== "text" && p.r.text.trim()} fallback={<div class="prtext">{p.r.text || " "}</div>}><MathView r={p.r} paper /></Show>
+    {p.r.kind === "image" ? <ImageView r={p.r} /> : p.r.kind === "table" || (p.r.kind !== "text" && p.r.text.trim()) ? <MathView r={p.r} paper /> : <div class="prtext">{p.r.text || " "}</div>}
   </div>
 );
 

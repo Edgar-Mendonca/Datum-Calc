@@ -1,6 +1,7 @@
 // Dialogs: title block, getting started, glossary, shortcuts, save before closing.
-import { For, Show, createSignal } from "solid-js";
-import { Out, TitleBlock } from "./api";
+import { For, Show, createSignal, createResource } from "solid-js";
+import { Lists, Out, TitleBlock } from "./api";
+import { typeText } from "./cmds";
 import { act, call, closeDialog, openDialog, S, opts } from "./store";
 import { Dialog } from "./ui";
 
@@ -74,3 +75,25 @@ export const confirmClose = (then: () => void) => openDialog(() => (
     <p>Do you want to save the changes to “{S().name}”?</p>
   </Dialog>
 ));
+
+/** Every unit (by kind), constant and function; a click types it into the region being edited. */
+export const unitsList = (start = "units") => openDialog(() => {
+  const [lists] = createResource(() => call<Lists>("lists"));
+  const [tab, setTab] = createSignal(start), [q, setQ] = createSignal("");
+  const match = (...t: string[]) => t.join(" ").toLowerCase().includes(q().toLowerCase());
+  const groups = () => { const m = new Map<string, Lists["units"]>(); for (const u of lists()?.units ?? []) if (match(...u)) m.set(u[2], [...(m.get(u[2]) ?? []), u]); return [...m.entries()]; };
+  const ins = (t: string) => { closeDialog(); setTimeout(() => typeText(t)); };
+  return (
+    <Dialog title="Units, constants and functions" wide>
+      <div class="ulhead"><div class="seg"><For each={[["units", "Units"], ["constants", "Constants"], ["functions", "Functions"]]}>{([k, l]) => <button classList={{ on: tab() === k }} onClick={() => setTab(k)}>{l}</button>}</For></div>
+        <input class="find" placeholder="Search, such as pressure or psi" value={q()} onInput={e => setQ(e.currentTarget.value)} /></div>
+      <p class="muted">Click one to type it into the region you are editing. Units go after a number: <code>120 m^3/h</code>, <code>2.5 kN*m</code>; combine them with * / ^ and brackets.</p>
+      <div class="ulist">
+        <Show when={tab() === "units"}><For each={groups()}>{([g, us]) => <section><h4>{g}</h4><table><tbody><For each={us}>{u => <tr onClick={() => ins(` ${u[0]}`)}><td class="sym">{u[0]}</td><td>{u[1]}</td><td class="muted">{u[3]}</td></tr>}</For></tbody></table></section>}</For></Show>
+        <Show when={tab() === "constants"}><table><tbody><For each={(lists()?.constants ?? []).filter(c => match(...c))}>{c => <tr onClick={() => ins(c[0])}><td class="sym">{c[0]}</td><td>{c[1]}</td></tr>}</For></tbody></table>
+          <p class="muted">A name you define on the sheet takes the place of a constant. σ is not a constant (it usually means stress); Stefan–Boltzmann is σ_SB.</p></Show>
+        <Show when={tab() === "functions"}><table><tbody><For each={(lists()?.functions ?? []).filter(c => match(...c))}>{c => <tr onClick={() => ins(c[0].replace(/\(.*\)/, "()"))}><td class="sym">{c[0]}</td><td>{c[1]}</td></tr>}</For></tbody></table></Show>
+      </div>
+    </Dialog>
+  );
+});

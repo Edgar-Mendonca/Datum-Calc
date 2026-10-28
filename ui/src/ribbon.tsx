@@ -5,6 +5,7 @@ import { C, ALL_CMDS, typeText } from "./cmds";
 import * as D from "./dialogs";
 import { Icon } from "./ui";
 import { Help, helpCard, HELP } from "./help";
+import { pickPicture } from "./sheet";
 
 const B = (p: { i: string; l: string; run?: (e: MouseEvent) => void; big?: boolean; on?: boolean; off?: boolean; dd?: (e: MouseEvent) => void; title?: string }) => p.big && p.run && p.dd ? (
   // Split button: the picture runs the command, the label opens the menu.
@@ -94,24 +95,24 @@ const setStyle = (s: string) => { const r = sel(); if (r) act({ Set: { id: r.id,
 export const Ribbon = () => (
   <section class="ribbon" ref={fitRibbon}>
     <Show when={tab() === "home"}>
-      <G l="Clipboard" h="clipboard"><B big i="paste" l="Paste" run={C.paste} /><S_><B i="copy" l="Copy" run={C.copy} /><B i="cut" l="Cut" run={() => C.copy().then(C.del)} /></S_></G>
+      <G l="Clipboard" h="clipboard"><B big i="paste" l="Paste" run={() => C.paste()} /><S_><B i="copy" l="Copy" run={C.copy} /><B i="cut" l="Cut" run={() => C.copy().then(C.del)} /></S_></G>
       <G l="Regions" h="regions"><B big i="math" l="Math" title="New math region (Ctrl+M)" run={() => C.insert("math")} /><B big i="text" l="Text" title="New text region (Ctrl+T)" run={() => C.insert("text")} /><B big i="check" l="Check" run={() => C.insert("check")} /></G>
       <G l="Arrange" h="arrange"><S_><B i="up" l="Move Up" run={() => C.move(true)} /><B i="down" l="Move Down" run={() => C.move(false)} /><B i="del" l="Delete" run={C.del} /></S_></G>
       <G l="Sheet" h="sheetset"><B big i="title" l="Title Block" run={() => D.titleBlock()} /><S_><B i="units" l="SI units" on={out()?.sheet.units === "SI"} run={() => C.units("SI")} /><B i="units" l="US units" on={out()?.sheet.units === "US"} run={() => C.units("US")} /></S_></G>
       <G l="Print" h="print"><B big i="print" l="Print / PDF" run={C.print} /></G>
     </Show>
     <Show when={tab() === "insert"}>
-      <G l="Regions" h="insert"><B big i="math" l="Math" run={() => C.insert("math")} /><B big i="text" l="Text" run={() => C.insert("text")} /><B big i="check" l="Check" run={() => C.insert("check")} /><B big i="solve" l="Solve" run={() => C.insert("solve")} /><B big i="plot" l="Plot" run={() => C.insert("plot")} />
+      <G l="Regions" h="insert"><B big i="math" l="Math" run={() => C.insert("math")} /><B big i="text" l="Text" run={() => C.insert("text")} /><B big i="check" l="Check" run={() => C.insert("check")} /><B big i="solve" l="Solve" run={() => C.insert("solve")} /><B big i="plot" l="Plot" run={() => C.insert("plot")} /><B big i="table" l="Table" run={() => C.insert("table")} /><B big i="image" l="Picture" run={() => C.picture()} />
         <S_><B i="text" l="Heading" run={() => C.insert("text").then(() => setStyle("heading"))} /><B i="text" l="Reference" run={() => C.insert("text", "Ref: ").then(() => setStyle("ref"))} /><B i="math" l="Input" run={() => C.insert("math").then(() => setStyle("input"))} /></S_></G>
     </Show>
     <Show when={tab() === "math"}>
       <G l="Operators" h="symbols"><div class="keys2"><K t="+" ins=" + " /><K t="−" ins=" - " /><K t="×" ins="*" /><K t="÷" ins="/" /><K t="xⁿ" ins="^" /><K t="√" ins="sqrt()" back={1} /><K t="( )" ins="()" back={1} /><K t="=" ins=" = " /><K t="≤" ins=" <= " /><K t="≥" ins=" >= " /><K t="x₁" ins="_" title="Subscript: type an underscore, then the subscript" /><K t=".." ins=" .. " title="A range: x = 0, 0.1 .. 10" /></div></G>
       <G l="Greek" h="symbols"><div class="keys2"><For each={GREEK}>{([g, n]) => <K t={g} ins={n} title={`${n} (type “${n}”)`} />}</For></div></G>
-      <G l="Functions" h="functions"><div class="keys2 wide"><For each={FUNCS}>{([n, ins]) => <K t={n} ins={ins} back={ins.length - ins.indexOf("(") - 1} />}</For></div></G>
+      <G l="Functions" h="functions"><div class="keys2 wide"><For each={FUNCS}>{([n, ins]) => <K t={n} ins={ins} back={ins.length - ins.indexOf("(") - 1} />}</For></div><B big i="list" l="All Functions" run={() => D.unitsList("functions")} /></G>
     </Show>
     <Show when={tab() === "units"}>
       <G l="Unit System" h="units"><B big i="units" l="SI" on={out()?.sheet.units === "SI"} run={() => C.units("SI")} /><B big i="units" l="US" on={out()?.sheet.units === "US"} run={() => C.units("US")} /></G>
-      <G l="Insert Unit" h="units"><B big i="ruler" l="Unit" dd={e => openMenu(e, unitMenu())} /><div class="keys2"><For each={["m", "mm", "kg", "s", "N", "kN", "Pa", "MPa", "bar", "W", "kW", "°C", "K"]}>{u => <K t={u} ins={` ${u}`} />}</For></div></G>
+      <G l="Insert Unit" h="units"><B big i="ruler" l="Unit" dd={e => openMenu(e, unitMenu())} /><B big i="list" l="All Units" run={() => D.unitsList()} /><div class="keys2"><For each={["m", "mm", "kg", "s", "N", "kN", "Pa", "MPa", "bar", "W", "kW", "°C", "K"]}>{u => <K t={u} ins={` ${u}`} />}</For></div></G>
     </Show>
     <Show when={tab() === "check"}>
       <G l="Checks" h="checks"><B big i="check" l="New Check" run={() => C.insert("check")} /><div class="keys2"><K t="≤" ins=" <= " /><K t="<" ins=" < " /><K t="≥" ins=" >= " /><K t=">" ins=" > " /></div></G>
@@ -123,6 +124,7 @@ export const Ribbon = () => (
     </Show>
     <Show when={tab() === "format" && sel()}>
       <G l="Region Style" h="regions"><S_><For each={STYLES.slice(0, 3)}>{([k, l]) => <B i="style" l={l} on={(sel()?.style ?? "") === k} run={() => setStyle(k)} />}</For></S_><S_><For each={STYLES.slice(3)}>{([k, l]) => <B i="style" l={l} on={(sel()?.style ?? "") === k} run={() => setStyle(k)} />}</For></S_></G>
+      <Show when={sel()?.kind === "image"}><G l="Picture" h="regions"><B big i="image" l="Change" run={() => pickPicture(selId())} /><S_><For each={[25, 50, 75, 100]}>{w => <B i="fit" l={`${w} %`} on={(sel()?.data?.width ?? 60) === w} run={() => act({ Set: { id: selId(), field: "data", value: { ...(sel()?.data ?? {}), width: w } } })} />}</For></S_></G></Show>
       <G l="Kind" h="regions"><S_><For each={[["math", "Math"], ["text", "Text"], ["check", "Check"], ["solve", "Solve"], ["plot", "Plot"]] as const}>{([k, l]) => <B i={k} l={l} on={sel()?.kind === k} run={() => act({ Set: { id: selId(), field: "kind", value: k } })} />}</For></S_></G>
       <G l="Arrange" h="arrange"><S_><B i="up" l="Move Up" run={() => C.move(true)} /><B i="down" l="Move Down" run={() => C.move(false)} /><B i="del" l="Delete" run={C.del} /></S_></G>
     </Show>

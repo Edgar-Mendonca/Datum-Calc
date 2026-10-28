@@ -22,7 +22,10 @@ export interface PlotOut { xs: number[]; xlabel: string; xunit: string; series: 
 export interface RegionOut {
   id: number; latex: string; result_tex: string; result: string; value: string; unit: string; name: string; input: boolean;
   error: { msg: string; from: number; to: number } | null; warn: string; check: CheckOut | null; plot: PlotOut | null; units: string[];
+  table: TableOut | null; defs: VarOut[];
 }
 export interface VarOut { name: string; tex: string; value: string; unit: string; id: number }
 export interface SheetOut { regions: RegionOut[]; vars: VarOut[]; checks: number; failed: number; errors: number }
 export interface Lists { units: [string, string, string, string][]; constants: [string, string][]; functions: [string, string][] }
+export interface TableOut { cols: { name: string; tex: string; unit: string; formula: string; cells: string[]; error: string }[]; rows: number }
+export interface TableData { cols: { name: string; unit: string; formula: string }[]; rows: string[][] }

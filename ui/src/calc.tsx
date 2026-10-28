@@ -4,7 +4,7 @@ import { For, Show, createMemo, onCleanup, onMount } from "solid-js";
 import katex from "katex";
 import "katex/dist/katex.min.css";
 import { Chart, LineController, LineElement, PointElement, LinearScale, Tooltip, Legend } from "chart.js";
-import { PlotOut, Region, RegionOut } from "./api";
+import { PlotOut, Region, RegionOut, TableOut } from "./api";
 import { out, act, call, openMenu, setSelId, toast } from "./store";
 import { Help } from "./help";
 
@@ -44,7 +44,8 @@ export const MathView = (p: { r: Region; paper?: boolean }) => {
   const o = () => outs().get(p.r.id);
   return (
     <Show when={o()} fallback={<div class="rtxt">{p.r.text}</div>}>{o => <>
-      <div class="mline">
+      <Show when={p.r.text.trim() && p.r.kind === "table"}><div class="tcap">{p.r.text}</div></Show>
+      <div class="mline" classList={{ none: p.r.kind === "table" }}>
         <Show when={o().latex}><Tex s={o().latex} display /></Show>
         <Show when={o().result_tex && !o().input && !o().check}><Tex s={o().result_tex.startsWith("\\Rightarrow") ? o().result_tex : `= ${o().result_tex}`} class="res" display /></Show>
         <Show when={!p.paper && o().units.length && !o().check}>
@@ -54,6 +55,7 @@ export const MathView = (p: { r: Region; paper?: boolean }) => {
       </div>
       <Show when={o().check}>{c => <div class="checkvals">{c().lhs} {({ "<=": "≤", ">=": "≥", "!=": "≠", "==": "=" } as Record<string, string>)[c().op] ?? c().op} {c().rhs}</div>}</Show>
       <Show when={o().plot}>{pl => <PlotView p={pl()} id={p.r.id} paper={p.paper} />}</Show>
+      <Show when={o().table}>{t => <TableView t={t()} />}</Show>
       <Show when={o().error}>{e => <div class="rerr" role="alert"><span class="ico">⚠</span><span>{e().msg}</span><Show when={!p.paper && e().to > e().from}><Marked text={p.r.text} from={e().from} to={e().to} /></Show></div>}</Show>
       <Show when={o().warn}><div class="rwarn"><span class="ico">⚠</span>{o().warn}</div></Show>
     </>}</Show>
@@ -91,6 +93,27 @@ export const PlotView = (p: { p: PlotOut; id: number; paper?: boolean }) => {
     </div>
   );
 };
+
+/** A table region as worked out: headings as maths, units under them, numbers right-aligned. */
+export const TableView = (p: { t: TableOut }) => (
+  <table class="ctable">
+    <thead>
+      <tr><For each={p.t.cols}>{c => <th><Show when={c.tex} fallback={<span class="muted">—</span>}><Tex s={c.tex} /></Show></th>}</For></tr>
+      <tr class="cu"><For each={p.t.cols}>{c => <th>{c.unit ? `(${c.unit})` : ""}{c.formula ? <span class="fx" title={`= ${c.formula}`}> ƒ</span> : ""}</th>}</For></tr>
+    </thead>
+    <tbody><For each={Array.from({ length: p.t.rows }, (_, i) => i)}>{i => <tr><For each={p.t.cols}>{c => <td classList={{ calc: !!c.formula }}>{c.cells[i] ?? ""}</td>}</For></tr>}</For></tbody>
+  </table>
+);
+
+/** A picture region: the picture at its width and the caption under it. */
+export const ImageView = (p: { r: Region }) => (
+  <figure class="cimg">
+    <Show when={p.r.data?.src} fallback={<div class="muted">No picture yet: double-click to choose one, or paste a picture.</div>}>
+      <img src={p.r.data.src} alt={p.r.text} style={{ width: `${p.r.data.width ?? 60}%` }} />
+    </Show>
+    <Show when={p.r.text.trim()}><figcaption>{p.r.text}</figcaption></Show>
+  </figure>
+);
 
 /** Every name on the sheet with its value and unit; a click selects the line that defines it. */
 export const VarsPanel = () => {

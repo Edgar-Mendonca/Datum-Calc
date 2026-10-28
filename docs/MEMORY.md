@@ -5,7 +5,7 @@
 | | |
 | --- | --- |
 | **Product** | Datum Calc: engineering calculation sheets with real units, readable maths, checks (PASS/FAIL with utilisation) and a printable calc sheet with a title block |
-| **Current version** | **0.1.1** (released 2026-10-28). Earlier: 0.1.0 |
+| **Current version** | **0.1.2** (released 2026-10-28). Earlier: 0.1.0, 0.1.1 |
 | **Repo** | `Edgar-Mendonca/Datum-Calc` · working branch `claude/festive-fermi-ir7jyi` (the first branch pushed, so also the default branch) |
 | **Stack** | Rust (engine `crates/core` + shell `src-tauri`), Tauri 2, WebView2, SolidJS + Vite UI in strict TypeScript (TSX), plain CSS with light/dark tokens, IBM Plex fonts; KaTeX for maths from 0.1.1; Chart.js for plots from 0.1.2. No Python |
 | **Code size** | About 4,000 lines at 0.1.1: core 2,000 (with 600 lines of tests), shell 350, UI 1,600 TSX + CSS |
@@ -57,8 +57,8 @@ ui/src/store.ts                signals and act()/call()
 ui/src/api.ts                  Tauri bridge and types
 ui/src/ribbon.tsx              title bar, ribbon (Home · Insert · Math · Units · Check · View · Help, Format contextual), Tell Me
 ui/src/backstage.tsx           File page: Home, Export, Options, Print, Roadmap, Updates
-ui/src/sheet.tsx               the page canvas: title block, regions, the region editor
-ui/src/calc.tsx                KaTeX (cached), MathView (maths, result, unit menu, PASS/FAIL, error with the marked span, warning), PlotView (Chart.js, family style), VarsPanel
+ui/src/sheet.tsx               the page canvas: title block, regions, the region editor, the table editor (local until Done/Esc/click outside), picture choice
+ui/src/calc.tsx                KaTeX (cached), MathView (maths, result, unit menu, PASS/FAIL, error with the marked span, warning), PlotView (Chart.js, family style), TableView, ImageView, VarsPanel
 ui/src/print.tsx               File › Print: pages packed from measured regions, title block on every page, references at the end
 ui/src/dialogs.tsx             title block, getting started, glossary, shortcuts, save before closing
 ui/src/help.tsx                the ? cards (HELP table)
@@ -110,6 +110,9 @@ tests_ui/run.cjs               Playwright UI tests against ui/dist with a mocked
 | 0.1.1 | Solve and plot exist already in 0.1.1 (the engine had them); 0.1.2 brings tables, pictures and the units list | Engine first; the cut order (image, table, plot) still holds |
 | 0.1.1 | The window shows results only from the engine (`calc` in every `Out`); the whole sheet is worked out after every change | Simple and fast enough (1,500 lines well under a second in release builds; a speed gate tests it) |
 | 0.1.1 | KaTeX and Plex fonts are bundled as woff2 only (a Vite transform drops woff/ttf) | Smaller installer; WebView2 reads woff2 |
+| 0.1.2 | A table is columns (name, unit, optional formula) over rows of typed cells; each column becomes a vector; formula columns are evaluated with the columns to their left | Pump curves and data-sheet values are tables; vectors plug into interp, sum, max and plots |
+| 0.1.2 | The table editor keeps its edits local and saves them as one change when it closes | Every save re-renders the sheet; typing from cell to cell must not lose focus, and undo should undo the whole edit |
+| 0.1.2 | After a unit, `*` and `/` never read the constants (g, e, R, c_0), a function's parameters or a `for` variable as units | 0.1.1 read `kg/m^3*g` as grams (found when checking the table formula in the real app) |
 | 0.1.1 | `release.yml` ran once on a push trigger to register it (tag pushes are blocked from the session); later releases use workflow_dispatch | A workflow needs one run before GitHub lists it |
 
 ## 3. Roadmap
@@ -124,8 +127,8 @@ tests_ui/run.cjs               Playwright UI tests against ui/dist with a mocked
 | 0.1.0 | Hardening tests (failed edits, random edits, damaged files, speed gate) and UI tests | ✅ |
 | 0.1.1 | Engine: units (about 200, NIST factors), parser, evaluator, LaTeX, solve (Brent), plot sampling; 23 test functions with about 450 assertions | ✅ |
 | 0.1.1 | Worksheet: KaTeX maths, results with units and a unit menu, checks (PASS/FAIL, utilisation), solve and plot regions, Variables panel, errors on the line | ✅ |
-| 0.1.2 | Table region; image region; units list; print polish | 🔜 |
-| 0.1.3 | The 10 calc packs with their tests; File › New from pack; CSV export; screenshots; README; site.json | ⬜ |
+| 0.1.2 | Table region (with formula columns), picture region (insert, paste, size), units/constants/functions list, print of tables and pictures | ✅ |
+| 0.1.3 | The 10 calc packs with their tests; File › New from pack; CSV export; screenshots; README; site.json | 🔜 |
 | 0.1.4 | Fixes from trying every pack; a Getting Started sheet; polish | ⬜ |
 | 0.2 | Materials from Datum Atlas, more packs, unit menus on results, symbolic simplify | ⬜ |
 | 0.3 | Matrices and linear systems, ODE solve, tables from CSV | ⬜ |
@@ -148,9 +151,16 @@ tests_ui/run.cjs               Playwright UI tests against ui/dist with a mocked
 - Checks: clippy clean, 23 engine tests, 50 UI tests.
 - Released 0.1.1.
 
+### 2026-10-28: Session 1, continued (0.1.2, tables and pictures)
+- Engine: table regions (columns → vectors, units per column, formula columns), names defined by tables in the Variables panel; the constant/parameter fix for units after numbers.
+- Window: table view and editor, picture regions (insert, paste, size, caption), the units/constants/functions list, printing of both.
+- Checked in the real app: a pump curve table (editing a cell, Enter down, Done) and its formula column in kW; the print preview over two pages.
+- Checks: clippy clean, 24 engine tests, 63 UI tests.
+- Released 0.1.2.
+
 ## 5. Known limits and next steps
 
 - Energy and torque share a dimension, so a torque shows in J unless its unit is chosen (N·m in the unit menu).
 - Vectors are shown as their first values and the last; there are no matrices yet (0.3).
-- Image and table regions exist in the format but have no editor yet (0.1.2); the cut order if time runs short is image, table, plot.
+- Tables hold values and formula columns, not free spreadsheet formulas per cell.
 - The installer is not code-signed (1.0).
