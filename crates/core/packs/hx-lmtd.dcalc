@@ -141,7 +141,7 @@
    "id": 15,
    "kind": "math",
    "text": "Q = m_h*cp_h*(T_hi - T_ho)  # duty",
-   "unit": "kW",
+   "unit": "",
    "style": "",
    "data": null
   },
@@ -149,7 +149,7 @@
    "id": 16,
    "kind": "math",
    "text": "m_c = Q/(cp_c*(T_co - T_ci))  # cooling water flow",
-   "unit": "kg/s",
+   "unit": "",
    "style": "",
    "data": null
   },
@@ -157,7 +157,7 @@
    "id": 17,
    "kind": "math",
    "text": "dT_1 = T_hi - T_co  # hot end",
-   "unit": "K",
+   "unit": "",
    "style": "",
    "data": null
   },
@@ -165,7 +165,7 @@
    "id": 18,
    "kind": "math",
    "text": "dT_2 = T_ho - T_ci  # cold end",
-   "unit": "K",
+   "unit": "",
    "style": "",
    "data": null
   },
@@ -173,7 +173,7 @@
    "id": 19,
    "kind": "math",
    "text": "LMTD = (dT_1 - dT_2)/ln(dT_1/dT_2)",
-   "unit": "K",
+   "unit": "",
    "style": "",
    "data": null
   },
@@ -181,7 +181,7 @@
    "id": 20,
    "kind": "math",
    "text": "A_req = Q/(U*F*LMTD)",
-   "unit": "m^2",
+   "unit": "",
    "style": "",
    "data": null
   },

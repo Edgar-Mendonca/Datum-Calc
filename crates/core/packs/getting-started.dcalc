@@ -1,0 +1,280 @@
+{
+ "format": 1,
+ "name": "Getting started with Datum Calc",
+ "title": {
+  "project": "",
+  "number": "START",
+  "title": "Getting started with Datum Calc",
+  "by": "",
+  "checked": "",
+  "date": "",
+  "rev": "A",
+  "company": "",
+  "client": "",
+  "logo": ""
+ },
+ "page": {
+  "paper": "A4",
+  "margins": [
+   15.0,
+   15.0,
+   15.0,
+   20.0
+  ]
+ },
+ "units": "SI",
+ "digits": 4,
+ "regions": [
+  {
+   "id": 1,
+   "kind": "text",
+   "text": "Getting started with Datum Calc",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 2,
+   "kind": "text",
+   "text": "This sheet is worked out from top to bottom, like a calculation on paper. Double-click any line to see what was typed, change it, and press Enter or Esc. Everything below follows.",
+   "unit": "",
+   "style": "note",
+   "data": null
+  },
+  {
+   "id": 3,
+   "kind": "text",
+   "text": "1. Inputs with units",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 4,
+   "kind": "text",
+   "text": "Type a name, =, a number and its unit. Inputs are highlighted (right-click › Mark as Input). Text after # describes the line.",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 5,
+   "kind": "math",
+   "text": "L = 6 m  # span",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 6,
+   "kind": "math",
+   "text": "w = 12 kN/m  # uniform load",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 7,
+   "kind": "math",
+   "text": "T_in = 20 °C  # temperatures in °C or °F are handled correctly",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 8,
+   "kind": "text",
+   "text": "2. Equations and results",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 9,
+   "kind": "text",
+   "text": "Use the names defined above. Fractions, powers and roots are drawn as maths, and each result gets a sensible unit. Click ▾ after a result to show it in another unit.",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 10,
+   "kind": "math",
+   "text": "M = w*L^2/8",
+   "unit": "kN*m",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 11,
+   "kind": "math",
+   "text": "T_out = T_in + 15 K  # a rise of 15 K",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 12,
+   "kind": "math",
+   "text": "dT = T_out - T_in  # a difference of temperatures is in K",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 13,
+   "kind": "text",
+   "text": "Mixing kinds of units is an error on its own line, with the wrong part underlined. Try changing w*L^2 to w + L above.",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 14,
+   "kind": "text",
+   "text": "3. Checks",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 15,
+   "kind": "math",
+   "text": "M_allow = 60 kN*m",
+   "unit": "kN*m",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 16,
+   "kind": "check",
+   "text": "check M <= M_allow",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 17,
+   "kind": "text",
+   "text": "A check shows PASS or FAIL and the utilisation: demand over capacity.",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 18,
+   "kind": "text",
+   "text": "4. Functions, solve and plot",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 19,
+   "kind": "math",
+   "text": "f(x) = x^3 - 2*x - 5",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 20,
+   "kind": "solve",
+   "text": "solve f(r) = 0 for r in 0 .. 3",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 21,
+   "kind": "plot",
+   "text": "plot f(x) for x in 0 .. 3",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 22,
+   "kind": "text",
+   "text": "5. Tables",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 23,
+   "kind": "table",
+   "text": "A table: each column becomes a vector you can use below",
+   "unit": "",
+   "style": "",
+   "data": {
+    "cols": [
+     {
+      "name": "Q_t",
+      "unit": "m^3/h",
+      "formula": ""
+     },
+     {
+      "name": "H_t",
+      "unit": "m",
+      "formula": ""
+     }
+    ],
+    "rows": [
+     [
+      "0",
+      "50"
+     ],
+     [
+      "50",
+      "45"
+     ],
+     [
+      "100",
+      "30"
+     ]
+    ]
+   }
+  },
+  {
+   "id": 24,
+   "kind": "math",
+   "text": "H_75 = interp(75 m^3/h, Q_t, H_t)",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 25,
+   "kind": "text",
+   "text": "6. Print",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 26,
+   "kind": "text",
+   "text": "Fill in the title block (click it at the top of the page), then press Ctrl+P and choose Save as PDF. Lines styled as References print at the end.",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 27,
+   "kind": "text",
+   "text": "Ref: the cubic x³ − 2x − 5 = 0 is the classic test equation of J. Wallis (root 2.0946).",
+   "unit": "",
+   "style": "ref",
+   "data": null
+  }
+ ],
+ "next_id": 28,
+ "ui": {
+  "pack": {
+   "id": "getting-started",
+   "field": "Start here",
+   "desc": "A short sheet that shows how Datum Calc works: equations with units, results, checks, solve, plot and tables."
+  }
+ }
+}

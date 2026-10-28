@@ -109,7 +109,7 @@
    "id": 11,
    "kind": "math",
    "text": "P_in = P_out/eta  # electrical input",
-   "unit": "kW",
+   "unit": "",
    "style": "",
    "data": null
   },
@@ -117,7 +117,7 @@
    "id": 12,
    "kind": "math",
    "text": "I_FL = P_in/(sqrt(3)*V_L*PF)  # full-load current",
-   "unit": "A",
+   "unit": "",
    "style": "",
    "data": null
   },
@@ -141,7 +141,7 @@
    "id": 15,
    "kind": "math",
    "text": "I_start = LRC*I_FL  # starting current",
-   "unit": "A",
+   "unit": "",
    "style": "",
    "data": null
   },

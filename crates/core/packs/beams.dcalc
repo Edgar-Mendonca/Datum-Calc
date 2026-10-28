@@ -85,7 +85,7 @@
    "id": 8,
    "kind": "math",
    "text": "sigma_allow = 0.66*f_y  # allowable bending stress",
-   "unit": "MPa",
+   "unit": "",
    "style": "",
    "data": null
   },
@@ -125,7 +125,7 @@
    "id": 13,
    "kind": "math",
    "text": "sigma = M_max/W_el",
-   "unit": "MPa",
+   "unit": "",
    "style": "",
    "data": null
   },
@@ -133,7 +133,7 @@
    "id": 14,
    "kind": "math",
    "text": "delta = 5*w*L^4/(384*E*I)",
-   "unit": "mm",
+   "unit": "",
    "style": "",
    "data": null
   },
@@ -189,7 +189,7 @@
    "id": 21,
    "kind": "math",
    "text": "sigma_c = M_c/W_el",
-   "unit": "MPa",
+   "unit": "",
    "style": "",
    "data": null
   },
@@ -197,7 +197,7 @@
    "id": 22,
    "kind": "math",
    "text": "delta_c = F*L_c^3/(3*E*I)",
-   "unit": "mm",
+   "unit": "",
    "style": "",
    "data": null
   },

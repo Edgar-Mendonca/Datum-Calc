@@ -355,25 +355,34 @@ pub fn fmt_num(x: f64, digits: u8, eng: bool) -> (String, String) {
         let mut e3 = (a.log10() / 3.0).floor() as i32 * 3;
         let mut m = x / 10f64.powi(e3);
         let mt = fmt_plain(m, digits);
-        if mt.trim_start_matches('-').starts_with("1000") { e3 += 3; m /= 1000.0; }
+        if mt.trim_start_matches('-').starts_with("1\u{2009}000") || mt.trim_start_matches('-').starts_with("1000") { e3 += 3; m /= 1000.0; }
         let mt = fmt_plain(m, digits);
         if e3 == 0 { return (mt.clone(), mt); }
         let sup: String = e3.to_string().chars().map(|c| match c { '-' => '⁻', '0' => '⁰', '1' => '¹', '2' => '²', '3' => '³', '4' => '⁴', '5' => '⁵', '6' => '⁶', '7' => '⁷', '8' => '⁸', _ => '⁹' }).collect();
         return (format!("{mt}×10{sup}"), format!("{mt} \\times 10^{{{e3}}}"));
     }
     let t = fmt_plain(x, digits);
-    if t.parse::<f64>().is_ok_and(|r| r.abs() >= 1e6) { return fmt_num(x, digits, true); }
-    (t.clone(), t)
+    if t.replace('\u{2009}', "").parse::<f64>().is_ok_and(|r| r.abs() >= 1e6) { return fmt_num(x, digits, true); }
+    (t.clone(), t.replace('\u{2009}', "\\,"))
 }
 
-/// Significant figures without exponent, trailing zeros removed.
+/// Significant figures without exponent, trailing zeros removed; whole parts of five digits or more
+/// are grouped in threes with a thin space (274 900).
 pub fn fmt_plain(x: f64, digits: u8) -> String {
     if x == 0.0 || !x.is_finite() { return if x.is_finite() { "0".into() } else { "—".into() }; }
     let mag = x.abs().log10().floor() as i32;
     let dec = (digits as i32 - 1 - mag).clamp(0, 15) as usize;
+    // Large numbers keep only their significant figures: 274 863 → 274 900 with 4.
+    let x = if mag >= digits as i32 { let q = 10f64.powi(mag - digits as i32 + 1); (x / q).round() * q } else { x };
     let s = format!("{:.*}", dec, x);
     let s = if s.contains('.') { s.trim_end_matches('0').trim_end_matches('.').to_string() } else { s };
-    if s == "-0" { "0".into() } else { s }
+    if s == "-0" { return "0".into(); }
+    let (sign, rest) = s.strip_prefix('-').map(|r| ("-", r)).unwrap_or(("", &s));
+    let (int, frac) = rest.split_once('.').map(|(a, b)| (a, Some(b))).unwrap_or((rest, None));
+    if int.len() < 5 { return s.clone(); }
+    let mut g = String::new();
+    for (i, ch) in int.chars().enumerate() { if i > 0 && (int.len() - i) % 3 == 0 { g.push('\u{2009}'); } g.push(ch); }
+    format!("{sign}{g}{}", frac.map(|f| format!(".{f}")).unwrap_or_default())
 }
 
 /// A value in the unit it is shown in: (text, LaTeX, unit label).
@@ -491,7 +500,12 @@ fn region(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>) -> Region
                 o.name = canon(name);
                 let v = env.eval(e)?;
                 o.input = matches!(e.e, E::Num(..)) || matches!(&e.e, E::Neg(x) if matches!(x.e, E::Num(..)));
-                set_result(&mut o, &v, r, f);
+                // An input keeps the unit it was typed in (8356 cm⁴ stays cm⁴), unless it belongs to the other unit system.
+                let typed = match &e.e { E::Num(_, Some(u)) => Some(u.text.clone()), E::Neg(x) => match &x.e { E::Num(_, Some(u)) => Some(u.text.clone()), _ => None }, _ => None };
+                match typed.filter(|t| r.unit.trim().is_empty() && units::system(t).is_none_or(|us| us == f.us)) {
+                    Some(t) => set_result(&mut o, &v, &Region { unit: t, ..r.clone() }, f),
+                    None => set_result(&mut o, &v, r, f),
+                }
                 env.vars.insert(canon(name), v);
                 known.push(name.clone());
             }

@@ -109,7 +109,7 @@
    "id": 11,
    "kind": "math",
    "text": "t_c = t - c  # corroded thickness",
-   "unit": "mm",
+   "unit": "",
    "style": "",
    "data": null
   },
@@ -117,7 +117,7 @@
    "id": 12,
    "kind": "math",
    "text": "R_i = D_i/2",
-   "unit": "mm",
+   "unit": "",
    "style": "",
    "data": null
   },
@@ -125,7 +125,7 @@
    "id": 13,
    "kind": "math",
    "text": "sigma_h = P*D_i/(2*t_c)  # hoop stress",
-   "unit": "MPa",
+   "unit": "",
    "style": "",
    "data": null
   },
@@ -133,7 +133,7 @@
    "id": 14,
    "kind": "math",
    "text": "sigma_l = P*D_i/(4*t_c)  # longitudinal stress",
-   "unit": "MPa",
+   "unit": "",
    "style": "",
    "data": null
   },
@@ -141,7 +141,7 @@
    "id": 15,
    "kind": "math",
    "text": "t_req = P*R_i/(S*E_j - 0.6*P) + c  # required thickness",
-   "unit": "mm",
+   "unit": "",
    "style": "",
    "data": null
   },

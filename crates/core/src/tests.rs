@@ -164,21 +164,30 @@ fn dimension_errors_are_caught_on_their_line() {
 
 #[test]
 fn display_picks_a_good_unit() {
-    assert_eq!(result(&["P = 18400 W"]), "18.4 kW");
-    assert_eq!(result(&["p = 2500000 Pa"]), "2.5 MPa");
-    assert_eq!(result(&["p = 250 Pa"]), "250 Pa");
+    assert_eq!(result(&["P = 18400 W*1"]), "18.4 kW");
+    assert_eq!(result(&["p = 2500000 Pa*1"]), "2.5 MPa");
+    assert_eq!(result(&["p = 250 Pa*1"]), "250 Pa");
     assert_eq!(result(&["F = 2 kg * 9.81 m/s^2"]), "19.62 N");
-    assert_eq!(result(&["L = 0.25 m"]), "250 mm");
-    assert_eq!(result(&["L = 2500 m"]), "2.5 km");
+    assert_eq!(result(&["L = 0.25 m*1"]), "250 mm");
+    assert_eq!(result(&["L = 2500 m*1"]), "2.5 km");
     assert_eq!(result(&["Q = 120 m^3/h"]), "120 m³/h");
     assert_eq!(result(&["v = 3 m/s"]), "3 m/s");
     assert_eq!(result(&["x = 3 m * 2 N / (4 s)"]), "1.5 W");
     assert_eq!(result(&["k = 0.5 W/(m*K)"]), "0.5 W/(m·K)");
     assert_eq!(result(&["U = 450 W/(m^2*K)"]), "450 W/(m²·K)");
-    assert_eq!(result(&["w = 2 kg*m^2/s"]), "2 m²·kg/s");
+    assert_eq!(result(&["w = 2 kg*m^2/s"]), "2 kg·m²/s");
+    assert_eq!(result(&["w = 2 kg*m^2/s*1"]), "2 m²·kg/s");
     assert_eq!(result(&["r = 3 m / (2 m)"]), "1.5");
-    assert_eq!(result(&["θ = 30 deg"]), "30 °");
-    assert_eq!(result(&["n = 1500 rpm"]), "157.1 rad/s");
+    assert_eq!(result(&["θ = 30 deg"]), "30 deg");
+    assert_eq!(result(&["θ = 30 deg*1"]), "30 °");
+    assert_eq!(result(&["I = 8356 cm^4"]), "8356 cm⁴", "an input keeps the unit it was typed in");
+    assert_eq!(result(&["D = 1200 mm"]), "1200 mm");
+    let mut s = sheet(&["D = 1200 mm", "L = 3 ft"]);
+    s.units = "US".into();
+    let o = eval::run(&s);
+    assert_eq!((o.regions[0].result.as_str(), o.regions[1].result.as_str()), ("3.937 ft", "3 ft"), "a metric input converts in a US sheet; a US input stays");
+    assert_eq!(result(&["n = 1500 rpm"]), "1500 rpm");
+    assert_eq!(result(&["n = 1500 rpm*1"]), "157.1 rad/s");
     let mut s = sheet(&["n = 1500 rpm"]);
     s.regions[0].unit = "rpm".into();
     assert_eq!(eval::run(&s).regions[0].result, "1500 rpm");
@@ -208,6 +217,11 @@ fn number_formatting() {
     assert_eq!(fmt_num(-0.5, 4, false).0, "-0.5");
     assert_eq!(fmt_num(0.0, 4, false).0, "0");
     assert_eq!(fmt_num(100.0, 4, false).0, "100");
+    assert_eq!(fmt_num(274_863.3, 4, false).0, "274\u{2009}900", "large numbers keep their significant figures, grouped");
+    assert_eq!(fmt_num(274_863.3, 4, false).1, "274\\,900");
+    assert_eq!(fmt_num(29_007.5, 4, false).0, "29\u{2009}010");
+    assert_eq!(fmt_num(1234.6, 4, false).0, "1235", "four digits are not grouped");
+    assert_eq!(fmt_num(-56_789.0, 5, false).0, "-56\u{2009}789");
     assert_eq!(fmt_num(1e6, 4, false).1, "1 \\times 10^{6}");
     assert_eq!(fmt_num(f64::NAN, 4, false).0, "—");
 }
@@ -389,7 +403,7 @@ fn latex_shows_what_is_computed() {
     assert_eq!(t("x = 0.0015"), "x = 0.0015");
     assert_eq!(crate::latex::unit("W/(m²·K)"), "\\mathrm{W/(m^{2}\\cdot K)}");
     assert_eq!(crate::latex::unit("m·s⁻¹"), "\\mathrm{m\\cdot s^{-1}}");
-    let o = run(&["P = 18400 W"]);
+    let o = run(&["P = 18400 W*1"]);
     assert_eq!(o.regions[0].result_tex, "18.4\\,\\mathrm{kW}");
 }
 

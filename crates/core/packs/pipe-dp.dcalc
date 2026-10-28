@@ -125,7 +125,7 @@
    "id": 13,
    "kind": "math",
    "text": "A = pi*D^2/4",
-   "unit": "mm^2",
+   "unit": "",
    "style": "",
    "data": null
   },
@@ -157,7 +157,7 @@
    "id": 17,
    "kind": "math",
    "text": "dp = (f*L/D + K)*rho*v^2/2  # pressure drop",
-   "unit": "kPa",
+   "unit": "",
    "style": "",
    "data": null
   },
@@ -165,7 +165,7 @@
    "id": 18,
    "kind": "math",
    "text": "h_L = dp/(rho*g)  # head loss",
-   "unit": "m",
+   "unit": "",
    "style": "",
    "data": null
   },

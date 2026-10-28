@@ -117,7 +117,7 @@
    "id": 12,
    "kind": "math",
    "text": "h_p = (p_atm - p_v)/(rho*g)  # pressure head above vapour pressure",
-   "unit": "m",
+   "unit": "",
    "style": "",
    "data": null
   },
@@ -125,7 +125,7 @@
    "id": 13,
    "kind": "math",
    "text": "NPSH_a = h_p + z_s - h_f",
-   "unit": "m",
+   "unit": "",
    "style": "",
    "data": null
   },

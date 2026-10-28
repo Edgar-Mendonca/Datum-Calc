@@ -300,3 +300,22 @@ pub fn pretty(s: &str) -> String {
 pub fn list() -> Vec<(&'static str, &'static str, &'static str, String)> {
     UNITS.iter().chain(ABS_TEMPS).map(|u| (u.sym, u.name, u.group, base_label(&u.dim))).collect()
 }
+
+/// US customary symbols (the rest are SI or neutral, such as s, A, V, rpm, %).
+const US_SYMS: [&str; 41] = ["in", "ft", "yd", "mi", "mil", "lb", "lbm", "oz", "slug", "ton_us", "grain", "°R", "degR", "Δ°F", "delta°F", "deltaF", "°F", "degF", "acre", "gal", "bbl",
+    "lbf", "kip", "psi", "ksi", "psf", "psia", "inHg", "inH2O", "BTU", "Btu", "therm", "MMBTU", "hp", "TR", "mph", "fpm", "fps", "gpm", "cfm", "pcf"];
+const NEUTRAL: [&str; 24] = ["s", "ms", "µs", "us", "ns", "min", "h", "hr", "day", "week", "yr", "A", "mA", "kA", "µA", "uA", "V", "mV", "kV", "rpm", "rps", "rad", "deg", "°"];
+
+/// Which system a unit expression belongs to: Some(true) for US customary, Some(false) for SI and
+/// metric, None when it only uses units common to both (s, A, V, rpm, %).
+pub fn system(text: &str) -> Option<bool> {
+    let toks = crate::parse::lex(text).ok()?;
+    let mut sys = None;
+    for (t, _) in toks {
+        if let crate::parse::Tok::Id(w) = t {
+            if US_SYMS.contains(&w.as_str()) { return Some(true); }
+            if !NEUTRAL.contains(&w.as_str()) && w != "%" && w != "ppm" && w != "ppb" { sys = Some(false); }
+        }
+    }
+    sys
+}

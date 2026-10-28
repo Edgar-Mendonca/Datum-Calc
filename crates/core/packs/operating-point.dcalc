@@ -104,7 +104,7 @@
    "id": 6,
    "kind": "math",
    "text": "k_s = 0.0012 m/(m^3/h)^2  # friction coefficient of the system",
-   "unit": "m/(m^3/h)^2",
+   "unit": "",
    "style": "input",
    "data": null
   },
@@ -176,7 +176,7 @@
    "id": 15,
    "kind": "solve",
    "text": "solve H_pump(Q_op) = H_sys(Q_op) for Q_op in 1 m^3/h .. 160 m^3/h",
-   "unit": "m^3/h",
+   "unit": "",
    "style": "",
    "data": null
   },
@@ -184,7 +184,7 @@
    "id": 16,
    "kind": "math",
    "text": "H_op = H_sys(Q_op)",
-   "unit": "m",
+   "unit": "",
    "style": "",
    "data": null
   },
@@ -192,7 +192,7 @@
    "id": 17,
    "kind": "math",
    "text": "P_op = rho*g*Q_op*H_op/eta  # shaft power at the operating point",
-   "unit": "kW",
+   "unit": "",
    "style": "",
    "data": null
   },

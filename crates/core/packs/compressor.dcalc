@@ -157,7 +157,7 @@
    "id": 17,
    "kind": "math",
    "text": "H_p = Z*R*T_1/MW/x*((p_2/p_1)^x - 1)  # polytropic head",
-   "unit": "kJ/kg",
+   "unit": "",
    "style": "",
    "data": null
   },
@@ -165,7 +165,7 @@
    "id": 18,
    "kind": "math",
    "text": "T_2 = T_1*(p_2/p_1)^x  # discharge temperature",
-   "unit": "°C",
+   "unit": "",
    "style": "",
    "data": null
   },
@@ -173,7 +173,7 @@
    "id": 19,
    "kind": "math",
    "text": "P_gas = m*H_p/eta_p  # gas power",
-   "unit": "kW",
+   "unit": "",
    "style": "",
    "data": null
   },
@@ -181,7 +181,7 @@
    "id": 20,
    "kind": "math",
    "text": "P_shaft = P_gas/eta_mech",
-   "unit": "kW",
+   "unit": "",
    "style": "",
    "data": null
   },

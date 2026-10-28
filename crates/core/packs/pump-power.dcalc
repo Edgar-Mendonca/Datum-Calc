@@ -117,7 +117,7 @@
    "id": 12,
    "kind": "math",
    "text": "P_h = rho*g*Q*H  # hydraulic power",
-   "unit": "kW",
+   "unit": "",
    "style": "",
    "data": null
   },
@@ -125,7 +125,7 @@
    "id": 13,
    "kind": "math",
    "text": "P_shaft = P_h/eta_p  # shaft power",
-   "unit": "kW",
+   "unit": "",
    "style": "",
    "data": null
   },
@@ -133,7 +133,7 @@
    "id": 14,
    "kind": "math",
    "text": "P_in = P_shaft/eta_m  # electrical input",
-   "unit": "kW",
+   "unit": "",
    "style": "",
    "data": null
   },
@@ -141,7 +141,7 @@
    "id": 15,
    "kind": "math",
    "text": "P_req = SF*P_shaft  # motor power required",
-   "unit": "kW",
+   "unit": "",
    "style": "",
    "data": null
   },
