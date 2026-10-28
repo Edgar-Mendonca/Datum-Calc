@@ -157,3 +157,91 @@ fn evaluation_speed_gate() {
     let limit = if cfg!(debug_assertions) { 10.0 } else { 1.0 };
     assert!(t.elapsed().as_secs_f64() < limit, "1,500 lines took {:?}", t.elapsed());
 }
+
+/// A random expression from the grammar: numbers with units, names, operators, functions, brackets.
+fn random_expr(r: &mut Rng, depth: u32) -> String {
+    const UNITS: [&str; 14] = ["m", "mm", "kg", "s", "N", "kN*m", "m^3/h", "MPa", "°C", "°F", "K", "rpm", "W/(m^2*K)", "%"];
+    const NUMS: [&str; 10] = ["0", "1", "2.5", "-3", "1e-9", "1e9", "1e300", "1e-300", "0.0001", "42"];
+    const FUNCS: [&str; 16] = ["sqrt", "sin", "cos", "ln", "log", "exp", "abs", "min", "max", "round", "sum", "mean", "len", "if", "hypot", "f"];
+    if depth == 0 || r.below(4) == 0 {
+        return match r.below(4) { 0 => NUMS[r.below(10)].into(), 1 => format!("{} {}", NUMS[r.below(10)], UNITS[r.below(14)]), 2 => ["a", "b", "v", "g", "pi", "zz"][r.below(6)].into(), _ => format!("({})", random_expr(r, depth.saturating_sub(1))) };
+    }
+    match r.below(4) {
+        0 | 1 => format!("{} {} {}", random_expr(r, depth - 1), ["+", "-", "*", "/", "^", "<=", ">"][r.below(7)], random_expr(r, depth - 1)),
+        2 => { let f = FUNCS[r.below(16)]; let n = if f == "if" { 3 } else if matches!(f, "min" | "max" | "round" | "hypot") { 2 } else { 1 }; format!("{f}({})", (0..n).map(|_| random_expr(r, depth - 1)).collect::<Vec<_>>().join(", ")) }
+        _ => format!("-{}", random_expr(r, depth - 1)),
+    }
+}
+
+#[test]
+fn random_expressions_never_panic() {
+    let mut r = Rng(0x5EED_CA1C_0001);
+    for round in 0..600 {
+        let mut s = Sheet::new("fuzz");
+        let mut push = |kind: Kind, text: String, data: serde_json::Value| { let id = s.regions.len() as u32 + 1; s.regions.push(Region { id, kind, text, data, ..Default::default() }); };
+        push(Kind::Math, "a = 2 m".into(), json!(null));
+        push(Kind::Math, "b = 3".into(), json!(null));
+        push(Kind::Math, "v = 0, 0.5 .. 3".into(), json!(null));
+        push(Kind::Math, "f(x) = x^2 + b".into(), json!(null));
+        if round % 5 == 0 {
+            let cell = |r: &mut Rng| [json!("1"), json!("2 m"), json!(""), json!("x"), json!(3), json!(null), json!("1e400")][r.below(7)].clone();
+            let rows: Vec<serde_json::Value> = (0..r.below(5)).map(|_| json!([cell(&mut r), cell(&mut r)])).collect();
+            push(Kind::Table, String::new(), json!({ "cols": [{ "name": "c1", "unit": (["", "m", "zz", "°C"][r.below(4)]) }, { "name": "c2", "formula": (["", "c1*2", "c1 +", "sum(c1)"][r.below(4)]) }], "rows": rows }));
+        }
+        for _ in 0..8 {
+            let e = random_expr(&mut r, 4);
+            let text = match r.below(6) {
+                0 => format!("check {e} <= {}", random_expr(&mut r, 2)),
+                1 => format!("solve {e} = {} for x in {} .. {}", random_expr(&mut r, 2), random_expr(&mut r, 1), random_expr(&mut r, 1)),
+                2 => format!("plot {e} for x in 0 .. {}", random_expr(&mut r, 1)),
+                3 => format!("w{} = {e}  # note", r.below(5)),
+                4 => format!("v{} = {} .. {}", r.below(3), random_expr(&mut r, 1), random_expr(&mut r, 1)),
+                _ => format!("{e} ="),
+            };
+            let kind = if text.starts_with("check") { Kind::Check } else { Kind::Math };
+            push(kind, text, json!(null));
+        }
+        for us in [false, true] {
+            let o = crate::eval::run_with(&s, &crate::eval::Fmt { digits: [2, 4, 10][round % 3], eng: round % 7 == 0, us });
+            assert_eq!(o.regions.len(), s.regions.len());
+            for g in &o.regions {
+                assert!(g.result.len() < 2000 && g.latex.len() < 20_000, "{}", g.latex);
+                if let Some(e) = &g.error { assert!(!e.msg.is_empty() && e.from <= e.to); }
+                if let Some(p) = &g.plot { assert!(p.series.iter().all(|s| s.ys.len() == p.xs.len())); }
+            }
+        }
+    }
+}
+
+#[test]
+fn units_latex_and_numbers_never_panic() {
+    let mut r = Rng(77);
+    for _ in 0..20_000 {
+        let t = r.text("m/^*()23-ksNPaW°CF·²³µΩ%h_ ".as_bytes(), 14);
+        if let Ok(u) = crate::units::parse(&t) { assert!(u.factor.is_finite() || u.factor == 0.0, "{t}"); }
+        let _ = crate::latex::unit(&crate::units::pretty(&t));
+        let _ = crate::units::system(&t);
+    }
+    let specials = [0.0, -0.0, f64::MIN_POSITIVE, 5e-324, 1e-300, 1e-12, 0.999_999_5, 999_999.5, 1e21, f64::MAX, -f64::MAX, f64::NAN, f64::INFINITY, -1e-7];
+    for x in specials.iter().copied().chain((0..20_000).map(|_| f64::from_bits(r.next()))) {
+        for d in [2, 4, 10] { for eng in [false, true] {
+            let (t, l) = crate::eval::fmt_num(x, d, eng);
+            assert!(!t.is_empty() && !l.is_empty() && t.len() < 60, "{x:e} → {t}");
+        } }
+    }
+}
+
+#[test]
+fn damaged_tables_and_pictures_open_and_work_out() {
+    let mut r = Rng(9);
+    let good = json!({ "format": 1, "name": "T", "regions": [
+        { "id": 1, "kind": "table", "text": "", "data": { "cols": [{ "name": "Q", "unit": "m^3/h" }, { "name": "H", "unit": "m", "formula": "" }], "rows": [["0", "60"], ["50", "55"]] } },
+        { "id": 2, "kind": "image", "text": "caption", "data": { "src": "data:image/png;base64,AAAA", "width": 60 } },
+        { "id": 3, "kind": "math", "text": "x = interp(25 m^3/h, Q, H)" } ] }).to_string();
+    for n in 0..3000 {
+        let mut b = good.clone().into_bytes();
+        for _ in 0..1 + r.below(4) { let i = r.below(b.len()); b[i] = b"{}[]\",:0x-9\\ "[r.below(13)]; }
+        if n % 4 == 0 { b.truncate(r.below(b.len())); }
+        if let Ok(s) = Sheet::from_json(&String::from_utf8_lossy(&b)) { let o = crate::eval::run(&s); assert_eq!(o.regions.len(), s.regions.len()); }
+    }
+}

@@ -73,6 +73,8 @@ pub struct Sheet {
     pub units: String,
     /// Significant figures for results.
     pub digits: u8,
+    /// Show each equation again with its numbers put in (P = ρgQH/η = 998 · 9.807 · … = 19.57 kW).
+    pub subst: bool,
     pub regions: Vec<Region>,
     pub next_id: u32,
     /// Window settings saved with the sheet (zoom, panels).
@@ -81,7 +83,7 @@ pub struct Sheet {
 
 impl Default for Sheet {
     fn default() -> Self {
-        Self { format: FORMAT, name: "Calc1".into(), title: TitleBlock::default(), page: Page::default(), units: "SI".into(), digits: 4, regions: vec![], next_id: 1, ui: serde_json::Value::Null }
+        Self { format: FORMAT, name: "Calc1".into(), title: TitleBlock::default(), page: Page::default(), units: "SI".into(), digits: 4, subst: false, regions: vec![], next_id: 1, ui: serde_json::Value::Null }
     }
 }
 
@@ -206,6 +208,7 @@ fn exec(s: &mut Sheet, op: Op) -> Result<(), String> {
         Op::SheetSet { field, value } => match field.as_str() {
             "name" => { let n = value.as_str().unwrap_or("").trim(); if n.is_empty() { return Err("Give the sheet a name.".into()); } s.name = n.into(); }
             "units" => s.units = match value.as_str() { Some("US") => "US".into(), Some("SI") => "SI".into(), _ => return Err("Units are SI or US.".into()) },
+            "subst" => s.subst = value.as_bool().ok_or("Show numbers is on or off.")?,
             "digits" => s.digits = value.as_u64().filter(|d| (2..=10).contains(d)).ok_or("Significant figures are 2 to 10.")? as u8,
             "paper" => s.page.paper = value.as_str().ok_or("Paper must be text.")?.into(),
             "margins" => s.page.margins = serde_json::from_value(value).map_err(|_| "Margins are four numbers in mm.")?,

@@ -192,7 +192,7 @@ fn ladder(dim: &Dim, us: bool) -> Option<&'static [&'static str]> {
     Some(match () {
         _ if k(L) => if us { &["in", "ft", "mi"] } else { &["mm", "m", "km"] },
         _ if k(M) => if us { &["lb"] } else { &["g", "kg", "t"] },
-        _ if k(T) => &["ms", "s"],
+        _ if k(T) => &["ms", "s", "min", "h"],
         _ if k(AREA) => if us { &["in^2", "ft^2"] } else { &["mm^2", "m^2"] },
         _ if k(VOL) => if us { &["in^3", "ft^3"] } else { &["mm^3", "L", "m^3"] },
         _ if k(FORCE) => if us { &["lbf", "kip"] } else { &["N", "kN", "MN"] },
@@ -261,7 +261,7 @@ pub fn display(si: f64, dim: &Dim, abs: bool, want: &str, us: bool) -> (f64, f64
 pub fn base_label(dim: &Dim) -> String {
     const SYM: [&str; 8] = ["m", "kg", "s", "K", "A", "mol", "cd", "rad"];
     let part = |pos: bool| -> Vec<String> {
-        (0..7).filter(|&i| if pos { dim[i] > 0 } else { dim[i] < 0 }).map(|i| { let e = dim[i].abs(); if e == 1 { SYM[i].to_string() } else { format!("{}{}", SYM[i], sup(e as i32)) } }).collect()
+        (0..7).filter(|&i| if pos { dim[i] > 0 } else { dim[i] < 0 }).map(|i| { let e = dim[i].unsigned_abs(); if e == 1 { SYM[i].to_string() } else { format!("{}{}", SYM[i], sup(e as i32)) } }).collect()
     };
     let (n, dn) = (part(true), part(false));
     match (n.is_empty(), dn.len()) {

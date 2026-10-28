@@ -49,6 +49,7 @@ const NewPage = () => {
 };
 
 const Home = () => {
+  const [packs] = createResource(() => call<PackCard[]>("packs"));
   const [recent] = createResource(() => call<{ path: string; name: string; modified: string }[]>("recent"));
   return (
     <div class="home">
@@ -56,7 +57,7 @@ const Home = () => {
         <h1>Good {new Date().getHours() < 12 ? "morning" : new Date().getHours() < 18 ? "afternoon" : "evening"}</h1>
         <div class="tiles">
           <button class="tile" onClick={C.newSheet}><div class="pic"><svg class="ic"><use href="#i-new" /></svg></div><b>Blank Sheet</b><span>An empty calc sheet with your title block.</span></button>
-          <button class="tile" onClick={() => setBackstage("new")}><div class="pic"><svg class="ic"><use href="#i-math" /></svg><small>10 packs</small></div><b>New from Pack</b><span>Ready, referenced calc sheets: pumps, pipes, compressors, vessels, beams, bolts, motors.</span></button>
+          <button class="tile" onClick={() => setBackstage("new")}><div class="pic"><svg class="ic"><use href="#i-math" /></svg><small>{packs()?.length ?? ""} packs</small></div><b>New from Pack</b><span>Ready, referenced calc sheets: pumps, pipes, compressors, vessels, beams, bolts, motors.</span></button>
           <button class="tile" onClick={C.open}><div class="pic"><svg class="ic"><use href="#i-open" /></svg></div><b>Open</b><span>A Datum Calc sheet (.dcalc) on this computer.</span></button>
           <button class="tile" onClick={() => C.pack("getting-started")}><div class="pic"><svg class="ic"><use href="#i-report" /></svg></div><b>Getting Started</b><span>A short sheet that shows how Datum Calc works, by example.</span></button>
           <button class="tile" onClick={() => setBackstage("roadmap")}><div class="pic"><svg class="ic"><use href="#i-list" /></svg></div><b>Roadmap</b><span>Everything Datum Calc will do, and when.</span></button>

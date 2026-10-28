@@ -59,35 +59,45 @@ fn prec(n: &Node) -> u8 {
     match &n.e { E::Bin(op, ..) => match *op { "<" | "<=" | ">" | ">=" | "==" | "!=" => 1, "+" | "-" => 3, "*" => 5, "/" => 9, _ => 7 }, E::Neg(_) => 4, _ => 9 }
 }
 
+/// Replaces a name by its value for the substituted line (None keeps the name).
+pub type Sub<'a> = dyn Fn(&str) -> Option<String> + 'a;
+
 /// LaTeX of an expression.
-pub fn node(n: &Node) -> String {
+pub fn node(n: &Node) -> String { nd(n, &|_| None) }
+
+/// LaTeX of an expression with each name replaced by its value: ρ·g·Q → 998 kg/m³ · 9.807 m/s² · …
+pub fn node_with(n: &Node, sub: &Sub) -> String { nd(n, sub) }
+
+fn nd(n: &Node, s: &Sub) -> String {
     match &n.e {
         E::Num(x, u) => {
             let t = if *x != 0.0 && !(1e-3..1e6).contains(&x.abs()) { let s = format!("{x:e}"); let (m, e) = s.split_once('e').unwrap_or((&s, "0")); format!("{m} \\times 10^{{{e}}}") } else { format!("{x}") };
             match u { Some(u) => format!("{t}\\,{}", unit_of(u)), None => t }
         }
-        E::Var(v) => name(v),
-        E::Group(e) => format!("\\left({}\\right)", node(e)),
-        E::Neg(e) => if prec(e) < 5 { format!("-\\left({}\\right)", node(e)) } else { format!("-{}", node(e)) },
+        E::Var(v) => s(v).map(|t| if t.starts_with('-') { format!("\\left({t}\\right)") } else { t }).unwrap_or_else(|| name(v)),
+        E::Group(e) => format!("\\left({}\\right)", nd(e, s)),
+        E::Neg(e) => if prec(e) < 5 { format!("-\\left({}\\right)", nd(e, s)) } else { format!("-{}", nd(e, s)) },
         E::Bin(op, a, b) => {
-            let wrap = |x: &Node, p: u8| if prec(x) < p && !matches!(x.e, E::Group(_)) { format!("\\left({}\\right)", node(x)) } else { node(x) };
+            let wrap = |x: &Node, p: u8| if prec(x) < p && !matches!(x.e, E::Group(_)) { format!("\\left({}\\right)", nd(x, s)) } else { nd(x, s) };
             match *op {
-                "/" => format!("\\frac{{{}}}{{{}}}", strip(a), strip(b)),
+                "/" => format!("\\frac{{{}}}{{{}}}", strip(a, s), strip(b, s)),
                 "^" => {
-                    let base = if matches!(a.e, E::Var(_) | E::Num(_, None) | E::Group(_) | E::Call(..)) { node(a) } else { format!("\\left({}\\right)", node(a)) };
-                    format!("{{{base}}}^{{{}}}", strip(b))
+                    let subbed = matches!(&a.e, E::Var(v) if s(v).is_some());
+                    let t = nd(a, s);
+                    let base = if (!subbed && matches!(a.e, E::Var(_) | E::Num(_, None) | E::Group(_) | E::Call(..))) || t.starts_with("\\left(") { t } else { format!("\\left({t}\\right)") };
+                    format!("{{{base}}}^{{{}}}", strip(b, s))
                 }
                 "*" => {
                     // A number times a name reads better without the dot only for 2πr-like terms; keep the dot otherwise.
                     format!("{} \\cdot {}", wrap(a, 5), wrap(b, 5))
                 }
                 "+" => format!("{} + {}", wrap(a, 3), wrap(b, 3)),
-                "-" => format!("{} - {}", wrap(a, 3), if prec(b) <= 3 && !matches!(b.e, E::Group(_)) { format!("\\left({}\\right)", node(b)) } else { node(b) }),
-                o => format!("{} {} {}", node(a), match o { "<" => "<", "<=" => "\\le", ">" => ">", ">=" => "\\ge", "==" => "=", _ => "\\ne" }, node(b)),
+                "-" => format!("{} - {}", wrap(a, 3), if prec(b) <= 3 && !matches!(b.e, E::Group(_)) { format!("\\left({}\\right)", nd(b, s)) } else { nd(b, s) }),
+                o => format!("{} {} {}", nd(a, s), match o { "<" => "<", "<=" => "\\le", ">" => ">", ">=" => "\\ge", "==" => "=", _ => "\\ne" }, nd(b, s)),
             }
         }
         E::Call(f, args) => {
-            let a: Vec<String> = args.iter().map(strip).collect();
+            let a: Vec<String> = args.iter().map(|x| strip(x, s)).collect();
             match f.as_str() {
                 "sqrt" if a.len() == 1 => format!("\\sqrt{{{}}}", a[0]),
                 "cbrt" if a.len() == 1 => format!("\\sqrt[3]{{{}}}", a[0]),
@@ -103,7 +113,7 @@ pub fn node(n: &Node) -> String {
 }
 
 /// Without the outer brackets the user typed (a fraction or power already groups it).
-fn strip(n: &Node) -> String { match &n.e { E::Group(e) => node(e), _ => node(n) } }
+fn strip(n: &Node, s: &Sub) -> String { match &n.e { E::Group(e) => nd(e, s), _ => nd(n, s) } }
 
 /// LaTeX of a whole statement.
 pub fn stmt(s: &Stmt) -> String {

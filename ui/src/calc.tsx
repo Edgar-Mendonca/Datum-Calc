@@ -47,12 +47,13 @@ export const MathView = (p: { r: Region; paper?: boolean }) => {
       <Show when={p.r.text.trim() && p.r.kind === "table"}><div class="tcap">{p.r.text}</div></Show>
       <div class="mline" classList={{ none: p.r.kind === "table" }}>
         <Show when={o().latex}><Tex s={o().latex} display /></Show>
+        <Show when={o().subst_tex && !o().check}><Tex s={`= ${o().subst_tex}`} class="subst" display /></Show>
         <Show when={o().result_tex && !o().input && !o().check}><Tex s={o().result_tex.startsWith("\\Rightarrow") ? o().result_tex : `= ${o().result_tex}`} class="res" display /></Show>
         <Show when={!p.paper && o().units.length && !o().check}>
           <button class="unitbtn" title="Show the result in another unit" onMouseDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); unitMenu(e, p.r, o()); }}>{p.r.unit ? "unit ▾" : "▾"}</button>
         </Show>
-        <Show when={o().note}><span class="note">{o().note}</span></Show>
         <Show when={o().check}>{c => <span class="checkout"><Badge pass={c().pass} /><Show when={c().ratio !== null}><span class="ratio">utilisation <b>{c().ratio!.toFixed(2)}</b></span></Show></span>}</Show>
+        <Show when={o().note}><span class="note">{o().note}</span></Show>
       </div>
       <Show when={o().check}>{c => <div class="checkvals">{c().lhs} {({ "<=": "≤", ">=": "≥", "!=": "≠", "==": "=" } as Record<string, string>)[c().op] ?? c().op} {c().rhs}</div>}</Show>
       <Show when={o().plot}>{pl => <PlotView p={pl()} id={p.r.id} paper={p.paper} />}</Show>
@@ -123,10 +124,11 @@ export const VarsPanel = () => {
     <aside class="vars">
       <header>Variables <Help k="vars" /></header>
       <Show when={vars().length} fallback={<p class="muted">Every name the sheet defines appears here with its value and unit.</p>}>
-        <table><tbody><For each={vars()}>{v => <tr onClick={() => setSelId(v.id)} title="Go to the line that defines it"><td><Tex s={v.tex} /></td><td class="r">{v.value}</td><td>{v.unit}</td></tr>}</For></tbody></table>
+        <table class="vlist"><tbody><For each={vars()}>{v => <tr onClick={() => setSelId(v.id)} title="Go to the line that defines it"><td><Tex s={v.tex} /></td><td class="r">{v.value}</td><td>{v.unit}</td></tr>}</For></tbody></table>
       </Show>
       <Show when={(out()?.calc.checks ?? 0) > 0}>
         <div class="vsum"><b>Checks</b> {out()!.calc.checks - out()!.calc.failed} of {out()!.calc.checks} pass{out()!.calc.failed ? <span class="failn"> · {out()!.calc.failed} fail</span> : ""}</div>
+        <table class="vchecks"><tbody><For each={(out()?.calc.regions ?? []).filter(r => r.check)}>{r => <tr onClick={() => setSelId(r.id)} title="Go to the check"><td><Tex s={r.latex} /></td><td class="r">{r.check!.ratio === null ? "" : r.check!.ratio.toFixed(2)}</td><td><Badge pass={r.check!.pass} /></td></tr>}</For></tbody></table>
       </Show>
       <Show when={(out()?.calc.errors ?? 0) > 0}><div class="vsum errn">{out()!.calc.errors} line{out()!.calc.errors > 1 ? "s" : ""} with errors</div></Show>
     </aside>

@@ -35,7 +35,7 @@ const check = (name, ok, info = "") => { console.log(`${ok ? "ok  " : "FAIL"} ${
   check("File page offers a blank sheet", (await p.textContent(".tiles")).includes("Blank Sheet"));
   // 1b. File › New lists the ten calc packs by field; a click opens one (0.1.3).
   await p.click(".bs aside button:has-text('New')"); await p.waitForTimeout(200);
-  check("New lists the ten calc packs", (await p.$$(".tiles.packs .tile")).length === 10 && (await p.$$eval("h3.packf", h => h.map(x => x.textContent))).join() === "Rotating equipment,Process,Mechanical,Electrical");
+  check("New lists the thirteen calc packs", (await p.$$(".tiles.packs .tile")).length === 13 && (await p.$$eval("h3.packf", h => h.map(x => x.textContent))).join() === "Rotating equipment,Process,Mechanical,Electrical");
   await p.click(".tiles.packs .tile:has-text('Pump power')"); await p.waitForTimeout(200);
   check("a pack tile opens that pack", JSON.stringify(await p.evaluate(() => window.__calls.filter(c => c[0] === "new_from_pack").pop())).includes("pump-power"));
   await p.click(".tabs .file").catch(() => {}); await p.waitForTimeout(100);
@@ -88,10 +88,10 @@ const check = (name, ok, info = "") => { console.log(`${ok ? "ok  " : "FAIL"} ${
   check("the unit menu offers hp", (await p.$$eval(".menu button", bs => bs.map(b => b.textContent))).some(t => t.includes("hp")));
   await p.click(".menu button:has-text('hp')"); await p.waitForTimeout(120);
   check("choosing a unit sets the region's unit", (await lastApply()).includes('"field":"unit"') && (await lastApply()).includes('"hp"'), await lastApply());
-  const vars = await p.$$eval(".vars tr", rs => rs.map(r => r.textContent));
+  const vars = await p.$$eval(".vars .vlist tr", rs => rs.map(r => r.textContent));
   check("the Variables panel lists every name with its value", vars.length === 9 && vars.some(v => v.includes("19.61") && v.includes("kW")), JSON.stringify(vars));
   check("the panel counts the checks and errors", (await p.textContent(".vars")).includes("1 of 1 pass") && (await p.textContent(".vars")).includes("1 line with errors"));
-  await p.click(".vars tr:nth-child(2)"); await p.waitForTimeout(100);
+  await p.click(".vars .vlist tr:nth-child(2)"); await p.waitForTimeout(100);
   check("clicking a variable selects its line", await (await R(2)).evaluate(e => e.classList.contains("sel")));
   check("the status bar counts the checks", (await p.textContent(".status")).includes("1/1 checks pass"));
 
@@ -155,6 +155,16 @@ const check = (name, ok, info = "") => { console.log(`${ok ? "ok  " : "FAIL"} ${
   const csv = await p.evaluate(() => window.__calls.filter(c => c[0] === "save_file").pop()?.[1]);
   check("CSV export lists inputs, results and checks", !!csv && csv.name.endsWith(".csv") && csv.data.startsWith("Name,Value,Unit,Kind") && csv.data.includes("Q,120,m³/h,input") && csv.data.includes("P,19.61,kW,result") && csv.data.includes("PASS"), JSON.stringify(csv).slice(0, 300));
   await p.click(".bs aside .back"); await p.waitForTimeout(150);
+
+  // 5c. View › Numbers saves the setting with the sheet; the side panel lists every check (0.1.5).
+  await p.click(".tabs > button:text-is('View')"); await p.waitForTimeout(80);
+  await p.click(".ribbon button:has-text('Numbers')"); await p.waitForTimeout(120);
+  check("View › Numbers turns on the substituted line", (await lastApply()).includes('"field":"subst"') && (await lastApply()).includes('"value":true'), await lastApply());
+  check("the side panel lists the checks with their badges", (await p.$$(".vars .vchecks tr")).length === 1 && (await p.textContent(".vars .vchecks")).includes("PASS"));
+  await p.click(".vars .vchecks tr"); await p.waitForTimeout(100);
+  check("clicking a listed check selects it", await (await R(7)).evaluate(e => e.classList.contains("sel")));
+  const badgeW = await p.$eval(".vars .vchecks .badge", b => b.scrollWidth <= b.clientWidth + 1);
+  check("the check badge in the panel is not cut", badgeW);
 
   // 6. ? help opens a card.
   await p.click(".tabs > button:text-is('Home')");

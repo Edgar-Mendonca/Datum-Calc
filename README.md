@@ -30,13 +30,14 @@ Datum Calc is a desktop app for engineering calculation sheets. You write the ca
 
 1. **Write the equations.** `Q = 120 m^3/h`, `H = 45 m`, `P = rho*g*Q*H/eta`. Greek letters and subscripts are typed simply (`sigma_allow`).
 2. **Check the results.** Every answer carries its unit, and `check sigma <= sigma_allow` shows PASS or FAIL with the utilisation ratio.
-3. **Print the calc sheet.** Fill in the title block (project, calc number, by, checked, date, revision) and save a PDF.
+3. **Show the numbers.** View › Numbers repeats each equation with its values put in, as on a hand calculation.
+4. **Print the calc sheet.** Fill in the title block (project, calc number, by, checked, date, revision) and save a PDF.
 
-**Ten calc packs** start you off (File › New from pack), each with its inputs at the top, its results and checks below and its references at the end, and each checked against a hand calculation in the tests:
+**Thirteen calc packs** start you off (File › New from pack), each with its inputs at the top, its results and checks below and its references at the end, and each checked against a hand calculation in the tests:
 
 | Rotating equipment | Process | Mechanical | Electrical |
 | --- | --- | --- | --- |
-| Pump power, efficiency and motor size · NPSH available against required · Pump curve against system curve (operating point) · Compressor polytropic head and power | Pipe pressure drop (Darcy–Weisbach, Colebrook) · Heat exchanger duty and LMTD | Thin-walled pressure vessel · Beams: deflection and bending stress · Bolt preload and tightening torque | Electric motor: current, power factor and starting current |
+| Pump power, efficiency and motor size · NPSH available against required · Pump curve against system curve (operating point) · Compressor polytropic head and power · Shaft torsion | Pipe pressure drop (Darcy–Weisbach, Colebrook) · Heat exchanger duty and LMTD · Tank volume and fill time | Thin-walled pressure vessel · Beams: deflection and bending stress · Bolt preload and tightening torque · Thermal expansion of a pipe | Electric motor: current, power factor and starting current |
 
 <table><tr>
 <td width="50%"><img src="docs/images/print.png" alt="The printed calc sheet with its title block"><br><sub>The printed calc sheet: title block, maths, results, PASS/FAIL checks, page numbers.</sub></td>
@@ -49,9 +50,9 @@ It is for mechanical, process, structural and electrical engineers, students and
 
 | Version | What |
 | --- | --- |
-| 0.1.0 – 0.1.3 ✅ | The calc sheet and its printing; units, equations, checks, solve and plot; tables and pictures; ten calc packs |
-| 0.1.4 | Fixes from trying every pack on a clean Windows PC; a Getting Started sheet |
-| 0.2 | Materials from Datum Atlas, more packs, equations shown with their numbers substituted |
+| 0.1.0 – 0.1.5 ✅ | The calc sheet and its printing; units, equations, checks, solve and plot; tables and pictures; thirteen calc packs; equations with their numbers; a Getting Started sheet; hardening |
+| 0.1.6 | Fixes from trying every pack on a clean Windows PC and from the convention |
+| 0.2 | Materials from Datum Atlas, more packs |
 | 0.3 – 1.0 | Matrices and ODEs, templates, a validation report, a signed installer |
 
 File › Roadmap in the app shows the full list; it comes from [`docs/site.json`](docs/site.json).

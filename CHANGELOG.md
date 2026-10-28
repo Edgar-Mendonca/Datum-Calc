@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.1.5 — 2026-10-28
+
+A bigger release: equations shown with their numbers, three more calc packs, a list of every check, and a round of hardening that found and fixed four ways the engine could fail.
+
+**Equations with their numbers** (View › Numbers)
+- Each equation is shown a second time with the values put in, as on a hand calculation: P = ρ g Q H/η = 998 kg/m³ · 9.807 m/s² · 120 m³/h · 45 m / 0.75 = 19.57 kW. Each value appears in the unit it is shown in on its own line. The setting is saved with the sheet and printed.
+
+**More calc packs** (13 in all)
+- Shaft torsion: torque from power and speed, shear stress, the smallest diameter for an allowable stress, and the angle of twist (shown in degrees).
+- Tank volume, liquid mass, bottom pressure and fill time (times of an hour or more show in hours).
+- Thermal expansion of a pipe: free growth, and the stress and force if it were fully restrained, with a FAIL that shows why the line needs a loop.
+- Each is checked against a hand calculation in the tests, like the first ten.
+
+**Checks**
+- The side panel lists every check with its utilisation and PASS or FAIL; click one to go to it.
+- On a check line the badge now comes straight after the check, before its note.
+
+**Sturdier**
+- A line with thousands of brackets or signs inside each other could stop Datum Calc; lines are now limited (60 levels, 1,000 symbols) with a clear message, and the sheet is worked out on its own thread with plenty of room.
+- A range with a tiny step (x = 0, 1e-300 .. 1) could stop Datum Calc; it now says a range holds at most 100,000 values.
+- A unit power such as m^999 was quietly cut to m^127; powers of units above 60 now give a clear message.
+- Results beyond about 10³⁰⁸ now say so instead of showing nothing; numbers too small to matter (below 10⁻³⁰⁰) show as 0.
+- A square or cube root of a value carrying rotation (such as a torque worked out from rpm) no longer gives a units error.
+- Over 100,000 random sheets (random equations, units, tables, checks, solve and plot) and 20,000 random unit strings and numbers are now worked out in the tests, in both build types, without a failure.
+
+**Smaller**
+- Degrees read 0.22° (no space). The Home tile counts the packs. Pasted pictures are limited to 4 MB.
+
 ## 0.1.4 — 2026-10-28
 
 A Getting Started sheet, inputs that keep their units, clearer numbers, and calc packs that convert to US units.

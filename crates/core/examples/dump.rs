@@ -3,6 +3,15 @@
 use datum_core::{eval, Doc, Kind, Op, Sheet};
 
 fn main() {
+    // With a pack id (and "us"), dump that pack instead: cargo run --example dump -- shaft us
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    if let Some(mut s) = args.first().and_then(|id| datum_core::packs::sheet(id)) {
+        if args.iter().any(|a| a == "us") { s.units = "US".into(); }
+        if args.iter().any(|a| a == "numbers") { s.subst = true; }
+        let state = serde_json::json!({ "sheet": s, "calc": eval::run(&s), "path": null, "dirty": false, "undo": false, "redo": false, "rev": 1 });
+        println!("{}", serde_json::json!({ "state": state, "packs": datum_core::packs::cards() }));
+        return;
+    }
     let mut d = Doc::new(Sheet::new("Pump power"));
     let rows: [(Kind, &str, &str); 11] = [
         (Kind::Text, "Pump power and motor size", "heading"),

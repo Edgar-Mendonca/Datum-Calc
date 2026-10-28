@@ -11,7 +11,7 @@ export type Kind = "math" | "text" | "check" | "solve" | "plot" | "table" | "ima
 export interface Region { id: number; kind: Kind; text: string; unit: string; style: string; data: any }
 export interface TitleBlock { project: string; number: string; title: string; by: string; checked: string; date: string; rev: string; company: string; client: string; logo: string }
 export interface Sheet {
-  format: number; name: string; title: TitleBlock; page: { paper: string; margins: [number, number, number, number] }; units: "SI" | "US"; digits: number;
+  format: number; name: string; title: TitleBlock; page: { paper: string; margins: [number, number, number, number] }; units: "SI" | "US"; digits: number; subst: boolean;
   regions: Region[]; next_id: number; ui: any;
 }
 export interface Out { sheet: Sheet; calc: SheetOut; path: string | null; dirty: boolean; undo: boolean; redo: boolean; rev: number }
@@ -21,7 +21,7 @@ export interface CheckOut { pass: boolean; ratio: number | null; lhs: string; rh
 export interface PlotOut { xs: number[]; xlabel: string; xunit: string; series: { label: string; ys: number[] }[]; yunit: string }
 export interface RegionOut {
   id: number; latex: string; result_tex: string; result: string; value: string; unit: string; name: string; input: boolean;
-  error: { msg: string; from: number; to: number } | null; warn: string; check: CheckOut | null; plot: PlotOut | null; units: string[]; note: string;
+  error: { msg: string; from: number; to: number } | null; warn: string; check: CheckOut | null; plot: PlotOut | null; units: string[]; note: string; subst_tex: string;
   table: TableOut | null; defs: VarOut[];
 }
 export interface VarOut { name: string; tex: string; value: string; unit: string; id: number }

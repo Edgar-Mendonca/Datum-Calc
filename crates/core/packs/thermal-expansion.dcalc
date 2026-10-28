@@ -1,0 +1,205 @@
+{
+ "format": 1,
+ "name": "Thermal expansion of a pipe",
+ "title": {
+  "project": "",
+  "number": "PACK-13",
+  "title": "Thermal expansion of a pipe",
+  "by": "",
+  "checked": "",
+  "date": "",
+  "rev": "A",
+  "company": "",
+  "client": "",
+  "logo": ""
+ },
+ "page": {
+  "paper": "A4",
+  "margins": [
+   15.0,
+   15.0,
+   15.0,
+   20.0
+  ]
+ },
+ "units": "SI",
+ "digits": 4,
+ "regions": [
+  {
+   "id": 1,
+   "kind": "text",
+   "text": "Thermal expansion of a pipe",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 2,
+   "kind": "text",
+   "text": "Carbon steel line installed cold and run hot. Free growth ΔL = α L ΔT; if both ends were fixed, the stress would be σ = E α ΔT and the end force F = σ A. The FAIL below shows why the line needs an expansion loop.",
+   "unit": "",
+   "style": "note",
+   "data": null
+  },
+  {
+   "id": 3,
+   "kind": "text",
+   "text": "Inputs",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 4,
+   "kind": "math",
+   "text": "alpha = 12e-6 K^-1  # expansion coefficient of carbon steel",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 5,
+   "kind": "math",
+   "text": "L = 50 m  # straight length between anchors",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 6,
+   "kind": "math",
+   "text": "T_in = 15 °C  # installation temperature",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 7,
+   "kind": "math",
+   "text": "T_op = 180 °C  # operating temperature",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 8,
+   "kind": "math",
+   "text": "E = 200 GPa  # Young's modulus",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 9,
+   "kind": "math",
+   "text": "D_o = 168.3 mm  # outside diameter (6 in)",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 10,
+   "kind": "math",
+   "text": "D_i = 154.1 mm  # inside diameter (schedule 40)",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 11,
+   "kind": "math",
+   "text": "dL_loop = 120 mm  # movement the expansion loop can take",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 12,
+   "kind": "math",
+   "text": "S_a = 138 MPa  # allowable stress",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 13,
+   "kind": "text",
+   "text": "Results",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 14,
+   "kind": "math",
+   "text": "dT = T_op - T_in  # temperature rise",
+   "unit": "K",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 15,
+   "kind": "math",
+   "text": "dL = alpha*L*dT  # free growth",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 16,
+   "kind": "math",
+   "text": "sigma_r = E*alpha*dT  # stress if fully restrained",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 17,
+   "kind": "math",
+   "text": "A = pi/4*(D_o^2 - D_i^2)  # metal area",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 18,
+   "kind": "math",
+   "text": "F_r = sigma_r*A  # end force if fully restrained",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 19,
+   "kind": "check",
+   "text": "check dL <= dL_loop",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 20,
+   "kind": "check",
+   "text": "check sigma_r <= S_a  # fully restrained: fails, so the line needs the loop",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 21,
+   "kind": "text",
+   "text": "Ref: S. Timoshenko, J. N. Goodier, Theory of Elasticity, 3rd ed., §150: thermal stress in a restrained bar; α for carbon steel from ASME B31.3 Table C-1.",
+   "unit": "",
+   "style": "ref",
+   "data": null
+  }
+ ],
+ "next_id": 22,
+ "ui": {
+  "pack": {
+   "id": "thermal-expansion",
+   "field": "Mechanical",
+   "desc": "Free growth of a hot steel pipe, and the stress and force if it were fully restrained: why the line needs a loop."
+  }
+ }
+}

@@ -1,0 +1,173 @@
+{
+ "format": 1,
+ "name": "Tank volume, mass and fill time",
+ "title": {
+  "project": "",
+  "number": "PACK-12",
+  "title": "Tank volume, mass and fill time",
+  "by": "",
+  "checked": "",
+  "date": "",
+  "rev": "A",
+  "company": "",
+  "client": "",
+  "logo": ""
+ },
+ "page": {
+  "paper": "A4",
+  "margins": [
+   15.0,
+   15.0,
+   15.0,
+   20.0
+  ]
+ },
+ "units": "SI",
+ "digits": 4,
+ "regions": [
+  {
+   "id": 1,
+   "kind": "text",
+   "text": "Tank volume, mass and fill time",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 2,
+   "kind": "text",
+   "text": "Vertical cylindrical tank with a flat bottom, filled to a working level by a pump of known flow.",
+   "unit": "",
+   "style": "note",
+   "data": null
+  },
+  {
+   "id": 3,
+   "kind": "text",
+   "text": "Inputs",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 4,
+   "kind": "math",
+   "text": "D = 3 m  # inside diameter",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 5,
+   "kind": "math",
+   "text": "H = 4 m  # height of the shell",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 6,
+   "kind": "math",
+   "text": "f_w = 0.9  # working level as a fraction of the height",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 7,
+   "kind": "math",
+   "text": "rho = 1000 kg/m^3  # liquid density",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 8,
+   "kind": "math",
+   "text": "Q = 20 m^3/h  # filling flow",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 9,
+   "kind": "math",
+   "text": "t_max = 2 h  # time allowed to fill",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 10,
+   "kind": "text",
+   "text": "Results",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 11,
+   "kind": "math",
+   "text": "V = pi*D^2/4*H  # total volume",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 12,
+   "kind": "math",
+   "text": "V_w = f_w*V  # working volume",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 13,
+   "kind": "math",
+   "text": "m_l = rho*V_w  # liquid mass",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 14,
+   "kind": "math",
+   "text": "p_b = rho*g*f_w*H  # pressure at the bottom (above atmosphere)",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 15,
+   "kind": "math",
+   "text": "t_fill = V_w/Q  # time to fill",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 16,
+   "kind": "check",
+   "text": "check t_fill <= t_max",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 17,
+   "kind": "text",
+   "text": "Ref: geometry of a right circular cylinder; hydrostatic pressure p = ρ g h (F. M. White, Fluid Mechanics, 8th ed., §2.3).",
+   "unit": "",
+   "style": "ref",
+   "data": null
+  }
+ ],
+ "next_id": 18,
+ "ui": {
+  "pack": {
+   "id": "tank",
+   "field": "Process",
+   "desc": "Volume of a vertical cylindrical tank, working volume and liquid mass, the pressure at the bottom and the time to fill it."
+  }
+ }
+}

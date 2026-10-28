@@ -38,7 +38,7 @@ pub fn lex(s: &str) -> Result<Vec<(Tok, Span)>, Error> {
                 if j < c.len() && c[j].is_ascii_digit() { while j < c.len() && c[j].is_ascii_digit() { j += 1; } i = j; }
             }
             let t: String = c[start..i].iter().collect();
-            let v = t.parse::<f64>().map_err(|_| Error { msg: format!("“{t}” is not a number."), at: (start, i) })?;
+            let v = t.parse::<f64>().ok().filter(|v| v.is_finite()).ok_or_else(|| Error { msg: format!("“{t}” is not a number this size can hold (up to about 10³⁰⁸)."), at: (start, i) })?;
             out.push((Tok::Num(v), (start, i)));
             continue;
         }
@@ -115,8 +115,8 @@ impl UnitParser<'_> {
             _ => return None,
         };
         let pw = match (self.peek(0), self.peek(1), self.peek(2)) {
-            (Some(Tok::Op("^")), Some(Tok::Num(n)), _) if n.fract() == 0.0 => { self.i += 2; Some(n as i8) }
-            (Some(Tok::Op("^")), Some(Tok::Op("-")), Some(Tok::Num(n))) if n.fract() == 0.0 => { self.i += 3; Some(-(n as i8)) }
+            (Some(Tok::Op("^")), Some(Tok::Num(n)), _) if n.fract() == 0.0 && n.abs() <= 60.0 => { self.i += 2; Some(n as i8) }
+            (Some(Tok::Op("^")), Some(Tok::Op("-")), Some(Tok::Num(n))) if n.fract() == 0.0 && n.abs() <= 60.0 => { self.i += 3; Some(-(n as i8)) }
             (Some(Tok::Op("²")), _, _) => { self.i += 1; Some(2) }
             (Some(Tok::Op("³")), _, _) => { self.i += 1; Some(3) }
             _ => None,
@@ -143,7 +143,7 @@ impl UnitParser<'_> {
     pub fn expr(&mut self) -> Option<UnitExpr> { self.expr_inner(true) }
 }
 
-struct P<'a> { t: Vec<(Tok, Span)>, i: usize, known: &'a [String], end: usize }
+struct P<'a> { t: Vec<(Tok, Span)>, i: usize, known: &'a [String], end: usize, depth: u32 }
 
 impl P<'_> {
     fn peek(&self) -> Option<&Tok> { self.t.get(self.i).map(|t| &t.0) }
@@ -160,7 +160,16 @@ impl P<'_> {
         match self.t.get(self.i) { Some((Tok::Id(s), a)) => { let r = (s.clone(), *a); self.i += 1; Ok(r) } _ => err("Expected a name here.", self.at()) }
     }
 
+    /// Brackets, minus signs and powers inside each other are limited, so no line can exhaust the stack.
     fn expr(&mut self, min: u8) -> Result<Node, Error> {
+        if self.depth >= MAX_NEST { return err(format!("Too many brackets or signs inside each other (more than {MAX_NEST})."), self.at()); }
+        self.depth += 1;
+        let r = self.expr_in(min);
+        self.depth -= 1;
+        r
+    }
+
+    fn expr_in(&mut self, min: u8) -> Result<Node, Error> {
         let mut lhs = self.prefix()?;
         loop {
             let Some(Tok::Op(op)) = self.peek().cloned() else {
@@ -257,6 +266,27 @@ impl P<'_> {
 
 fn lhs_is_num(n: &Node) -> bool { matches!(n.e, E::Num(..)) }
 
+const MAX_NEST: u32 = 60;
+const MAX_TOKENS: usize = 1000;
+/// The deepest expression tree that is worked out (a chain of 1 + 1 + … grows one level per sign).
+const MAX_DEPTH: usize = 400;
+
+/// The depth of an expression tree, found without recursion.
+pub fn depth(n: &Node) -> usize {
+    let mut stack = vec![(n, 1usize)];
+    let mut max = 0;
+    while let Some((n, d)) = stack.pop() {
+        max = max.max(d);
+        match &n.e {
+            E::Neg(a) | E::Group(a) => stack.push((a, d + 1)),
+            E::Bin(_, a, b) => { stack.push((a, d + 1)); stack.push((b, d + 1)); }
+            E::Call(_, args) => stack.extend(args.iter().map(|a| (a, d + 1))),
+            _ => {}
+        }
+    }
+    max
+}
+
 /// Names that are never read as a unit after `*` or `/`: the built-in constants (g is gravity, not grams).
 const NOT_UNITS: [&str; 4] = ["g", "e", "R", "c_0"];
 
@@ -273,7 +303,8 @@ pub fn statement(s: &str, known: &[String]) -> Result<Stmt, Error> {
         if is_def(&t) { names.extend(t.iter().skip(2).take_while(|x| x.0 != Tok::Op(")")).filter_map(|x| if let Tok::Id(n) = &x.0 { Some(n.clone()) } else { None })); }
     }
     if let Some(k) = t.iter().position(|x| x.0 == Tok::Id("for".into())) { if let Some((Tok::Id(n), _)) = t.get(k + 1) { names.push(n.clone()); } }
-    let mut p = P { end: s2.chars().count(), t, i: 0, known: &names };
+    if t.len() > MAX_TOKENS { return err(format!("This line is too long (more than {MAX_TOKENS} symbols): split it over several lines."), (0, s2.chars().count())); }
+    let mut p = P { end: s2.chars().count(), t, i: 0, known: &names, depth: 0 };
     let st = match (&p.t[0].0, p.t.get(1).map(|x| &x.0)) {
         (Tok::Id(w), Some(_)) if w == "check" => { p.i = 1; Stmt::Check { e: p.expr(0)? } }
         (Tok::Id(w), Some(_)) if w == "solve" => {
@@ -313,6 +344,14 @@ pub fn statement(s: &str, known: &[String]) -> Result<Stmt, Error> {
         _ => Stmt::Show { e: p.expr(1)? },
     };
     p.done()?;
+    let nodes: Vec<&Node> = match &st {
+        Stmt::Assign { e, .. } | Stmt::Func { e, .. } | Stmt::Check { e } | Stmt::Show { e } => vec![e],
+        Stmt::Range { start, next, end, .. } => [Some(start), next.as_ref(), Some(end)].into_iter().flatten().collect(),
+        Stmt::Solve { lhs, rhs, lo, hi, .. } => vec![lhs, rhs, lo, hi],
+        Stmt::Plot { ys, lo, hi, .. } => ys.iter().chain([lo, hi]).collect(),
+        Stmt::Empty => vec![],
+    };
+    if nodes.iter().any(|n| depth(n) > MAX_DEPTH) { return err("This line is too long to work out: split it over several lines.", (0, p.end)); }
     Ok(st)
 }
 

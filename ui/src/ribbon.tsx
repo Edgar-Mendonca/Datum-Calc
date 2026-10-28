@@ -119,7 +119,7 @@ export const Ribbon = () => (
     </Show>
     <Show when={tab() === "view"}>
       <G l="Zoom" h="zoom"><B big i="zin" l="Zoom In" run={C.zoomIn} /><B big i="zout" l="Zoom Out" run={C.zoomOut} /><S_><B i="fit" l="100 %" run={() => setZoom(100)} /><span class="muted zoomv">{zoom()} %</span></S_></G>
-      <G l="Show" h="show"><B big i="vars" l="Variables" on={varsPanel()} run={C.vars} /></G>
+      <G l="Show" h="show"><B big i="vars" l="Variables" on={varsPanel()} run={C.vars} /><B big i="math" l="Numbers" title="Show each equation again with its numbers put in (also printed)" on={!!out()?.sheet.subst} run={() => act({ SheetSet: { field: "subst", value: !out()?.sheet.subst } })} /></G>
       <G l="Theme" h="theme"><S_><For each={[["auto", "Auto"], ["light", "Light"], ["dark", "Dark"]]}>{([k, l]) => <B i="theme" l={l} on={theme() === k} run={() => setTheme(k)} />}</For></S_></G>
     </Show>
     <Show when={tab() === "format" && sel()}>

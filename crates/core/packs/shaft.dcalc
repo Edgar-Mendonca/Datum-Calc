@@ -1,0 +1,205 @@
+{
+ "format": 1,
+ "name": "Shaft torsion: stress, size and twist",
+ "title": {
+  "project": "",
+  "number": "PACK-11",
+  "title": "Shaft torsion: stress, size and twist",
+  "by": "",
+  "checked": "",
+  "date": "",
+  "rev": "A",
+  "company": "",
+  "client": "",
+  "logo": ""
+ },
+ "page": {
+  "paper": "A4",
+  "margins": [
+   15.0,
+   15.0,
+   15.0,
+   20.0
+  ]
+ },
+ "units": "SI",
+ "digits": 4,
+ "regions": [
+  {
+   "id": 1,
+   "kind": "text",
+   "text": "Shaft torsion: stress, size and twist",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 2,
+   "kind": "text",
+   "text": "Solid circular steel shaft carrying a motor's power. Torque T = P/ω; shear stress τ = 16T/(πd³); twist θ = T L/(G J) with J = πd⁴/32.",
+   "unit": "",
+   "style": "note",
+   "data": null
+  },
+  {
+   "id": 3,
+   "kind": "text",
+   "text": "Inputs",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 4,
+   "kind": "math",
+   "text": "P = 75 kW  # power transmitted",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 5,
+   "kind": "math",
+   "text": "n = 1480 rpm  # shaft speed",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 6,
+   "kind": "math",
+   "text": "d = 60 mm  # shaft diameter",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 7,
+   "kind": "math",
+   "text": "L = 0.8 m  # length between coupling and impeller",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 8,
+   "kind": "math",
+   "text": "G = 79.3 GPa  # shear modulus of steel",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 9,
+   "kind": "math",
+   "text": "tau_allow = 40 MPa  # allowable shear stress (with keyway and fatigue allowance)",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 10,
+   "kind": "math",
+   "text": "theta_max = 0.25 deg  # twist limit over the length",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 11,
+   "kind": "text",
+   "text": "Results",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 12,
+   "kind": "math",
+   "text": "T = P/n  # torque",
+   "unit": "N*m",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 13,
+   "kind": "math",
+   "text": "tau = 16*T/(pi*d^3)  # shear stress at the surface",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 14,
+   "kind": "math",
+   "text": "d_min = cbrt(16*T/(pi*tau_allow))  # smallest diameter for the allowable stress",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 15,
+   "kind": "math",
+   "text": "J = pi*d^4/32  # polar second moment of area",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 16,
+   "kind": "math",
+   "text": "theta = T*L/(G*J)  # angle of twist",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 17,
+   "kind": "check",
+   "text": "check tau <= tau_allow",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 18,
+   "kind": "check",
+   "text": "check d_min <= d",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 19,
+   "kind": "check",
+   "text": "check theta <= theta_max",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 20,
+   "kind": "text",
+   "text": "Ref: J. M. Gere, B. J. Goodno, Mechanics of Materials, 8th ed., §3.3–3.7: torsion of circular bars, power transmission.",
+   "unit": "",
+   "style": "ref",
+   "data": null
+  },
+  {
+   "id": 21,
+   "kind": "text",
+   "text": "Ref: R. G. Budynas, J. K. Nisbett, Shigley's Mechanical Engineering Design, 10th ed., §3-12: torsion.",
+   "unit": "",
+   "style": "ref",
+   "data": null
+  }
+ ],
+ "next_id": 22,
+ "ui": {
+  "pack": {
+   "id": "shaft",
+   "field": "Rotating equipment",
+   "desc": "Torque from power and speed, shear stress in a solid shaft, the smallest diameter for an allowable stress, and the angle of twist."
+  }
+ }
+}

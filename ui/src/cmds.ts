@@ -30,6 +30,7 @@ export const C = {
   },
   picture: async (src?: string) => {
     src = src ?? await call<string | null>("pick_image") ?? undefined;
+    if (src && src.length > 5_500_000) return toast("Choose a picture smaller than 4 MB.");
     if (src) C.insert("image", "", { src, width: 60 });
   },
   del: () => { const id = selId(); if (!id) return toast("Select a region first."); const i = S().regions.findIndex(r => r.id === id); act({ Delete: { ids: [id] } }).then(ok => { if (ok) setSelId(S().regions[Math.min(i, S().regions.length - 1)]?.id ?? 0); }); },
@@ -91,7 +92,7 @@ export const C = {
 export const ALL_CMDS: [string, () => void, string?][] = [
   ["Insert math region", () => C.insert("math"), "Ctrl+M"], ["Insert text region", () => C.insert("text"), "Ctrl+T"], ["Insert check", () => C.insert("check")], ["Insert table", () => C.insert("table")], ["Insert picture", () => C.picture()], ["Units list", () => D.unitsList()], ["Functions and constants", () => D.unitsList("functions")], ["Insert solve", () => C.insert("solve")], ["Insert plot", () => C.insert("plot")],
   ["Delete region", C.del, "Delete"], ["Move region up", () => C.move(true), "Alt+↑"], ["Move region down", () => C.move(false), "Alt+↓"],
-  ["Copy", C.copy, "Ctrl+C"], ["Copy result", C.copyResult], ["Copy as LaTeX", C.copyLatex], ["Export CSV (inputs and results)", C.csv], ["New from pack", () => C.file("new")], ["Paste", () => C.paste(), "Ctrl+V"], ["Undo", C.undo, "Ctrl+Z"], ["Redo", C.redo, "Ctrl+Y"],
+  ["Copy", C.copy, "Ctrl+C"], ["Copy result", C.copyResult], ["Copy as LaTeX", C.copyLatex], ["Export CSV (inputs and results)", C.csv], ["Show numbers in equations", () => act({ SheetSet: { field: "subst", value: !out()?.sheet.subst } })], ["New from pack", () => C.file("new")], ["Paste", () => C.paste(), "Ctrl+V"], ["Undo", C.undo, "Ctrl+Z"], ["Redo", C.redo, "Ctrl+Y"],
   ["Save", () => C.save(), "Ctrl+S"], ["Save as", () => C.save(true)], ["Open", C.open, "Ctrl+O"], ["New sheet", C.newSheet, "Ctrl+N"], ["Print / PDF", C.print, "Ctrl+P"],
   ["Title block", () => D.titleBlock()], ["SI units", () => C.units("SI")], ["US units", () => C.units("US")],
   ["Zoom in", C.zoomIn], ["Zoom out", C.zoomOut], ["Options", C.options], ["Check for updates", () => C.file("about")], ["Roadmap", () => C.file("roadmap")],

@@ -16,7 +16,8 @@ impl Val {
     pub fn num(x: f64, dim: Dim) -> Self { Self { v: vec![x], dim, abs: false, vec: false, logic: false } }
     pub fn plain(x: f64) -> Self { Self::num(x, NONE) }
     fn vector(v: Vec<f64>, dim: Dim) -> Self { Self { v, dim, abs: false, vec: true, logic: false } }
-    pub fn x(&self) -> f64 { self.v[0] }
+    /// The first value (a scalar's value); NaN for an empty vector, never a panic.
+    pub fn x(&self) -> f64 { self.v.first().copied().unwrap_or(f64::NAN) }
 }
 
 type R<T> = Result<T, Error>;
@@ -67,13 +68,15 @@ pub const FUNCTIONS: [(&str, &str); 27] = [
 pub struct Env {
     pub vars: HashMap<String, Val>,
     pub funcs: HashMap<String, (Vec<String>, Node)>,
+    /// The unit each name is shown in on its own line, so substituted values read the same.
+    pub shown: HashMap<String, String>,
     /// Names that are defined further down the sheet, or whose own line has an error.
     later: HashMap<String, bool>,
     depth: u32,
 }
 
 impl Env {
-    pub fn new() -> Self { Self { vars: HashMap::new(), funcs: HashMap::new(), later: HashMap::new(), depth: 0 } }
+    pub fn new() -> Self { Self { vars: HashMap::new(), funcs: HashMap::new(), shown: HashMap::new(), later: HashMap::new(), depth: 0 } }
 
     fn var(&self, name: &str, at: Span) -> R<Val> {
         let k = canon(name);
@@ -160,6 +163,13 @@ fn zip(a: &Val, b: &Val, at: Span, f: impl Fn(f64, f64) -> f64) -> R<Vec<f64>> {
 fn ang(a: &Dim, b: &Dim) -> i8 { if a[7] != 0 { a[7] } else { b[7] } }
 
 pub fn bin(op: &str, a: Val, b: Val, at: Span, rat: Span) -> R<Val> {
+    let r = bin_raw(op, a, b, at, rat)?;
+    if r.v.iter().any(|x| !x.is_finite()) { return fail("The result is too large to hold (beyond about 10³⁰⁸) or not a number.", at); }
+    if r.dim.iter().any(|e| e.unsigned_abs() > 60) { return fail("Units with powers above 60 cannot be worked out.", at); }
+    Ok(r)
+}
+
+fn bin_raw(op: &str, a: Val, b: Val, at: Span, rat: Span) -> R<Val> {
     let vec = a.vec || b.vec;
     let mk = |v: Vec<f64>, dim: Dim, abs: bool| Val { v, dim, abs, vec, logic: false };
     match op {
@@ -185,8 +195,9 @@ pub fn bin(op: &str, a: Val, b: Val, at: Span, rat: Span) -> R<Val> {
             if units::is_none(&a.dim) && a.dim[7] == 0 { return Ok(mk(a.v.iter().map(|x| x.powf(p)).collect(), NONE, false)); }
             // With units, the power must give whole exponents (x^2, x^0.5 of an area, x^(1/3) of a volume).
             let mut dim = NONE;
-            for (o, x) in dim.iter_mut().zip(a.dim) {
+            for (i, (o, x)) in dim.iter_mut().zip(a.dim).enumerate() {
                 let e = x as f64 * p;
+                if i == 7 && (e - e.round()).abs() > 1e-9 { *o = 0; continue; }
                 if (e - e.round()).abs() > 1e-9 { return fail(format!("{} to the power {} has no units.", dim_name(&a.dim), fmt_plain(p, 4)), at); }
                 *o = e.round() as i8;
             }
@@ -212,9 +223,10 @@ fn builtin(f: &str, a: Vec<Val>, at: Span) -> R<Val> {
         "sqrt" | "cbrt" => {
             want(1)?;
             let k = if f == "sqrt" { 2 } else { 3 };
-            if a[0].dim.iter().any(|e| e % k != 0) { return fail(format!("{f} of {} has no units.", dim_name(&a[0].dim))); }
+            // The angle tag is soft: it is dropped when it does not divide evenly (∛ of N·m/rad is fine).
+            if a[0].dim[..7].iter().any(|e| e % k != 0) { return fail(format!("{f} of {} has no units.", dim_name(&a[0].dim))); }
             if f == "sqrt" && a[0].v.iter().any(|x| *x < 0.0) { return fail("sqrt of a negative number.".into()); }
-            map(&a[0], std::array::from_fn(|i| a[0].dim[i] / k), &|x| if k == 2 { x.sqrt() } else { x.cbrt() })
+            map(&a[0], std::array::from_fn(|i| if i == 7 && a[0].dim[7] % k != 0 { 0 } else { a[0].dim[i] / k }), &|x| if k == 2 { x.sqrt() } else { x.cbrt() })
         }
         "abs" => { want(1)?; Val { v: a[0].v.iter().map(|x| x.abs()).collect(), ..a[0].clone() } }
         "exp" | "ln" | "log" | "log10" | "sinh" | "cosh" | "tanh" => {
@@ -335,6 +347,8 @@ pub struct RegionOut {
     pub units: Vec<String>,
     /// The description after `#` on the line.
     pub note: String,
+    /// The equation again with each name replaced by its value (when the sheet shows numbers).
+    pub subst_tex: String,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -349,7 +363,8 @@ pub struct Fmt { pub digits: u8, pub eng: bool, pub us: bool }
 /// (or every number with `eng`) use engineering notation: a power of ten in steps of three.
 pub fn fmt_num(x: f64, digits: u8, eng: bool) -> (String, String) {
     if !x.is_finite() { return ("—".into(), "\\text{—}".into()); }
-    if x == 0.0 { return ("0".into(), "0".into()); }
+    // Below 10⁻³⁰⁰ (subnormal) the powers of ten underflow; such values are zero for any engineering purpose.
+    if x == 0.0 || x.abs() < 1e-300 { return ("0".into(), "0".into()); }
     let a = x.abs();
     if eng || !(1e-3..1e6).contains(&a) {
         let mut e3 = (a.log10() / 3.0).floor() as i32 * 3;
@@ -405,8 +420,8 @@ pub fn show_val(v: &Val, want: &str, f: &Fmt) -> (String, String, String, String
         (format!("[{}]", join(0)), format!("\\left[{}\\right]", join(1)))
     } else { fmt_num(conv(v.x()), f.digits, f.eng) };
     let unit_tex = latex::unit(&label);
-    let full_t = if label.is_empty() { text.clone() } else { format!("{text} {label}") };
-    let full_x = if label.is_empty() { tex } else { format!("{tex}\\,{unit_tex}") };
+    let full_t = if label.is_empty() { text.clone() } else if label == "°" { format!("{text}°") } else { format!("{text} {label}") };
+    let full_x = if label.is_empty() { tex } else if label == "°" { format!("{tex}{unit_tex}") } else { format!("{tex}\\,{unit_tex}") };
     (full_t, full_x, text, label)
 }
 
@@ -435,8 +450,16 @@ pub fn run(s: &Sheet) -> SheetOut {
 
 pub fn run_with(s: &Sheet, f: &Fmt) -> SheetOut { run_env(s, f).0 }
 
-/// The sheet worked out, with the final symbol table (the packs' tests read values from it).
+/// The sheet worked out, with the final symbol table (the packs' tests read values from it). It runs on
+/// its own thread with a large stack: the window's thread has 1 MB on Windows, and user functions nest.
 pub fn run_env(s: &Sheet, f: &Fmt) -> (SheetOut, Env) {
+    let (s2, f2) = (s.clone(), Fmt { digits: f.digits, eng: f.eng, us: f.us });
+    std::thread::Builder::new().stack_size(64 << 20).spawn(move || run_here(&s2, &f2)).ok()
+        .and_then(|h| h.join().ok())
+        .unwrap_or_else(|| (SheetOut { errors: 1, ..Default::default() }, Env::new()))
+}
+
+fn run_here(s: &Sheet, f: &Fmt) -> (SheetOut, Env) {
     let mut env = Env::new();
     // Names defined anywhere, so a name used too early gets a helpful message.
     for r in &s.regions {
@@ -447,11 +470,13 @@ pub fn run_env(s: &Sheet, f: &Fmt) -> (SheetOut, Env) {
     let mut out = SheetOut::default();
     let mut known: Vec<String> = vec![];
     for r in &s.regions {
-        let o = region(&mut env, r, f, &mut known);
+        let o = region(&mut env, r, f, &mut known, s.subst);
         if let Some(c) = &o.check { out.checks += 1; if !c.pass { out.failed += 1; } }
         if o.error.is_some() { out.errors += 1; if !o.name.is_empty() { env.later.insert(canon(&o.name), true); } }
         for v in &o.defs { out.vars.retain(|x| x.name != v.name); out.vars.push(v.clone()); }
         if let Some(t) = &o.table { for c in t.cols.iter().filter(|c| !c.error.is_empty() && !c.name.is_empty()) { env.later.insert(canon(&c.name), true); } }
+        if o.error.is_none() && !o.name.is_empty() && !o.unit.is_empty() { env.shown.insert(canon(&o.name), o.unit.clone()); }
+        for d in &o.defs { env.shown.insert(d.name.clone(), d.unit.clone()); }
         if o.error.is_none() && !o.name.is_empty() && !o.value.is_empty() {
             out.vars.retain(|v| v.name != o.name);
             out.vars.push(VarOut { name: o.name.clone(), tex: latex::name(&o.name), value: o.value.clone(), unit: o.unit.clone(), id: r.id });
@@ -471,7 +496,20 @@ fn defined_name(t: &str) -> Option<String> {
     }
 }
 
-fn region(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>) -> RegionOut {
+/// The expression with each name replaced by its value in the unit it is shown in; π and e stay symbols.
+fn substituted(env: &Env, e: &Node, f: &Fmt) -> String {
+    let has_name = |n: &Node| { let mut st = vec![n]; while let Some(x) = st.pop() { match &x.e { E::Var(v) if !matches!(canon(v).as_str(), "π" | "e") => return true, E::Neg(a) | E::Group(a) => st.push(a), E::Bin(_, a, b) => { st.push(a); st.push(b); } E::Call(_, a) => st.extend(a.iter()), _ => {} } } false };
+    if !has_name(e) { return String::new(); }
+    let sub = |name: &str| -> Option<String> {
+        let k = canon(name);
+        if k == "π" || k == "e" { return None; }
+        let v = env.vars.get(&k).cloned().or_else(|| constant(&k)).filter(|v| !v.vec && !v.logic)?;
+        Some(show_val(&v, env.shown.get(&k).map(|u| u.as_str()).unwrap_or(""), f).1)
+    };
+    latex::node_with(e, &sub)
+}
+
+fn region(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>, subst: bool) -> RegionOut {
     let mut o = RegionOut { id: r.id, ..Default::default() };
     if r.kind == Kind::Table { table(env, r, f, known, &mut o); return o; }
     if !matches!(r.kind, Kind::Math | Kind::Check | Kind::Solve | Kind::Plot) || r.text.trim().is_empty() { return o; }
@@ -500,6 +538,7 @@ fn region(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>) -> Region
                 o.name = canon(name);
                 let v = env.eval(e)?;
                 o.input = matches!(e.e, E::Num(..)) || matches!(&e.e, E::Neg(x) if matches!(x.e, E::Num(..)));
+                if subst && !o.input { o.subst_tex = substituted(env, e, f); }
                 // An input keeps the unit it was typed in (8356 cm⁴ stays cm⁴), unless it belongs to the other unit system.
                 let typed = match &e.e { E::Num(_, Some(u)) => Some(u.text.clone()), E::Neg(x) => match &x.e { E::Num(_, Some(u)) => Some(u.text.clone()), _ => None }, _ => None };
                 match typed.filter(|t| r.unit.trim().is_empty() && units::system(t).is_none_or(|us| us == f.us)) {
@@ -523,8 +562,9 @@ fn region(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>) -> Region
                 let st = if units::is_none(&st.dim) && !units::is_none(&b.dim) && next.is_none() { return fail("Give the step with its unit: x = 0, 10 m .. 100 m.", end.at) } else { st };
                 same_or(&a, &b, "use", end.at)?;
                 if st.x() == 0.0 || (b.x() - a.x()) / st.x() < 0.0 { return fail("The step must go from the first value towards the last.", end.at); }
-                let n = ((b.x() - a.x()) / st.x() + 1e-9).floor() as usize + 1;
-                if n > 100_000 { return fail("A range holds at most 100,000 values.", end.at); }
+                let count = ((b.x() - a.x()) / st.x() + 1e-9).floor() + 1.0;
+                if !(1.0..=100_000.0).contains(&count) { return fail("A range holds at most 100,000 values.", end.at); }
+                let n = count as usize;
                 let v = Val { abs: a.abs, ..Val::vector((0..n).map(|i| a.x() + st.x() * i as f64).collect(), a.dim) };
                 set_result(&mut o, &v, r, f);
                 env.vars.insert(canon(name), v);
@@ -535,6 +575,7 @@ fn region(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>) -> Region
                 if !matches!(*op, "<" | "<=" | ">" | ">=" | "==" | "!=") { return fail("A check compares two values with <, <=, >, >= or ==.", e.at); }
                 let (x, y) = (env.eval(a)?, env.eval(b)?);
                 let t = bin(op, x.clone(), y.clone(), e.at, b.at)?;
+                if subst { o.subst_tex = substituted(env, e, f); }
                 if t.vec { return fail("A check needs single values, not vectors (use max or min).", e.at); }
                 let pass = t.x() != 0.0;
                 let ratio = match *op { "<" | "<=" if y.x() != 0.0 => Some(x.x() / y.x()), ">" | ">=" if x.x() != 0.0 => Some(y.x() / x.x()), _ => None };
@@ -573,6 +614,7 @@ fn region(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>) -> Region
             Stmt::Plot { ys, var, lo, hi } => {
                 let (a, b) = (env.eval(lo)?, env.eval(hi)?);
                 same_or(&a, &b, "use", hi.at)?;
+                if !(b.x() - a.x()).is_finite() || a.x() == b.x() { return fail("The plot range must be two different finite values.", (lo.at.0, hi.at.1)); }
                 let k = canon(var);
                 let saved = env.vars.get(&k).cloned();
                 let n = 121;
@@ -613,6 +655,7 @@ fn region(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>) -> Region
             }
             Stmt::Show { e } => {
                 let v = env.eval(e)?;
+                if subst { o.subst_tex = substituted(env, e, f); }
                 set_result(&mut o, &v, r, f);
             }
         }

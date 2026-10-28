@@ -33,7 +33,7 @@ export const HELP: Record<string, Topic> = {
     how: ["Type check sigma <= sigma_allow (or <, >, >=).", "The ratio is the left side over the right side: 0.82 means 82 % used."] },
   // View tab
   zoom: { t: "Zoom", what: "How large the page shows on the screen. Printing is not affected." },
-  show: { t: "Show", what: "Panels beside the page: Variables lists every name the sheet defines." },
+  show: { t: "Show", what: "Variables lists every name the sheet defines and every check. Numbers shows each equation a second time with the values put in (P = ρgQH/η = 998 kg/m³ · 9.807 m/s² · … = 19.57 kW), as on a hand calculation; it is saved with the sheet and printed." },
   vars: { t: "Variables", what: "Every name the sheet defines, with its value and unit, in the order they are defined. The checks and errors are counted at the bottom.",
     how: ["Click a name to go to the line that defines it.", "View › Variables shows or hides the panel."] },
   results: { t: "Results", what: "Each equation shows its answer with a unit chosen for it: kW for power, MPa for stress, m³/h for flow. The unit system (SI or US) sets the defaults.",

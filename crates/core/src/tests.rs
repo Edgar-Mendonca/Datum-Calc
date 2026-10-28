@@ -158,6 +158,8 @@ fn dimension_errors_are_caught_on_their_line() {
     assert!(error(&["x = 2 m", "check x < 3 s"]).contains("compare"));
     assert!(error(&["x = sqrt(2 m)"]).contains("no units"));
     assert_eq!(result(&["A = 4 m^2", "x = sqrt(A)"]), "2 m");
+    assert_eq!(result(&["T = 8 N*m/rad", "x = cbrt(T/(1 N/m^2))"]), "2 m", "the soft angle tag never blocks a root");
+    assert_eq!(result(&["T = 4 N*m/rad", "x = (T*1 m/(1 N))^0.5"]), "2 m");
     assert_eq!(result(&["V = 8 m^3", "x = cbrt(V)"]), "2 m");
     assert_eq!(result(&["A = 4 m^2", "x = A^0.5"]), "2 m");
 }
@@ -179,7 +181,7 @@ fn display_picks_a_good_unit() {
     assert_eq!(result(&["w = 2 kg*m^2/s*1"]), "2 m²·kg/s");
     assert_eq!(result(&["r = 3 m / (2 m)"]), "1.5");
     assert_eq!(result(&["θ = 30 deg"]), "30 deg");
-    assert_eq!(result(&["θ = 30 deg*1"]), "30 °");
+    assert_eq!(result(&["θ = 30 deg*1"]), "30°");
     assert_eq!(result(&["I = 8356 cm^4"]), "8356 cm⁴", "an input keeps the unit it was typed in");
     assert_eq!(result(&["D = 1200 mm"]), "1200 mm");
     let mut s = sheet(&["D = 1200 mm", "L = 3 ft"]);
@@ -486,7 +488,7 @@ mod packs {
     #[test]
     fn all_packs_open_and_list() {
         let cards = crate::packs::cards();
-        assert_eq!(cards.len(), 10);
+        assert_eq!(cards.len(), 13);
         for c in &cards { assert!(!c.name.is_empty() && !c.desc.is_empty() && !c.field.is_empty() && c.checks > 0, "{}", c.id); }
     }
 
@@ -499,6 +501,46 @@ mod packs {
         assert!(close(v(&e, "H_75"), 37.5, 1e-9));
         assert_eq!(o.regions.iter().find(|r| r.name == "dT").unwrap().result, "15 K");
         assert!(checks(&o)[0].0);
+    }
+
+    #[test]
+    fn shaft() {
+        // ω = 1480 × 2π/60 = 154.99 rad/s; T = 75 000/154.99 = 483.9 N·m; τ = 16 × 483.9/(π 0.06³) = 11.41 MPa;
+        // d_min = ∛(16 × 483.9/(π 40e6)) = 39.50 mm; θ = 483.9 × 0.8/(79.3e9 × 1.2723e-6) = 3.837e-3 rad = 0.2198°.
+        let (o, e) = run("shaft");
+        assert!(close(v(&e, "T"), 483.917_06, 1e-6));
+        assert!(close(v(&e, "tau"), 11.410_043e6, 1e-6));
+        assert!(close(v(&e, "d_min"), 39.496_658e-3, 1e-6));
+        assert!(close(v(&e, "theta"), 3.836_920_8e-3, 1e-6));
+        assert!(o.regions.iter().any(|r| r.result == "0.2198°"), "the twist shows in degrees");
+        assert!(o.regions.iter().any(|r| r.result == "483.9 N·m"));
+        assert!(checks(&o).iter().all(|c| c.0));
+        assert!(close(checks(&o)[2].1, 0.879_357, 1e-5));
+    }
+
+    #[test]
+    fn tank() {
+        // V = π 3²/4 × 4 = 28.27 m³; V_w = 25.45 m³; m = 25.45 t; p = 1000 × 9.80665 × 3.6 = 35.30 kPa; t = 25.45/20 = 1.272 h.
+        let (o, e) = run("tank");
+        assert!(close(v(&e, "V"), 28.274_334, 1e-6));
+        assert!(close(v(&e, "m_l"), 25_446.900, 1e-6));
+        assert!(close(v(&e, "p_b"), 35_303.94, 1e-6));
+        assert!(close(v(&e, "t_fill"), 1.272_345 * 3600.0, 1e-6));
+        assert!(o.regions.iter().any(|r| r.result == "1.272 h"), "a time of an hour or more shows in hours");
+        assert!(checks(&o)[0].0 && close(checks(&o)[0].1, 0.636_17, 1e-4));
+    }
+
+    #[test]
+    fn thermal_expansion() {
+        // ΔT = 165 K; ΔL = 12e-6 × 50 × 165 = 99 mm; σ = 200e9 × 12e-6 × 165 = 396 MPa; A = π/4 (168.3² − 154.1²) = 3596 mm²; F = 1424 kN.
+        let (o, e) = run("thermal-expansion");
+        assert!(close(v(&e, "dT"), 165.0, 1e-9));
+        assert!(close(v(&e, "dL"), 0.099, 1e-9));
+        assert!(close(v(&e, "sigma_r"), 396e6, 1e-9));
+        assert!(close(v(&e, "F_r"), 1_423_863.79, 1e-6));
+        let c = checks(&o);
+        assert!(c[0].0 && close(c[0].1, 0.825, 1e-9));
+        assert!(!c[1].0, "the fully restrained case fails, as the pack explains");
     }
 
     #[test]
@@ -619,4 +661,23 @@ mod packs {
         assert!(o.regions.iter().any(|r| r.result == "91.8 kVA") && o.regions.iter().any(|r| r.result == "46.84 kvar"));
         assert!(checks(&o)[0].0 && close(checks(&o)[0].1, 0.828_13, 1e-4));
     }
+}
+
+#[test]
+fn equations_with_numbers_substituted() {
+    let mut s = sheet(&["rho = 998 kg/m^3", "Q = 120 m^3/h", "H = 45 m", "eta = 0.75", "P = rho*g*Q*H/eta", "A = pi*(2 m)^2/4", "s_x = -3 m", "y = s_x^2", "check P <= 30 kW"]);
+    assert!(eval::run(&s).regions[4].subst_tex.is_empty(), "off unless the sheet shows numbers");
+    s.subst = true;
+    let o = eval::run(&s);
+    assert_eq!(o.regions[4].subst_tex, "\\frac{998\\,\\mathrm{kg/m^{3}} \\cdot 9.807\\,\\mathrm{m/s^{2}} \\cdot 120\\,\\mathrm{m^{3}/h} \\cdot 45\\,\\mathrm{m}}{0.75}");
+    assert!(o.regions[0].subst_tex.is_empty(), "an input is not repeated");
+    assert!(o.regions[5].subst_tex.is_empty(), "π alone is not a substitution");
+    assert_eq!(o.regions[7].subst_tex, "{\\left(-3\\,\\mathrm{m}\\right)}^{2}", "a negative value is bracketed under a power");
+    assert!(o.regions[8].subst_tex.contains("\\le 30\\,\\mathrm{kW}"));
+    let mut s = sheet(&["P = 75 kW", "n = 1480 rpm", "T = P/n", "x = T*2"]);
+    s.regions[2].unit = "N*m".into();
+    s.subst = true;
+    assert_eq!(eval::run(&s).regions[3].subst_tex, "483.9\\,\\mathrm{N\\cdot m} \\cdot 2", "a value is put in with the unit it is shown in");
+    let s2 = Sheet { subst: true, ..Default::default() };
+    assert!(Sheet::from_json(&s2.json()).unwrap().subst, "the setting is saved with the sheet");
 }
