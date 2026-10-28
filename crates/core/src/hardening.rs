@@ -121,3 +121,39 @@ fn speed_gate_large_sheet() {
     let limit = if cfg!(debug_assertions) { 20.0 } else { 3.0 };
     assert!(t.elapsed().as_secs_f64() < limit, "2,000 inserts and a round trip took {:?}", t.elapsed());
 }
+
+#[test]
+fn random_text_never_panics_the_parser_or_evaluator() {
+    let mut r = Rng(0xDA7A_CA1C);
+    let pieces: [&str; 40] = ["x", "y", "=", "+", "-", "*", "/", "^", "(", ")", ",", "..", "1", "0", "2.5", "1e308", "-1e-308", "m", "kg", "s", "°C", "°F", "kN*m", "m^3/h",
+        "sqrt(", "sin(", "if(", "max(", "f(", "check ", "solve ", "plot ", " for x in ", "<=", ">", "σ", "_", "²", "%", " "];
+    let mut texts: Vec<String> = (0..3000).map(|_| (0..1 + r.below(12)).map(|_| pieces[r.below(pieces.len())]).collect()).collect();
+    texts.extend((0..1000).map(|_| r.text(b"xy=+-*/^().,0123456789 me<>_!$#[]{}\\\"'", 24)));
+    for chunk in texts.chunks(8) {
+        let mut s = Sheet::new("fuzz");
+        s.regions.push(Region { id: 1, kind: Kind::Math, text: "f(x) = x^2".into(), ..Default::default() });
+        for (i, t) in chunk.iter().enumerate() {
+            let _ = crate::parse::statement(t, &[]);
+            s.regions.push(Region { id: i as u32 + 2, kind: if t.starts_with("check") { Kind::Check } else { Kind::Math }, text: t.clone(), ..Default::default() });
+        }
+        let o = crate::eval::run(&s);
+        assert_eq!(o.regions.len(), s.regions.len());
+        for g in &o.regions {
+            if let Some(e) = &g.error { assert!(!e.msg.is_empty() && e.from <= e.to && e.to <= 200, "{e:?}"); }
+        }
+    }
+}
+
+#[test]
+fn evaluation_speed_gate() {
+    let mut s = Sheet::new("Big");
+    s.regions.push(Region { id: 1, kind: Kind::Math, text: "x0 = 1 m".into(), ..Default::default() });
+    for k in 1..1500 { s.regions.push(Region { id: k + 1, kind: Kind::Math, text: format!("x{k} = x{} * 1.001 + 2 mm", k - 1), ..Default::default() }); }
+    s.regions.push(Region { id: 9000, kind: Kind::Math, text: "v = 0, 0.002 .. 100".into(), ..Default::default() });
+    s.regions.push(Region { id: 9001, kind: Kind::Math, text: "w = sum(sqrt(v)*2)".into(), ..Default::default() });
+    let t = std::time::Instant::now();
+    let o = crate::eval::run(&s);
+    assert_eq!(o.errors, 0);
+    let limit = if cfg!(debug_assertions) { 10.0 } else { 1.0 };
+    assert!(t.elapsed().as_secs_f64() < limit, "1,500 lines took {:?}", t.elapsed());
+}

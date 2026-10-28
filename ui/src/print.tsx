@@ -6,6 +6,7 @@ import { Portal } from "solid-js/web";
 import { Region } from "./api";
 import { S, out, act } from "./store";
 import { Pick } from "./ui";
+import { MathView } from "./calc";
 
 /** Paper sizes in millimetres (portrait). */
 export const PAPERS: [string, number, number][] = [["A4", 210, 297], ["Letter", 215.9, 279.4], ["A3", 297, 420], ["Legal", 215.9, 355.6]];
@@ -14,7 +15,7 @@ export const MM = 96 / 25.4;
 /** How a region looks on paper. Shared by the measuring pass, the preview and the print. */
 export const PrintRegion = (p: { r: Region }) => (
   <div class={`pr k-${p.r.kind}`} classList={{ [`s-${p.r.style}`]: !!p.r.style }}>
-    <div class="prtext">{p.r.text || " "}</div>
+    <Show when={p.r.kind !== "text" && p.r.text.trim()} fallback={<div class="prtext">{p.r.text || " "}</div>}><MathView r={p.r} paper /></Show>
   </div>
 );
 
@@ -35,7 +36,7 @@ const TitleBlock = (p: { page: number; pages: number }) => {
 
 type PageOf = { regions: Region[]; refs: boolean };
 const geom = () => { const p = PAPERS.find(x => x[0] === S().page.paper) ?? PAPERS[0]; const m = S().page.margins; return { pw: p[1], ph: p[2], m, W: (p[1] - m[1] - m[3]) * MM, H: (p[2] - m[0] - m[2]) * MM }; };
-const TB_H = 104, FOOT_H = 26, GAP = 6;
+const TB_H = 124, FOOT_H = 26, GAP = 6;
 
 /** Packs measured regions into pages. References (style "ref") go to the end under their own heading. */
 const pack = (heights: Map<number, number>): PageOf[] => {

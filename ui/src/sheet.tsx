@@ -7,6 +7,7 @@ import { C, setField } from "./cmds";
 import * as D from "./dialogs";
 import { Help } from "./help";
 import { PAPERS } from "./print";
+import { MathView, outs } from "./calc";
 
 const MM = 96 / 25.4;
 const KIND: Record<string, string> = { math: "Math", text: "Text", check: "Check", solve: "Solve", plot: "Plot", table: "Table", image: "Picture" };
@@ -35,8 +36,12 @@ const RegionView = (p: { r: Region }) => (
     onMouseDown={e => { if (editId() !== p.r.id) { e.preventDefault(); setSelId(p.r.id); (document.querySelector(".cpage") as HTMLElement | null)?.focus(); } }}
     onDblClick={() => { setSelId(p.r.id); setEditId(p.r.id); }}>
     <span class="rtag">{KIND[p.r.kind]}</span>
-    <Show when={editId() === p.r.id} fallback={<div class="rtxt">{p.r.text || <span class="muted">Empty {KIND[p.r.kind].toLowerCase()} region: double-click to type.</span>}</div>}>
+    <Show when={editId() === p.r.id} fallback={
+      <Show when={p.r.text.trim()} fallback={<div class="rtxt"><span class="muted">Empty {KIND[p.r.kind].toLowerCase()} region: double-click to type.</span></div>}>
+        <Show when={p.r.kind !== "text"} fallback={<div class="rtxt">{p.r.text}</div>}><MathView r={p.r} /></Show>
+      </Show>}>
       <Editor r={p.r} />
+      <Show when={outs().get(p.r.id)?.error}>{e => <div class="rerr live"><span class="ico">⚠</span>{e().msg}</div>}</Show>
     </Show>
   </div>
 );

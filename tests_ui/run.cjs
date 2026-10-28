@@ -37,9 +37,10 @@ const check = (name, ok, info = "") => { console.log(`${ok ? "ok  " : "FAIL"} ${
 
   // 2. The sheet: title block and every region, in order.
   check("title block shows the calc number", (await p.textContent(".tblock")).includes("CALC-001"));
-  const texts = await p.$$eval(".region .rtxt", els => els.map(e => e.textContent));
-  check("regions show top to bottom", texts.length === 6 && texts[1] === "Q = 120 m^3/h" && texts[4].startsWith("check"), JSON.stringify(texts));
-  check("inputs are highlighted", (await p.$$(".region.s-input")).length === 2);
+  check("every region shows", (await p.$$(".region")).length === 11);
+  check("maths is drawn with KaTeX", (await p.$$(".region .katex")).length >= 9);
+  check("the heading shows as text", (await p.textContent(".region.s-heading .rtxt")) === "Pump power and motor size");
+  check("inputs are highlighted", (await p.$$(".region.s-input")).length === 4);
   check("the page is A4 wide", Math.abs((await p.$eval(".cpage", e => e.getBoundingClientRect().width)) - 210 * 96 / 25.4) < 2);
 
   // 3. Click selects, double-click edits, Escape saves the text.
@@ -49,6 +50,7 @@ const check = (name, ok, info = "") => { console.log(`${ok ? "ok  " : "FAIL"} ${
   check("Format tab appears for a selected region", (await p.textContent(".ctxgrp")).includes("Region Tools"));
   await r2[2].dblclick(); await p.waitForTimeout(150);
   check("double-click opens the editor", !!(await p.$(".region.editing textarea")));
+  check("the editor holds the typed text", (await p.$eval(".region.editing textarea", t => t.value)) === "H = 45 m");
   await p.keyboard.press("End"); await p.keyboard.type("0"); await p.keyboard.press("Escape"); await p.waitForTimeout(150);
   check("Escape saves the edit", (await lastApply()).includes('"Set"') && (await lastApply()).includes("H = 45 m0"), await lastApply());
 
@@ -63,6 +65,29 @@ const check = (name, ok, info = "") => { console.log(`${ok ? "ok  " : "FAIL"} ${
   check("Delete removes the region", (await lastApply()).includes('"Delete"'), await lastApply());
   await p.keyboard.press("Control+m"); await p.waitForTimeout(150);
   check("Ctrl+M inserts a math region below the selection", (await lastApply()).includes('"Insert"') && (await lastApply()).includes('"kind":"math"') && (await lastApply()).includes('"at":3'), await lastApply());
+  await p.keyboard.press("Escape");
+
+  // 4b. Results, checks, errors, plots, the unit menu and the Variables panel (0.1.1).
+  const R = i => p.$$(".region").then(r => r[i]);
+  check("a result shows with its unit", (await (await R(5)).textContent()).includes("19.61") && (await (await R(5)).textContent()).includes("kW"));
+  check("an input does not repeat its value", (await (await R(1)).$$(".res")).length === 0);
+  check("a check shows PASS and the utilisation", (await (await R(7)).textContent()).includes("PASS") && (await (await R(7)).textContent()).includes("0.89"));
+  check("the PASS badge is green", (await (await R(7)).$eval(".badge", b => getComputedStyle(b).color)) === "rgb(31, 122, 77)");
+  const er = await (await R(8)).$(".rerr");
+  check("an error shows on its own line", !!er && (await er.textContent()).includes("Cannot add a power and a flow"));
+  check("the wrong part of the line is marked", (await (await R(8)).$eval(".marked mark", m => m.textContent)) === "P + Q");
+  check("a plot draws a chart", !!(await (await R(9)).$("canvas")) && (await (await R(9)).$eval("canvas", c => c.width)) > 100);
+  await (await R(5)).click(); await p.waitForTimeout(80);
+  await (await R(5)).$eval(".unitbtn", b => b.click()); await p.waitForTimeout(120);
+  check("the unit menu offers hp", (await p.$$eval(".menu button", bs => bs.map(b => b.textContent))).some(t => t.includes("hp")));
+  await p.click(".menu button:has-text('hp')"); await p.waitForTimeout(120);
+  check("choosing a unit sets the region's unit", (await lastApply()).includes('"field":"unit"') && (await lastApply()).includes('"hp"'), await lastApply());
+  const vars = await p.$$eval(".vars tr", rs => rs.map(r => r.textContent));
+  check("the Variables panel lists every name with its value", vars.length === 6 && vars.some(v => v.includes("19.61") && v.includes("kW")), JSON.stringify(vars));
+  check("the panel counts the checks and errors", (await p.textContent(".vars")).includes("1 of 1 pass") && (await p.textContent(".vars")).includes("1 line with errors"));
+  await p.click(".vars tr:nth-child(2)"); await p.waitForTimeout(100);
+  check("clicking a variable selects its line", await (await R(2)).evaluate(e => e.classList.contains("sel")));
+  check("the status bar counts the checks", (await p.textContent(".status")).includes("1/1 checks pass"));
   await p.keyboard.press("Escape");
 
   // 5. Ribbon: the seven tabs, symbols type into the editor, no sideways scrolling.
@@ -106,6 +131,8 @@ const check = (name, ok, info = "") => { console.log(`${ok ? "ok  " : "FAIL"} ${
   const n = (await p.$$(".pprev .ppage")).length;
   check("print preview shows the page with its title block", n === 1 && (await p.textContent(".pprev .ptb")).includes("CALC-001") && (await p.textContent(".pprev .pcfoot")).includes("Page 1 of 1"), String(n));
   check("references print at the end under their heading", (await p.textContent(".pprev .pbody")).includes("References"));
+  check("the printed sheet shows the maths and the PASS badge", (await p.$$(".pprev .katex")).length >= 9 && (await p.textContent(".pprev")).includes("PASS"));
+  check("the printed sheet hides the unit buttons", (await p.$$(".pprev .unitbtn, .pprev .pngbtn")).length === 0);
   await p.evaluate(() => { window.print = () => { window.__printed = [document.querySelectorAll("#printroot .ppage").length, [...document.querySelectorAll("style")].map(s => s.textContent).find(t => t.includes("@page")) || ""]; }; });
   await p.click(".pbtns .btn"); await p.waitForTimeout(500);
   const pr = await p.evaluate(() => window.__printed);
@@ -120,7 +147,7 @@ const check = (name, ok, info = "") => { console.log(`${ok ? "ok  " : "FAIL"} ${
 
   // 11. Dark theme keeps the page white-ish and the text readable.
   await p.evaluate(() => { document.documentElement.dataset.theme = "dark"; }); await p.waitForTimeout(100);
-  const ink = await p.$eval(".rtxt", e => getComputedStyle(e).color);
+  const ink = await p.$eval(".region .rtxt", e => getComputedStyle(e).color);
   check("sheet text stays dark on the page in dark theme", ink === "rgb(27, 39, 51)", ink);
 
   check("no script errors", errors.length === 0, errors.join(" | "));

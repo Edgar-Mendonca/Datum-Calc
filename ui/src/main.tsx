@@ -10,11 +10,12 @@ import "@fontsource/ibm-plex-mono/latin-500.css";
 import "@fontsource/ibm-plex-mono/latin-600.css";
 import "./styles.css";
 import { invoke, listen, Out, Options } from "./api";
-import { out, setOut, backstage, setBackstage, setOpts, opts, dialogs, call, zoom, setZoom, openDialog, toast, setThemeRaw, applyTheme, editId } from "./store";
+import { out, setOut, backstage, setBackstage, setOpts, opts, dialogs, call, zoom, setZoom, openDialog, toast, setThemeRaw, applyTheme, editId, varsPanel } from "./store";
 import { C } from "./cmds";
 import { TitleBar, Ribbon, palette } from "./ribbon";
 import { Backstage, update, checkUpdate } from "./backstage";
 import { SheetView } from "./sheet";
+import { VarsPanel } from "./calc";
 import { Menu, Toast, Icon, Dialog } from "./ui";
 import * as D from "./dialogs";
 
@@ -26,6 +27,8 @@ const Status = () => (
   <footer class="status">
     <span>Ready</span>
     <span class="muted">{out() ? `${out()!.sheet.regions.length} regions · ${out()!.sheet.units} units · ${out()!.sheet.page.paper}` : ""}</span>
+    <Show when={out()?.calc.checks}><span classList={{ late: !!out()?.calc.failed }}>{out()!.calc.checks - out()!.calc.failed}/{out()!.calc.checks} checks pass</span></Show>
+    <Show when={out()?.calc.errors}><span class="late">{out()!.calc.errors} with errors</span></Show>
     <span class="grow" />
     <button onClick={C.zoomOut}>−</button><input class="zoom" type="range" min="50" max="200" step="10" value={zoom()} onInput={e => setZoom(+e.currentTarget.value)} /><button onClick={C.zoomIn}>+</button><span class="muted">{zoom()} %</span>
   </footer>
@@ -73,7 +76,7 @@ const App = () => {
       <Ribbon />
       <main class="work">
         <nav class="side"><For each={SIDE}>{x => <button classList={{ on: x[0] === "sheet" }} onClick={x[3]} title={x[2]}><Icon n={x[1]} /><span>{x[2]}</span></button>}</For></nav>
-        <div class="content"><Show when={out()}><SheetView /></Show></div>
+        <div class="content"><Show when={out()}><SheetView /><Show when={varsPanel()}><VarsPanel /></Show></Show></div>
       </main>
       <Status />
       <Show when={backstage()}><Backstage /></Show>

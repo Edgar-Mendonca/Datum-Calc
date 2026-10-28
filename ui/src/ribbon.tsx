@@ -1,6 +1,6 @@
 // Title bar, quick access toolbar, Tell Me and the ribbon.
 import { For, Show, JSX, createSignal, createMemo, onMount } from "solid-js";
-import { out, tab, setTab, setBackstage, openMenu, openDialog, closeDialog, theme, setTheme, selId, zoom, setZoom, act } from "./store";
+import { out, tab, setTab, setBackstage, openMenu, openDialog, closeDialog, theme, setTheme, selId, zoom, setZoom, act, varsPanel } from "./store";
 import { C, ALL_CMDS, typeText } from "./cmds";
 import * as D from "./dialogs";
 import { Icon } from "./ui";
@@ -101,7 +101,7 @@ export const Ribbon = () => (
       <G l="Print" h="print"><B big i="print" l="Print / PDF" run={C.print} /></G>
     </Show>
     <Show when={tab() === "insert"}>
-      <G l="Regions" h="insert"><B big i="math" l="Math" run={() => C.insert("math")} /><B big i="text" l="Text" run={() => C.insert("text")} /><B big i="check" l="Check" run={() => C.insert("check")} />
+      <G l="Regions" h="insert"><B big i="math" l="Math" run={() => C.insert("math")} /><B big i="text" l="Text" run={() => C.insert("text")} /><B big i="check" l="Check" run={() => C.insert("check")} /><B big i="solve" l="Solve" run={() => C.insert("solve")} /><B big i="plot" l="Plot" run={() => C.insert("plot")} />
         <S_><B i="text" l="Heading" run={() => C.insert("text").then(() => setStyle("heading"))} /><B i="text" l="Reference" run={() => C.insert("text", "Ref: ").then(() => setStyle("ref"))} /><B i="math" l="Input" run={() => C.insert("math").then(() => setStyle("input"))} /></S_></G>
     </Show>
     <Show when={tab() === "math"}>
@@ -118,11 +118,12 @@ export const Ribbon = () => (
     </Show>
     <Show when={tab() === "view"}>
       <G l="Zoom" h="zoom"><B big i="zin" l="Zoom In" run={C.zoomIn} /><B big i="zout" l="Zoom Out" run={C.zoomOut} /><S_><B i="fit" l="100 %" run={() => setZoom(100)} /><span class="muted zoomv">{zoom()} %</span></S_></G>
+      <G l="Show" h="show"><B big i="vars" l="Variables" on={varsPanel()} run={C.vars} /></G>
       <G l="Theme" h="theme"><S_><For each={[["auto", "Auto"], ["light", "Light"], ["dark", "Dark"]]}>{([k, l]) => <B i="theme" l={l} on={theme() === k} run={() => setTheme(k)} />}</For></S_></G>
     </Show>
     <Show when={tab() === "format" && sel()}>
       <G l="Region Style" h="regions"><S_><For each={STYLES.slice(0, 3)}>{([k, l]) => <B i="style" l={l} on={(sel()?.style ?? "") === k} run={() => setStyle(k)} />}</For></S_><S_><For each={STYLES.slice(3)}>{([k, l]) => <B i="style" l={l} on={(sel()?.style ?? "") === k} run={() => setStyle(k)} />}</For></S_></G>
-      <G l="Kind" h="regions"><S_><For each={[["math", "Math"], ["text", "Text"], ["check", "Check"]] as const}>{([k, l]) => <B i={k} l={l} on={sel()?.kind === k} run={() => act({ Set: { id: selId(), field: "kind", value: k } })} />}</For></S_></G>
+      <G l="Kind" h="regions"><S_><For each={[["math", "Math"], ["text", "Text"], ["check", "Check"], ["solve", "Solve"], ["plot", "Plot"]] as const}>{([k, l]) => <B i={k} l={l} on={sel()?.kind === k} run={() => act({ Set: { id: selId(), field: "kind", value: k } })} />}</For></S_></G>
       <G l="Arrange" h="arrange"><S_><B i="up" l="Move Up" run={() => C.move(true)} /><B i="down" l="Move Down" run={() => C.move(false)} /><B i="del" l="Delete" run={C.del} /></S_></G>
     </Show>
     <Show when={tab() === "help"}>

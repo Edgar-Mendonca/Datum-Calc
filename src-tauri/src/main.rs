@@ -2,7 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 mod update;
 
-use datum_core::{Doc, Op, Sheet};
+use datum_core::{eval, Doc, Op, Sheet};
 use serde::{Deserialize, Serialize};
 use std::{path::{Path, PathBuf}, sync::Mutex};
 use tauri::{AppHandle, Emitter, Manager, State, WindowEvent};
@@ -55,6 +55,8 @@ type R<T> = Result<T, String>;
 #[serde(rename_all = "camelCase")]
 struct Out {
     sheet: Sheet,
+    /// The sheet worked out: results, maths, checks, errors and variables.
+    calc: eval::SheetOut,
     path: Option<String>,
     dirty: bool,
     undo: bool,
@@ -64,7 +66,8 @@ struct Out {
 
 fn out(a: &App) -> Out {
     let d = &a.doc;
-    Out { sheet: d.s.clone(), path: d.path.as_ref().map(|p| p.display().to_string()), dirty: d.dirty, undo: d.can_undo(), redo: d.can_redo(), rev: d.rev() }
+    let f = eval::Fmt { digits: d.s.digits, eng: a.opts.number == "eng", us: d.s.units == "US" };
+    Out { sheet: d.s.clone(), calc: eval::run_with(&d.s, &f), path: d.path.as_ref().map(|p| p.display().to_string()), dirty: d.dirty, undo: d.can_undo(), redo: d.can_redo(), rev: d.rev() }
 }
 
 fn today() -> String { chrono::Local::now().format("%d-%b-%Y").to_string() }
@@ -313,6 +316,15 @@ fn open_url(url: String) -> R<()> {
     r.map(|_| ()).map_err(|e| e.to_string())
 }
 
+/// Every unit, constant and function, for the Units and Help lists.
+#[derive(Serialize)]
+struct Lists { units: Vec<(&'static str, &'static str, &'static str, String)>, constants: Vec<(&'static str, &'static str)>, functions: Vec<(&'static str, &'static str)> }
+
+#[tauri::command]
+fn lists() -> Lists {
+    Lists { units: datum_core::units::list(), constants: eval::CONSTANTS.to_vec(), functions: eval::FUNCTIONS.to_vec() }
+}
+
 #[tauri::command]
 fn version() -> &'static str { env!("CARGO_PKG_VERSION") }
 
@@ -355,7 +367,7 @@ fn main() {
         })
         .invoke_handler(tauri::generate_handler![
             state, apply, history, new_sheet, open, save, save_file, pick_image,
-            options, set_options, autosave, recovery, recover, recent, startup_file, version, open_url, quit, check_update, install_update
+            lists, options, set_options, autosave, recovery, recover, recent, startup_file, version, open_url, quit, check_update, install_update
         ])
         .run(tauri::generate_context!())
         .expect("Datum Calc failed to start");

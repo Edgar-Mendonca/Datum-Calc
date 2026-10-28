@@ -14,5 +14,15 @@ export interface Sheet {
   format: number; name: string; title: TitleBlock; page: { paper: string; margins: [number, number, number, number] }; units: "SI" | "US"; digits: number;
   regions: Region[]; next_id: number; ui: any;
 }
-export interface Out { sheet: Sheet; path: string | null; dirty: boolean; undo: boolean; redo: boolean; rev: number }
+export interface Out { sheet: Sheet; calc: SheetOut; path: string | null; dirty: boolean; undo: boolean; redo: boolean; rev: number }
 export interface Options { autosave: number; beta: boolean; theme: string; openLast: boolean; units: string; digits: number; paper: string; company: string; by: string; logo: string; number: string }
+
+export interface CheckOut { pass: boolean; ratio: number | null; lhs: string; rhs: string; op: string }
+export interface PlotOut { xs: number[]; xlabel: string; xunit: string; series: { label: string; ys: number[] }[]; yunit: string }
+export interface RegionOut {
+  id: number; latex: string; result_tex: string; result: string; value: string; unit: string; name: string; input: boolean;
+  error: { msg: string; from: number; to: number } | null; warn: string; check: CheckOut | null; plot: PlotOut | null; units: string[];
+}
+export interface VarOut { name: string; tex: string; value: string; unit: string; id: number }
+export interface SheetOut { regions: RegionOut[]; vars: VarOut[]; checks: number; failed: number; errors: number }
+export interface Lists { units: [string, string, string, string][]; constants: [string, string][]; functions: [string, string][] }

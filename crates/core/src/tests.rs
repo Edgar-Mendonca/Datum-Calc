@@ -1,0 +1,408 @@
+#![allow(clippy::approx_constant)]
+//! Engine tests: every unit factor against NIST SP 811 (2008) Appendix B, temperatures, dimension
+//! errors, display choice, the parser, evaluation, LaTeX and solving. Expected values are worked
+//! out by hand (or quoted from the source) before running.
+use crate::eval::{self, fmt_num, Fmt};
+use crate::sheet::{Kind, Region, Sheet};
+use crate::units::{self, lookup};
+
+fn close(a: f64, b: f64, rel: f64) -> bool { (a - b).abs() <= rel * b.abs().max(1e-300) }
+
+/// Each unit's factor to SI, as published (NIST SP 811 App. B.8/B.9, exact where NIST says exact).
+#[test]
+fn unit_factors_match_nist() {
+    let table: &[(&str, f64)] = &[
+        ("m", 1.0), ("km", 1000.0), ("cm", 0.01), ("mm", 0.001), ("µm", 1e-6), ("um", 1e-6), ("nm", 1e-9), ("in", 0.0254), ("ft", 0.3048), ("yd", 0.9144), ("mi", 1609.344), ("nmi", 1852.0), ("mil", 2.54e-5),
+        ("kg", 1.0), ("g", 1e-3), ("mg", 1e-6), ("t", 1000.0), ("tonne", 1000.0), ("lb", 0.45359237), ("lbm", 0.45359237), ("oz", 2.834952e-2), ("slug", 1.459390e1), ("ton_us", 9.071847e2), ("grain", 6.479891e-5),
+        ("s", 1.0), ("ms", 1e-3), ("µs", 1e-6), ("us", 1e-6), ("min", 60.0), ("h", 3600.0), ("hr", 3600.0), ("day", 86400.0), ("week", 604800.0), ("yr", 3.15576e7),
+        ("K", 1.0), ("°R", 5.0 / 9.0), ("degR", 5.0 / 9.0), ("Δ°C", 1.0), ("delta°C", 1.0), ("deltaC", 1.0), ("Δ°F", 5.0 / 9.0), ("delta°F", 5.0 / 9.0), ("deltaF", 5.0 / 9.0),
+        ("A", 1.0), ("mA", 1e-3), ("kA", 1e3), ("mol", 1.0), ("kmol", 1e3), ("mmol", 1e-3), ("lbmol", 453.59237), ("cd", 1.0),
+        ("rad", 1.0), ("deg", 1.745329e-2), ("°", 1.745329e-2), ("rev", 6.283185), ("arcmin", 2.908882e-4), ("arcsec", 4.848137e-6),
+        ("ha", 1e4), ("acre", 4.046856e3), ("L", 1e-3), ("l", 1e-3), ("mL", 1e-6), ("ml", 1e-6), ("gal", 3.785412e-3), ("gal_uk", 4.54609e-3), ("bbl", 1.589873e-1),
+        ("N", 1.0), ("mN", 1e-3), ("kN", 1e3), ("MN", 1e6), ("kgf", 9.80665), ("lbf", 4.448222), ("kip", 4.448222e3), ("dyn", 1e-5),
+        ("Pa", 1.0), ("kPa", 1e3), ("MPa", 1e6), ("GPa", 1e9), ("hPa", 100.0), ("bar", 1e5), ("mbar", 100.0), ("atm", 1.01325e5), ("psi", 6.894757e3), ("ksi", 6.894757e6),
+        ("psf", 4.788026e1), ("torr", 1.333224e2), ("mmHg", 1.333224e2), ("inHg", 3.386389e3), ("mH2O", 9.80665e3), ("inH2O", 2.490889e2),
+        ("J", 1.0), ("kJ", 1e3), ("MJ", 1e6), ("GJ", 1e9), ("Wh", 3600.0), ("kWh", 3.6e6), ("MWh", 3.6e9), ("cal", 4.184), ("kcal", 4184.0), ("BTU", 1.055056e3), ("Btu", 1.055056e3),
+        ("therm", 1.055056e8), ("eV", 1.602177e-19), ("erg", 1e-7),
+        ("W", 1.0), ("mW", 1e-3), ("kW", 1e3), ("MW", 1e6), ("GW", 1e9), ("hp", 7.456999e2), ("hp_metric", 7.354988e2), ("PS", 7.354988e2), ("TR", 3.516853e3),
+        ("VA", 1.0), ("kVA", 1e3), ("MVA", 1e6), ("var", 1.0), ("kvar", 1e3),
+        ("Hz", 1.0), ("kHz", 1e3), ("MHz", 1e6), ("rpm", 1.047198e-1), ("rps", 6.283185),
+        ("mph", 4.4704e-1), ("kn", 5.144444e-1), ("knot", 5.144444e-1), ("kph", 2.777778e-1), ("fpm", 5.08e-3), ("fps", 3.048e-1),
+        ("gpm", 6.309020e-5), ("cfm", 4.719474e-4), ("lpm", 1.666667e-5), ("bpd", 1.840131e-6), ("MGD", 4.381264e-2), ("tph", 2.777778e-1),
+        ("P", 0.1), ("cP", 1e-3), ("St", 1e-4), ("cSt", 1e-6),
+        ("V", 1.0), ("mV", 1e-3), ("kV", 1e3), ("Ω", 1.0), ("ohm", 1.0), ("kΩ", 1e3), ("kohm", 1e3), ("MΩ", 1e6), ("mΩ", 1e-3), ("S", 1.0), ("C", 1.0), ("Ah", 3600.0), ("mAh", 3.6),
+        ("F", 1.0), ("µF", 1e-6), ("uF", 1e-6), ("nF", 1e-9), ("pF", 1e-12), ("H", 1.0), ("mH", 1e-3), ("Wb", 1.0), ("T", 1.0), ("mT", 1e-3),
+        ("sg", 1000.0), ("%", 0.01), ("ppm", 1e-6), ("ppb", 1e-9),
+        ("dm", 0.1), ("Mg", 1e3), ("µg", 1e-9), ("ns", 1e-9), ("gon", 1.570796e-2), ("cc", 1e-6), ("qt", 9.463529e-4), ("pt", 4.731765e-4), ("fl_oz", 2.957353e-5),
+        ("tf", 9.80665e3), ("ozf", 2.780139e-1), ("at", 9.80665e4), ("psia", 6.894757e3), ("MMBTU", 1.055056e9), ("TJ", 1e12), ("GHz", 1e9), ("gph", 1.051503e-6),
+        ("µA", 1e-6), ("uA", 1e-6), ("GΩ", 1e9), ("µH", 1e-6), ("G", 1e-4), ("µT", 1e-6), ("lm", 1.0), ("lx", 1.0), ("pcf", 1.601846e1),
+    ];
+    // NIST gives 7 significant figures for inexact factors.
+    for (sym, want) in table {
+        let u = lookup(sym).unwrap_or_else(|| panic!("{sym} is missing"));
+        assert!(close(u.factor, *want, 5e-7), "{sym}: {} vs {want}", u.factor);
+    }
+    // Every unit in the table is tested.
+    for u in units::UNITS { assert!(table.iter().any(|t| t.0 == u.sym), "{} has no factor test", u.sym); }
+    assert!(units::UNITS.len() + units::ABS_TEMPS.len() >= 180, "about 200 units");
+}
+
+#[test]
+fn unit_dimensions() {
+    let dim = |s: &str| units::parse(s).unwrap().dim;
+    assert_eq!(dim("N"), dim("kg*m/s^2"));
+    assert_eq!(dim("Pa"), dim("N/m^2"));
+    assert_eq!(dim("J"), dim("N*m"));
+    assert_eq!(dim("W"), dim("J/s"));
+    assert_eq!(dim("V"), dim("W/A"));
+    assert_eq!(dim("Ω"), dim("V/A"));
+    assert_eq!(dim("C"), dim("A*s"));
+    assert_eq!(dim("F"), dim("C/V"));
+    assert_eq!(dim("H"), dim("Wb/A"));
+    assert_eq!(dim("T"), dim("Wb/m^2"));
+    assert_eq!(dim("S"), dim("A/V"));
+    assert_eq!(dim("gpm"), dim("m^3/s"));
+    assert_eq!(dim("cP"), dim("Pa*s"));
+    assert_eq!(dim("cSt"), dim("m^2/s"));
+    assert_eq!(dim("kWh"), dim("J"));
+    assert_eq!(dim("psi"), dim("lbf/in^2"));
+    assert!(units::same(&dim("rpm"), &dim("Hz")), "rotation and frequency differ only by the angle tag");
+}
+
+#[test]
+fn unit_expressions() {
+    let f = |s: &str| units::parse(s).unwrap().factor;
+    assert!(close(f("m^3/h"), 1.0 / 3600.0, 1e-12));
+    assert!(close(f("kN*m"), 1000.0, 1e-12));
+    assert!(close(f("W/(m^2*K)"), 1.0, 1e-12));
+    assert!(close(f("W/m^2/K"), 1.0, 1e-12));
+    assert!(close(f("lbf/in^2"), lookup("psi").unwrap().factor, 1e-12));
+    assert!(close(f("ft^3/min"), lookup("cfm").unwrap().factor, 1e-12));
+    assert!(close(f("m/s²"), 1.0, 1e-12));
+    assert!(close(f("m³"), 1.0, 1e-12));
+    assert!(close(f("N·m"), 1.0, 1e-12));
+    assert!(close(f("BTU/(h*ft^2*°R)"), 5.678263, 1e-6), "W/(m²·K) per BTU/(h·ft²·°F), NIST");
+    assert!(close(f("kg/m^3"), 1.0, 1e-12));
+    assert!(close(f("s^-1"), 1.0, 1e-12));
+    assert!(units::parse("m^3/hx").is_err());
+    assert!(units::parse("").is_err());
+    assert!(units::parse("°C^2").is_err(), "an absolute temperature has no powers");
+}
+
+fn sheet(lines: &[&str]) -> Sheet {
+    let mut s = Sheet::new("t");
+    for (i, l) in lines.iter().enumerate() {
+        let kind = if l.starts_with("check") { Kind::Check } else { Kind::Math };
+        s.regions.push(Region { id: i as u32 + 1, kind, text: l.to_string(), ..Default::default() });
+    }
+    s
+}
+fn run(lines: &[&str]) -> eval::SheetOut { eval::run(&sheet(lines)) }
+/// The SI value of the last region's result.
+fn val(lines: &[&str]) -> f64 {
+    let s = sheet(lines);
+    let o = eval::run(&s);
+    if let Some(e) = o.regions.iter().find_map(|r| r.error.clone()) { panic!("{lines:?}: {}", e.msg); }
+    let mut env = eval::Env::new();
+    let mut known = vec![];
+    let mut last = f64::NAN;
+    for l in lines {
+        match crate::parse::statement(l, &known).unwrap() {
+            crate::parse::Stmt::Assign { name, e, .. } => { let v = env.eval(&e).unwrap(); last = v.x(); env.vars.insert(eval::canon(&name), v); known.push(name); }
+            crate::parse::Stmt::Show { e } => last = env.eval(&e).unwrap().x(),
+            crate::parse::Stmt::Func { name, params, e } => { env.funcs.insert(eval::canon(&name), (params, e)); }
+            _ => {}
+        }
+    }
+    last
+}
+fn result(lines: &[&str]) -> String { let o = run(lines); let r = o.regions.last().unwrap(); r.error.as_ref().map(|e| format!("ERR {}", e.msg)).unwrap_or(r.result.clone()) }
+fn error(lines: &[&str]) -> String { run(lines).regions.last().unwrap().error.clone().map(|e| e.msg).unwrap_or_default() }
+
+#[test]
+fn temperatures() {
+    assert!(close(val(&["T = 20 °C"]), 293.15, 1e-12));
+    assert!(close(val(&["T = 68 °F"]), 293.15, 1e-12));
+    assert!(close(val(&["T = -40 °C"]), 233.15, 1e-12));
+    assert!(close(val(&["T = -40 °F"]), 233.15, 1e-12), "−40 is the same on both scales");
+    assert!(close(val(&["T = 0 degF"]), 255.372_222, 1e-6));
+    assert!(close(val(&["T = 491.67 °R"]), 273.15, 1e-12));
+    assert_eq!(result(&["T = 20 °C"]), "20 °C");
+    assert_eq!(result(&["T1 = 20 °C", "T2 = 80 °C", "dT = T2 - T1"]), "60 K", "a difference is not a temperature");
+    assert_eq!(result(&["T1 = 20 °C", "T2 = 30 °C", "Tm = (T1 + T2)/2"]), "25 °C", "a mean of temperatures stays a temperature");
+    assert_eq!(result(&["T1 = 20 °C", "T2 = T1 + 15 K"]), "35 °C");
+    assert_eq!(result(&["T1 = 20 °C", "T2 = T1 + 15 Δ°C"]), "35 °C");
+    let mut s = sheet(&["T1 = 20 °C", "T2 = 80 °C", "dT = T2 - T1"]);
+    s.regions[2].unit = "°F".into();
+    assert_eq!(eval::run(&s).regions[2].result, "108 Δ°F", "a difference shown in °F is a Δ°F");
+    s.regions[1].unit = "°F".into();
+    assert_eq!(eval::run(&s).regions[1].result, "176 °F");
+    s.regions[1].unit = "K".into();
+    assert_eq!(eval::run(&s).regions[1].result, "353.1 K");
+    let mut s = sheet(&["T = 100 °C"]);
+    s.units = "US".into();
+    assert_eq!(eval::run(&s).regions[0].result, "212 °F");
+}
+
+#[test]
+fn dimension_errors_are_caught_on_their_line() {
+    let o = run(&["a = 2 m", "b = 3 s", "c = a + b", "d = a * 2"]);
+    let e = o.regions[2].error.as_ref().unwrap();
+    assert!(e.msg.contains("a length") && e.msg.contains("a time"), "{}", e.msg);
+    assert_eq!((e.from, e.to), (4, 9), "the error points at a + b");
+    assert!(o.regions[3].error.is_none(), "the rest of the sheet still works");
+    assert_eq!(o.regions[3].result, "4 m");
+    assert!(error(&["x = 2 m", "y = sin(x)"]).contains("angle"));
+    assert!(error(&["x = 2 m", "y = ln(x)"]).contains("plain number"));
+    assert!(error(&["x = 2 m", "y = 2^x"]).contains("plain number"));
+    assert!(error(&["x = 2 m", "check x < 3 s"]).contains("compare"));
+    assert!(error(&["x = sqrt(2 m)"]).contains("no units"));
+    assert_eq!(result(&["A = 4 m^2", "x = sqrt(A)"]), "2 m");
+    assert_eq!(result(&["V = 8 m^3", "x = cbrt(V)"]), "2 m");
+    assert_eq!(result(&["A = 4 m^2", "x = A^0.5"]), "2 m");
+}
+
+#[test]
+fn display_picks_a_good_unit() {
+    assert_eq!(result(&["P = 18400 W"]), "18.4 kW");
+    assert_eq!(result(&["p = 2500000 Pa"]), "2.5 MPa");
+    assert_eq!(result(&["p = 250 Pa"]), "250 Pa");
+    assert_eq!(result(&["F = 2 kg * 9.81 m/s^2"]), "19.62 N");
+    assert_eq!(result(&["L = 0.25 m"]), "250 mm");
+    assert_eq!(result(&["L = 2500 m"]), "2.5 km");
+    assert_eq!(result(&["Q = 120 m^3/h"]), "120 m³/h");
+    assert_eq!(result(&["v = 3 m/s"]), "3 m/s");
+    assert_eq!(result(&["x = 3 m * 2 N / (4 s)"]), "1.5 W");
+    assert_eq!(result(&["k = 0.5 W/(m*K)"]), "0.5 W/(m·K)");
+    assert_eq!(result(&["U = 450 W/(m^2*K)"]), "450 W/(m²·K)");
+    assert_eq!(result(&["w = 2 kg*m^2/s"]), "2 m²·kg/s");
+    assert_eq!(result(&["r = 3 m / (2 m)"]), "1.5");
+    assert_eq!(result(&["θ = 30 deg"]), "30 °");
+    assert_eq!(result(&["n = 1500 rpm"]), "157.1 rad/s");
+    let mut s = sheet(&["n = 1500 rpm"]);
+    s.regions[0].unit = "rpm".into();
+    assert_eq!(eval::run(&s).regions[0].result, "1500 rpm");
+    let mut s = sheet(&["P = 18.4 kW"]);
+    s.regions[0].unit = "hp".into();
+    assert_eq!(eval::run(&s).regions[0].result, "24.67 hp");
+    s.regions[0].unit = "m".into();
+    let o = eval::run(&s);
+    assert!(o.regions[0].warn.contains("cannot show"), "{}", o.regions[0].warn);
+    assert_eq!(o.regions[0].result, "18.4 kW");
+    let mut s = sheet(&["p = 1 MPa", "F = 10 kN", "L = 3 ft"]);
+    s.units = "US".into();
+    let o = eval::run(&s);
+    assert_eq!(o.regions[0].result, "145 psi");
+    assert_eq!(o.regions[1].result, "2.248 kip");
+    assert_eq!(o.regions[2].result, "3 ft");
+}
+
+#[test]
+fn number_formatting() {
+    assert_eq!(fmt_num(18.4, 4, false).0, "18.4");
+    assert_eq!(fmt_num(19.6133, 4, false).0, "19.61");
+    assert_eq!(fmt_num(0.00012345, 4, false).0, "123.5×10⁻⁶");
+    assert_eq!(fmt_num(1234567.0, 4, false).0, "1.235×10⁶");
+    assert_eq!(fmt_num(999999.9, 3, false).0, "1×10⁶");
+    assert_eq!(fmt_num(12500.0, 3, true).0, "12.5×10³");
+    assert_eq!(fmt_num(-0.5, 4, false).0, "-0.5");
+    assert_eq!(fmt_num(0.0, 4, false).0, "0");
+    assert_eq!(fmt_num(100.0, 4, false).0, "100");
+    assert_eq!(fmt_num(1e6, 4, false).1, "1 \\times 10^{6}");
+    assert_eq!(fmt_num(f64::NAN, 4, false).0, "—");
+}
+
+#[test]
+fn arithmetic_and_precedence() {
+    assert_eq!(val(&["x = 2 + 3 * 4"]), 14.0);
+    assert_eq!(val(&["x = (2 + 3) * 4"]), 20.0);
+    assert_eq!(val(&["x = 2^3^2"]), 512.0, "powers group from the right");
+    assert_eq!(val(&["x = -2^2"]), -4.0);
+    assert_eq!(val(&["x = 2*-3"]), -6.0);
+    assert_eq!(val(&["x = 10 / 4 / 5"]), 0.5);
+    assert_eq!(val(&["x = 7 - 2 - 1"]), 4.0);
+    assert_eq!(val(&["x = 3²"]), 9.0);
+    assert_eq!(val(&["x = 2**3"]), 8.0);
+    assert_eq!(val(&["x = 1.5e3 + .5"]), 1500.5);
+    assert_eq!(val(&["x = 6 × 7 ÷ 2"]), 21.0);
+    assert!(close(val(&["x = sin(30 deg)"]), 0.5, 1e-12));
+    assert!(close(val(&["x = cos(pi)"]), -1.0, 1e-12));
+    assert!(close(val(&["x = cos(π)"]), -1.0, 1e-12));
+    assert!(close(val(&["x = tan(45 °)"]), 1.0, 1e-12));
+    assert!(close(val(&["x = asin(0.5)"]), std::f64::consts::PI / 6.0, 1e-12));
+    assert!(close(val(&["x = ln(e)"]), 1.0, 1e-12));
+    assert!(close(val(&["x = log(1000)"]), 3.0, 1e-12));
+    assert!(close(val(&["x = exp(0)"]), 1.0, 1e-12));
+    assert_eq!(val(&["x = abs(-3 m)"]), 3.0);
+    assert_eq!(val(&["x = min(3, 1, 2)"]), 1.0);
+    assert_eq!(val(&["x = max(3 m, 400 mm)"]), 3.0);
+    assert_eq!(val(&["x = round(2.345, 2)"]), 2.35);
+    assert_eq!(val(&["x = floor(2.7)"]), 2.0);
+    assert_eq!(val(&["x = ceil(2.1)"]), 3.0);
+    assert_eq!(val(&["x = if(2 > 1, 10, 20)"]), 10.0);
+    assert_eq!(val(&["x = if(2 < 1, 10, 20)"]), 20.0);
+    assert_eq!(val(&["x = if(1 > 0, 1, sqrt(-1))"]), 1.0, "if only works out the branch it takes");
+    assert_eq!(val(&["x = hypot(3, 4)"]), 5.0);
+    assert!(close(val(&["x = atan2(1, 1)"]), std::f64::consts::FRAC_PI_4, 1e-12));
+    assert!(close(val(&["x = 5 %"]), 0.05, 1e-12));
+}
+
+#[test]
+fn names_greek_and_subscripts() {
+    assert_eq!(val(&["sigma_allow = 250 MPa", "x = σ_allow / 2"]), 125e6, "sigma and σ are the same name");
+    assert_eq!(val(&["ρ = 1000 kg/m^3", "x = rho * 2"]), 2000.0);
+    assert_eq!(val(&["eta_motor = 0.9", "x = η_motor"]), 0.9);
+    assert_eq!(val(&["P_in' = 3", "x = P_in' * 2"]), 6.0);
+    assert_eq!(val(&["g = 10 m/s^2", "x = g"]), 10.0, "a name on the sheet takes the place of a constant");
+    assert!(close(val(&["x = g"]), 9.80665, 1e-12));
+    assert!(close(val(&["x = R"]), 8.314462618, 1e-12));
+    assert!(close(val(&["x = σ_SB"]), 5.670374419e-8, 1e-12));
+}
+
+#[test]
+fn units_after_numbers() {
+    assert!(close(val(&["Q = 120 m^3/h"]), 120.0 / 3600.0, 1e-12));
+    assert!(close(val(&["M = 2.5 kN*m"]), 2500.0, 1e-12));
+    assert!(close(val(&["h = 1.2 W/(m^2*K)"]), 1.2, 1e-12));
+    assert!(close(val(&["x = 2 m * 3"]), 6.0, 1e-12), "* followed by a number ends the unit");
+    assert!(close(val(&["t = 4", "x = 2*t"]), 8.0, 1e-12), "a unit must follow the number directly");
+    assert!(close(val(&["t = 4", "x = 2 m*t"]), 8.0, 1e-12), "a name on the sheet is not taken as a unit");
+    assert!(close(val(&["x = 2 m*t"]), 2000.0, 1e-12), "without a name t is the tonne");
+    assert!(close(val(&["x = 10 m/s / 2"]), 5.0, 1e-12));
+    assert!(close(val(&["v = 3 m/s", "x = 9 m / v"]), 3.0, 1e-12));
+    assert!(error(&["x = 2 metres"]).contains("not a unit"));
+}
+
+#[test]
+fn user_functions_and_vectors() {
+    assert_eq!(val(&["f(x) = 3*x^2 + 2", "y = f(2)"]), 14.0);
+    assert_eq!(val(&["A(d) = pi*d^2/4", "y = A(2 m)"]), std::f64::consts::PI);
+    assert_eq!(val(&["h(a, b) = sqrt(a^2 + b^2)", "y = h(3 m, 4 m)"]), 5.0);
+    assert!(error(&["f(x) = x", "y = f(1, 2)"]).contains("takes 1"));
+    assert!(error(&["f(x) = f(x)", "y = f(1)"]).contains("too deeply"));
+    let o = run(&["x = 0, 0.5 .. 2", "s = sum(x)", "m = mean(x)", "n = len(x)", "y = x^2", "mx = max(y)"]);
+    assert_eq!(o.regions[0].result, "[0, 0.5, 1, 1.5, 2]");
+    assert_eq!(o.regions[1].result, "5");
+    assert_eq!(o.regions[2].result, "1");
+    assert_eq!(o.regions[3].result, "5");
+    assert_eq!(o.regions[5].result, "4");
+    assert_eq!(result(&["x = 0 .. 3"]), "[0, 1, 2, 3]");
+    assert_eq!(result(&["L = 0, 1 m .. 3 m"]), "[0, 1, 2, 3] m");
+    assert!(result(&["x = 0, 0.1 .. 10"]).starts_with("[0, 0.1, 0.2, … 10]"));
+    assert!(error(&["x = 0, -1 .. 10"]).contains("step"));
+    assert_eq!(result(&["xs = 0 .. 2", "x = interp(1.5, xs, xs^2)"]), "2.5");
+}
+
+#[test]
+fn checks_pass_fail_and_utilisation() {
+    let o = run(&["sigma = 205 MPa", "sigma_allow = 250 MPa", "check sigma <= sigma_allow"]);
+    let c = o.regions[2].check.as_ref().unwrap();
+    assert!(c.pass);
+    assert!(close(c.ratio.unwrap(), 0.82, 1e-12));
+    assert_eq!((c.lhs.as_str(), c.rhs.as_str()), ("205 MPa", "250 MPa"));
+    let o = run(&["P = 18.4 kW", "P_motor = 15 kW", "check P_motor >= P"]);
+    let c = o.regions[2].check.as_ref().unwrap();
+    assert!(!c.pass);
+    assert!(close(c.ratio.unwrap(), 18.4 / 15.0, 1e-12), "utilisation is demand over capacity");
+    assert_eq!((o.checks, o.failed), (1, 1));
+    let o = run(&["a = 300 mm", "check a <= 0.3 m"]);
+    assert!(o.regions[1].check.as_ref().unwrap().pass, "equal within rounding passes ≤");
+    assert_eq!(o.regions[1].check.as_ref().unwrap().rhs, "300 mm", "the right side is shown in the left side's unit");
+    assert!(error(&["check 3"]).contains("compares"));
+}
+
+#[test]
+fn errors_say_where_and_why() {
+    let o = run(&["x = y + 1", "y = 2"]);
+    assert!(o.regions[0].error.as_ref().unwrap().msg.contains("further down"), "{:?}", o.regions[0].error);
+    let o = run(&["a = 1 m + 1 s", "b = a * 2"]);
+    assert!(o.regions[1].error.as_ref().unwrap().msg.contains("error on its own line"));
+    assert!(error(&["x = z * 2"]).contains("not defined"));
+    assert!(error(&["x = (2 + 3"]).contains("“)”"));
+    assert!(error(&["x = 2 + 3)"]).contains("bracket"));
+    assert!(error(&["x = 2 +"]).contains("missing"));
+    assert!(error(&["x = 2 $"]).contains("“$”"));
+    assert!(error(&["x = 1 / 0"]).contains("zero"));
+    assert!(error(&["x = sqrt(-4)"]).contains("negative"));
+    assert!(error(&["x = foo(2)"]).contains("not a function"));
+    assert!(error(&["x = 2 3"]).contains("operator"));
+    assert!(error(&["x = kN"]).contains("is a unit"));
+    let o = run(&["x = (2 + 3"]);
+    let e = o.regions[0].error.as_ref().unwrap();
+    assert_eq!((e.from, e.to), (10, 10), "a missing bracket points at the end");
+}
+
+#[test]
+fn solve_finds_roots() {
+    let o = run(&["solve x^2 = 2 for x in 0 .. 3"]);
+    assert!(o.regions[0].error.is_none(), "{:?}", o.regions[0].error);
+    assert!(close(val(&["x = 0"]), 0.0, 1.0));
+    let mut env = eval::Env::new();
+    let _ = &mut env;
+    assert_eq!(o.regions[0].result, "1.414");
+    assert_eq!(o.vars[0].name, "x");
+    // Colebrook: ε/D = 0.0001, Re = 1e5 → f ≈ 0.0185 (Moody chart; Haaland gives 0.01848).
+    let o = run(&["eps = 0.0001", "Re = 100000", "solve 1/sqrt(f) = -2*log(eps/3.7 + 2.51/(Re*sqrt(f))) for f in 0.005 .. 0.1", "y = f * 2"]);
+    assert!(o.regions[2].error.is_none(), "{:?}", o.regions[2].error);
+    assert_eq!(o.regions[2].result, "0.01851");
+    assert_eq!(o.regions[3].result, "0.03703");
+    let o = run(&["solve x^2 = -1 for x in 0 .. 3"]);
+    assert!(o.regions[0].error.as_ref().unwrap().msg.starts_with("No root between 0 and 3"), "{:?}", o.regions[0].error);
+    let o = run(&["solve x^2 = 4 m^2 for x in 0 m .. 10 m"]);
+    assert_eq!(o.regions[0].result, "2 m");
+    let mut f = |x: f64| x.cos() - x;
+    assert!(close(crate::solve::root(&mut f, 0.0, 1.0).unwrap(), 0.739_085_133_215_160_6, 1e-12));
+}
+
+#[test]
+fn plots_sample_their_curves() {
+    let o = run(&["H_pump(Q) = 60 m - 0.002 m/(m^3/h)^2 * Q^2", "H_sys(Q) = 20 m + 0.001 m/(m^3/h)^2 * Q^2", "plot H_pump(Q), H_sys(Q) for Q in 0 m^3/h .. 150 m^3/h"]);
+    let p = o.regions[2].plot.as_ref().unwrap_or_else(|| panic!("{:?}", o.regions[2].error));
+    assert_eq!(p.xs.len(), 121);
+    assert_eq!(p.xunit, "m³/h");
+    assert!(close(p.xs[120], 150.0, 1e-12));
+    assert_eq!(p.series.len(), 2);
+    assert!(close(p.series[0].ys[0], 60.0, 1e-12) && p.yunit == "m", "{} {}", p.series[0].ys[0], p.yunit);
+    assert!(close(p.series[1].ys[120], 42.5, 1e-9));
+}
+
+#[test]
+fn latex_shows_what_is_computed() {
+    let t = |s: &str| crate::latex::stmt(&crate::parse::statement(s, &[]).unwrap());
+    assert_eq!(t("P = rho*g*Q*H/eta"), "P = \\frac{\\rho \\cdot g \\cdot Q \\cdot H}{\\eta}");
+    assert_eq!(t("sigma_allow = 250 MPa"), "\\sigma_{\\mathrm{allow}} = 250\\,\\mathrm{MPa}");
+    assert_eq!(t("Q = 120 m^3/h"), "Q = 120\\,\\mathrm{m^{3}/h}");
+    assert_eq!(t("x = sqrt(a^2 + b^2)"), "x = \\sqrt{{a}^{2} + {b}^{2}}");
+    assert_eq!(t("x = (a + b)/(c - d)"), "x = \\frac{a + b}{c - d}");
+    assert_eq!(t("x = (a + b)*c"), "x = \\left(a + b\\right) \\cdot c");
+    assert_eq!(t("x = a - (b - c)"), "x = a - \\left(b - c\\right)");
+    assert_eq!(t("check sigma <= sigma_allow"), "\\sigma \\le \\sigma_{\\mathrm{allow}}");
+    assert_eq!(t("f(x) = 3*x^2"), "f\\left(x\\right) = 3 \\cdot {x}^{2}");
+    assert_eq!(t("T = 20 °C"), "T = 20\\,\\mathrm{{^\\circ}C}");
+    assert_eq!(t("x = sin(30 deg)"), "x = \\sin\\left(30\\,\\mathrm{deg}\\right)");
+    assert_eq!(t("Re = rho*v*D/mu"), "\\mathrm{Re} = \\frac{\\rho \\cdot v \\cdot D}{\\mu}");
+    assert_eq!(t("x = 1.5e-5"), "x = 1.5 \\times 10^{-5}");
+    assert_eq!(t("x = 0.0015"), "x = 0.0015");
+    assert_eq!(crate::latex::unit("W/(m²·K)"), "\\mathrm{W/(m^{2}\\cdot K)}");
+    assert_eq!(crate::latex::unit("m·s⁻¹"), "\\mathrm{m\\cdot s^{-1}}");
+    let o = run(&["P = 18400 W"]);
+    assert_eq!(o.regions[0].result_tex, "18.4\\,\\mathrm{kW}");
+}
+
+#[test]
+fn whole_sheet_pump_power() {
+    // Hydraulic power P = ρ·g·Q·H / η: 1000 × 9.80665 × (120/3600) × 45 / 0.75 = 19 613.3 W.
+    let mut s = sheet(&["rho = 1000 kg/m^3", "Q = 120 m^3/h", "H = 45 m", "eta = 0.75", "P = rho*g*Q*H/eta", "P_motor = 22 kW", "check P <= P_motor"]);
+    s.regions.insert(0, Region { id: 99, kind: Kind::Text, text: "Pump power".into(), ..Default::default() });
+    let o = eval::run(&s);
+    assert_eq!(o.regions[5].result, "19.61 kW");
+    assert!(o.regions[2].input && !o.regions[5].input);
+    let c = o.regions[7].check.as_ref().unwrap();
+    assert!(c.pass && close(c.ratio.unwrap(), 19613.3 / 22000.0, 1e-5));
+    assert_eq!(o.vars.len(), 6);
+    assert_eq!(o.vars[4].name, "P");
+    assert_eq!(o.errors, 0);
+    let f = Fmt { digits: 3, eng: false, us: true };
+    let o = eval::run_with(&s, &f);
+    assert_eq!(o.regions[5].result, "26.3 hp");
+}

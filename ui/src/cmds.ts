@@ -6,7 +6,7 @@ import * as D from "./dialogs";
 const GH = "https://github.com/Edgar-Mendonca/Datum-Calc";
 /** Where a new region goes: below the selected one, or at the end. */
 const below = () => { const i = out()?.sheet.regions.findIndex(r => r.id === selId()) ?? -1; return i >= 0 ? i + 1 : out()?.sheet.regions.length ?? 0; };
-const STARTER: Record<Kind, string> = { math: "", text: "", check: "check ", solve: "", plot: "", table: "", image: "" };
+const STARTER: Record<Kind, string> = { math: "", text: "", check: "check ", solve: "solve x^2 = 2 for x in 0 .. 10", plot: "plot sin(x), cos(x) for x in 0 .. 2*pi", table: "", image: "" };
 
 /** The textarea being edited, so symbol buttons can type into it. */
 let field: HTMLTextAreaElement | null = null;
@@ -58,7 +58,7 @@ export const C = {
 
 /** Every command with a name, for Tell Me and the shortcut list. */
 export const ALL_CMDS: [string, () => void, string?][] = [
-  ["Insert math region", () => C.insert("math"), "Ctrl+M"], ["Insert text region", () => C.insert("text"), "Ctrl+T"], ["Insert check", () => C.insert("check")],
+  ["Insert math region", () => C.insert("math"), "Ctrl+M"], ["Insert text region", () => C.insert("text"), "Ctrl+T"], ["Insert check", () => C.insert("check")], ["Insert solve", () => C.insert("solve")], ["Insert plot", () => C.insert("plot")],
   ["Delete region", C.del, "Delete"], ["Move region up", () => C.move(true), "Alt+↑"], ["Move region down", () => C.move(false), "Alt+↓"],
   ["Copy", C.copy, "Ctrl+C"], ["Paste", C.paste, "Ctrl+V"], ["Undo", C.undo, "Ctrl+Z"], ["Redo", C.redo, "Ctrl+Y"],
   ["Save", () => C.save(), "Ctrl+S"], ["Save as", () => C.save(true)], ["Open", C.open, "Ctrl+O"], ["New sheet", C.newSheet, "Ctrl+N"], ["Print / PDF", C.print, "Ctrl+P"],
