@@ -6,6 +6,13 @@ use std::path::{Path, PathBuf};
 /// The .dcalc format written by this version. Older files are migrated in `Sheet::from_json`.
 pub const FORMAT: u32 = 1;
 const UNDO_LIMIT: usize = 200;
+const MAX_FILE: u64 = 64_000_000;
+/// Limits a sheet read from a file is held to (beyond them the rest is left out).
+const MAX_REGIONS: usize = 5000;
+const MAX_TEXT: usize = 20_000;
+const MAX_PICTURE: usize = 8_000_000;
+const MAX_ROWS: usize = 2000;
+const MAX_COLS: usize = 50;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
@@ -123,6 +130,13 @@ impl Sheet {
     /// Keeps the invariants every reader and edit relies on: unique non-zero ids, next_id above them all,
     /// sane digits and units.
     pub fn normalize(&mut self) {
+        self.regions.truncate(MAX_REGIONS);
+        for r in &mut self.regions {
+            if r.text.len() > MAX_TEXT { let mut k = MAX_TEXT; while !r.text.is_char_boundary(k) { k -= 1; } r.text.truncate(k); }
+            if r.data.get("src").and_then(|v| v.as_str()).is_some_and(|v| v.len() > MAX_PICTURE) { r.data["src"] = serde_json::Value::Null; }
+            if let Some(rows) = r.data.get_mut("rows").and_then(|v| v.as_array_mut()) { rows.truncate(MAX_ROWS); }
+            if let Some(cols) = r.data.get_mut("cols").and_then(|v| v.as_array_mut()) { cols.truncate(MAX_COLS); }
+        }
         let mut seen = std::collections::HashSet::new();
         let mut next = self.regions.iter().map(|r| r.id).max().unwrap_or(0).max(self.next_id.saturating_sub(1));
         for r in &mut self.regions {
@@ -172,11 +186,16 @@ fn exec(s: &mut Sheet, op: Op) -> Result<(), String> {
             let r = &mut s.regions[i];
             let text = || value.as_str().map(String::from).ok_or_else(|| format!("{field} must be text."));
             match field.as_str() {
-                "text" => r.text = text()?,
+                "text" => { let t = text()?; if t.len() > MAX_TEXT { return Err("A region holds at most 20,000 characters.".into()); } r.text = t; }
                 "unit" => r.unit = text()?,
                 "style" => r.style = text()?,
                 "kind" => r.kind = serde_json::from_value(value.clone()).map_err(|_| "Unknown region kind.")?,
-                "data" => r.data = value,
+                "data" => {
+                    if value.get("src").and_then(|v| v.as_str()).is_some_and(|v| v.len() > MAX_PICTURE) { return Err("Choose a picture smaller than 6 MB.".into()); }
+                    if value.get("rows").and_then(|v| v.as_array()).is_some_and(|v| v.len() > MAX_ROWS) { return Err("A table holds at most 2,000 rows.".into()); }
+                    if value.get("cols").and_then(|v| v.as_array()).is_some_and(|v| v.len() > MAX_COLS) { return Err("A table holds at most 50 columns.".into()); }
+                    r.data = value;
+                }
                 f => return Err(format!("Regions have no field {f}.")),
             }
         }
@@ -260,16 +279,25 @@ impl Doc {
         if let Some(s) = self.redo.pop() { self.undo.push(std::mem::replace(&mut self.s, s)); self.dirty = true; }
     }
 
+    /// Opens a .dcalc file. Files over 64 MB are refused (a sheet is a few hundred kB even with pictures);
+    /// bytes that are not UTF-8 are replaced, so a damaged file still opens as far as it can.
     pub fn open(path: &Path) -> Result<Self, String> {
-        let text = std::fs::read_to_string(path).map_err(|e| format!("Could not open {}: {e}", path.display()))?;
-        let s = Sheet::from_json(&text).map_err(|e| format!("This is not a Datum Calc sheet: {e}"))?;
+        let len = std::fs::metadata(path).map_err(|e| format!("Could not open {}: {e}", path.display()))?.len();
+        if len > MAX_FILE { return Err(format!("{} is {} MB; a Datum Calc sheet is never that large.", path.display(), len / 1_000_000)); }
+        let bytes = std::fs::read(path).map_err(|e| format!("Could not open {}: {e}", path.display()))?;
+        let s = Sheet::from_json(&String::from_utf8_lossy(&bytes)).map_err(|e| format!("This is not a Datum Calc sheet: {e}"))?;
         let mut d = Self::new(s);
         d.path = Some(path.into());
         Ok(d)
     }
 
+    /// Saves safely: the sheet is written to a temporary file next to the target, which then replaces
+    /// it in one step, so a crash or a full disk never leaves a half-written sheet.
     pub fn save(&mut self, path: &Path) -> Result<(), String> {
-        std::fs::write(path, self.s.json()).map_err(|e| format!("Could not save {}: {e}", path.display()))?;
+        let tmp = path.with_extension("dcalc.saving");
+        let fail = |e: std::io::Error| format!("Could not save {}: {e}", path.display());
+        std::fs::write(&tmp, self.s.json()).map_err(|e| { let _ = std::fs::remove_file(&tmp); fail(e) })?;
+        std::fs::rename(&tmp, path).map_err(|e| { let _ = std::fs::remove_file(&tmp); fail(e) })?;
         self.path = Some(path.into());
         self.dirty = false;
         Ok(())

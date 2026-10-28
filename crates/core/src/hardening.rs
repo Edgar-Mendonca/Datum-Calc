@@ -245,3 +245,53 @@ fn damaged_tables_and_pictures_open_and_work_out() {
         if let Ok(s) = Sheet::from_json(&String::from_utf8_lossy(&b)) { let o = crate::eval::run(&s); assert_eq!(o.regions.len(), s.regions.len()); }
     }
 }
+
+#[test]
+fn saving_is_atomic_and_opening_has_limits() {
+    let dir = std::env::temp_dir().join(format!("datum-calc-hardening-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("a.dcalc");
+    let mut d = Doc::new(Sheet::new("A"));
+    d.apply(Op::Insert { at: 0, kind: Kind::Math, text: "x = 1 m".into(), data: json!(null) }).unwrap();
+    d.save(&path).unwrap();
+    assert!(!dir.join("a.dcalc.saving").exists(), "no temporary file is left behind");
+    let before = std::fs::read_to_string(&path).unwrap();
+    // A save that cannot happen (the target is a folder) leaves no partial file and changes nothing.
+    assert!(d.save(&dir).is_err());
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), before);
+    assert_eq!(Doc::open(&path).unwrap().s, d.s);
+    // Bytes that are not UTF-8 are replaced, so the rest of the sheet still opens.
+    let mut b = before.clone().into_bytes();
+    let i = before.find("x = 1 m").unwrap();
+    b[i + 4] = 0xFF;
+    std::fs::write(&path, &b).unwrap();
+    assert_eq!(Doc::open(&path).unwrap().s.regions.len(), 1);
+    // A huge file is refused without reading it.
+    let big = dir.join("big.dcalc");
+    std::fs::File::create(&big).unwrap().set_len(65_000_000).unwrap();
+    assert!(Doc::open(&big).err().unwrap_or_default().contains("never that large"));
+    // Edits that would exceed the limits fail and change nothing; a file beyond them is cut to them.
+    assert!(d.apply(Op::Set { id: 1, field: "text".into(), value: json!("x".repeat(20_001)) }).is_err());
+    assert!(d.apply(Op::Set { id: 1, field: "data".into(), value: json!({ "rows": vec![json!([]); 2001] }) }).is_err());
+    let mut v: serde_json::Value = serde_json::from_str(&before).unwrap();
+    v["regions"][0]["text"] = json!("é".repeat(15_000));
+    v["regions"][0]["data"] = json!({ "src": "x".repeat(9_000_000), "cols": vec![json!({}); 80] });
+    let s = Sheet::from_json(&v.to_string()).unwrap();
+    assert!(s.regions[0].text.len() <= 20_000 && s.regions[0].data["src"].is_null() && s.regions[0].data["cols"].as_array().unwrap().len() == 50);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn every_pack_survives_saving_and_damage() {
+    let mut r = Rng(31);
+    for p in crate::packs::PACKS.iter().chain([&crate::packs::GETTING_STARTED]) {
+        let s = Sheet::from_json(p.json).unwrap();
+        assert_eq!(Sheet::from_json(&s.json()).unwrap(), s, "{} round-trips", p.id);
+        for n in 0..300 {
+            let mut b = p.json.as_bytes().to_vec();
+            for _ in 0..1 + r.below(5) { let i = r.below(b.len()); b[i] = b"{}[]\",:0-9x\\ m^/*"[r.below(17)]; }
+            if n % 5 == 0 { b.truncate(r.below(b.len())); }
+            if let Ok(s) = Sheet::from_json(&String::from_utf8_lossy(&b)) { assert_eq!(crate::eval::run(&s).regions.len(), s.regions.len()); }
+        }
+    }
+}

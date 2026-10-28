@@ -1,0 +1,197 @@
+{
+ "format": 1,
+ "name": "Column buckling (Euler)",
+ "title": {
+  "project": "",
+  "number": "PACK-15",
+  "title": "Column buckling (Euler)",
+  "by": "",
+  "checked": "",
+  "date": "",
+  "rev": "A",
+  "company": "",
+  "client": "",
+  "logo": ""
+ },
+ "page": {
+  "paper": "A4",
+  "margins": [
+   15.0,
+   15.0,
+   15.0,
+   20.0
+  ]
+ },
+ "units": "SI",
+ "digits": 4,
+ "regions": [
+  {
+   "id": 1,
+   "kind": "text",
+   "text": "Column buckling (Euler)",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 2,
+   "kind": "text",
+   "text": "Slender steel column, pinned at both ends (K = 1), buckling about its weak axis (IPE 300 properties). Euler's formula holds while the critical stress stays below yield, which is checked.",
+   "unit": "",
+   "style": "note",
+   "data": null
+  },
+  {
+   "id": 3,
+   "kind": "text",
+   "text": "Inputs",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 4,
+   "kind": "math",
+   "text": "E = 200 GPa  # Young's modulus",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 5,
+   "kind": "math",
+   "text": "I_min = 603.8 cm^4  # second moment of area, weak axis",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 6,
+   "kind": "math",
+   "text": "A = 53.8 cm^2  # cross-section area",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 7,
+   "kind": "math",
+   "text": "L = 4 m  # length between supports",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 8,
+   "kind": "math",
+   "text": "K = 1  # effective length factor (pinned–pinned)",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 9,
+   "kind": "math",
+   "text": "f_y = 275 MPa  # yield strength",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 10,
+   "kind": "math",
+   "text": "P = 200 kN  # axial load",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 11,
+   "kind": "math",
+   "text": "FS = 3  # safety factor on buckling",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 12,
+   "kind": "text",
+   "text": "Results",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 13,
+   "kind": "math",
+   "text": "P_cr = pi^2*E*I_min/(K*L)^2  # Euler critical load",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 14,
+   "kind": "math",
+   "text": "sigma_cr = P_cr/A  # critical stress",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 15,
+   "kind": "math",
+   "text": "r = sqrt(I_min/A)  # radius of gyration",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 16,
+   "kind": "math",
+   "text": "lambda = K*L/r  # slenderness ratio",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 17,
+   "kind": "check",
+   "text": "check P <= P_cr/FS",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 18,
+   "kind": "check",
+   "text": "check sigma_cr <= f_y  # Euler's formula is valid (elastic buckling)",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 19,
+   "kind": "text",
+   "text": "Ref: J. M. Gere, B. J. Goodno, Mechanics of Materials, 8th ed., §11.4–11.5: Euler load, effective lengths.",
+   "unit": "",
+   "style": "ref",
+   "data": null
+  },
+  {
+   "id": 20,
+   "kind": "text",
+   "text": "Ref: S. P. Timoshenko, J. M. Gere, Theory of Elastic Stability, 2nd ed., ch. 2.",
+   "unit": "",
+   "style": "ref",
+   "data": null
+  }
+ ],
+ "next_id": 21,
+ "ui": {
+  "pack": {
+   "id": "column",
+   "field": "Mechanical",
+   "desc": "Critical buckling load of a slender column from Euler's formula, its slenderness, and the load against the critical load with a safety factor."
+  }
+ }
+}

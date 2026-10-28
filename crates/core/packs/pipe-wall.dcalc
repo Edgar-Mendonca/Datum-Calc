@@ -1,0 +1,181 @@
+{
+ "format": 1,
+ "name": "Pipe wall thickness (internal pressure)",
+ "title": {
+  "project": "",
+  "number": "PACK-14",
+  "title": "Pipe wall thickness (internal pressure)",
+  "by": "",
+  "checked": "",
+  "date": "",
+  "rev": "A",
+  "company": "",
+  "client": "",
+  "logo": ""
+ },
+ "page": {
+  "paper": "A4",
+  "margins": [
+   15.0,
+   15.0,
+   15.0,
+   20.0
+  ]
+ },
+ "units": "SI",
+ "digits": 4,
+ "regions": [
+  {
+   "id": 1,
+   "kind": "text",
+   "text": "Pipe wall thickness for internal pressure",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 2,
+   "kind": "text",
+   "text": "Straight carbon steel pipe under internal pressure. Pressure design thickness t = P D/(2 (S E W + P Y)); add the corrosion allowance, then allow for the mill under-tolerance of the nominal wall.",
+   "unit": "",
+   "style": "note",
+   "data": null
+  },
+  {
+   "id": 3,
+   "kind": "text",
+   "text": "Inputs",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 4,
+   "kind": "math",
+   "text": "P = 40 bar  # design pressure (gauge)",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 5,
+   "kind": "math",
+   "text": "D = 168.3 mm  # outside diameter (6 in)",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 6,
+   "kind": "math",
+   "text": "S = 138 MPa  # allowable stress at design temperature",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 7,
+   "kind": "math",
+   "text": "E = 1  # quality factor (seamless)",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 8,
+   "kind": "math",
+   "text": "W = 1  # weld joint strength reduction factor",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 9,
+   "kind": "math",
+   "text": "Y = 0.4  # coefficient for ferritic steel below 482 °C",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 10,
+   "kind": "math",
+   "text": "c = 1.5 mm  # corrosion allowance",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 11,
+   "kind": "math",
+   "text": "m_t = 12.5 %  # mill under-tolerance",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 12,
+   "kind": "math",
+   "text": "t_nom = 7.11 mm  # nominal wall, schedule 40",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 13,
+   "kind": "text",
+   "text": "Results",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 14,
+   "kind": "math",
+   "text": "t = P*D/(2*(S*E*W + P*Y))  # pressure design thickness",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 15,
+   "kind": "math",
+   "text": "t_m = t + c  # minimum required thickness",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 16,
+   "kind": "math",
+   "text": "t_req = t_m/(1 - m_t)  # nominal wall needed with the mill tolerance",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 17,
+   "kind": "check",
+   "text": "check t_req <= t_nom",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 18,
+   "kind": "text",
+   "text": "Ref: ASME B31.3 Process Piping, §304.1.2, equation (3a): pressure design thickness of straight pipe.",
+   "unit": "",
+   "style": "ref",
+   "data": null
+  }
+ ],
+ "next_id": 19,
+ "ui": {
+  "pack": {
+   "id": "pipe-wall",
+   "field": "Process",
+   "desc": "Pressure design thickness of a straight pipe, with corrosion allowance and mill tolerance, against the nominal wall of the chosen schedule."
+  }
+ }
+}

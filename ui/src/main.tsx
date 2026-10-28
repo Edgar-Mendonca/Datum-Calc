@@ -1,6 +1,6 @@
 // Datum Calc window: layout, sidebar, status bar, keyboard shortcuts, startup and recovery.
 import { render } from "solid-js/web";
-import { For, Show, onMount } from "solid-js";
+import { ErrorBoundary, For, Show, onMount } from "solid-js";
 import "@fontsource/ibm-plex-sans/latin-400.css";
 import "@fontsource/ibm-plex-sans/latin-500.css";
 import "@fontsource/ibm-plex-sans/latin-600.css";
@@ -71,7 +71,9 @@ const App = () => {
     else if (ctrl && k === "o") { e.preventDefault(); C.open(); }
     else if (ctrl && k === "n") { e.preventDefault(); setBackstage("home"); }
     else if (ctrl && k === "p") { e.preventDefault(); C.print(); }
+    else if (ctrl && e.shiftKey && k === "m" && out()) { e.preventDefault(); C.insertAbove(); }
     else if (ctrl && k === "m" && out()) { e.preventDefault(); C.insert("math"); }
+    else if (ctrl && k === "d" && out() && !typing && !backstage()) { e.preventDefault(); C.duplicate(); }
     else if (ctrl && k === "t" && out()) { e.preventDefault(); C.insert("text"); }
     else if (ctrl && k === "z" && !typing) { e.preventDefault(); C.undo(); }
     else if (ctrl && k === "y" && !typing) { e.preventDefault(); C.redo(); }
@@ -86,7 +88,10 @@ const App = () => {
       <Ribbon />
       <main class="work">
         <nav class="side"><For each={SIDE}>{x => <button classList={{ on: x[0] === "sheet" }} onClick={x[3]} title={x[2]}><Icon n={x[1]} /><span>{x[2]}</span></button>}</For></nav>
-        <div class="content"><Show when={out()}><SheetView /><Show when={varsPanel()}><VarsPanel /></Show></Show></div>
+        <div class="content"><Show when={out()}>
+          <ErrorBoundary fallback={(e, reset) => <div class="crash"><h3>The sheet could not be shown</h3><p>{String(e).slice(0, 300)}</p><p>Your work is safe: save it (Ctrl+S), then try again. Please report this on GitHub (Help › Report an Issue).</p><button class="btn pri" onClick={reset}>Try again</button></div>}><SheetView /></ErrorBoundary>
+          <Show when={varsPanel()}><ErrorBoundary fallback={<aside class="vars"><p class="muted">The Variables panel could not be shown.</p></aside>}><VarsPanel /></ErrorBoundary></Show>
+        </Show></div>
       </main>
       <Status />
       <Show when={backstage()}><Backstage /></Show>

@@ -33,11 +33,11 @@ Datum Calc is a desktop app for engineering calculation sheets. You write the ca
 3. **Show the numbers.** View › Numbers repeats each equation with its values put in, as on a hand calculation.
 4. **Print the calc sheet.** Fill in the title block (project, calc number, by, checked, date, revision) and save a PDF.
 
-**Thirteen calc packs** start you off (File › New from pack), each with its inputs at the top, its results and checks below and its references at the end, and each checked against a hand calculation in the tests:
+**Sixteen calc packs** start you off (File › New from pack), each with its inputs at the top, its results and checks below and its references at the end, and each checked against a hand calculation in the tests:
 
 | Rotating equipment | Process | Mechanical | Electrical |
 | --- | --- | --- | --- |
-| Pump power, efficiency and motor size · NPSH available against required · Pump curve against system curve (operating point) · Compressor polytropic head and power · Shaft torsion | Pipe pressure drop (Darcy–Weisbach, Colebrook) · Heat exchanger duty and LMTD · Tank volume and fill time | Thin-walled pressure vessel · Beams: deflection and bending stress · Bolt preload and tightening torque · Thermal expansion of a pipe | Electric motor: current, power factor and starting current |
+| Pump power, efficiency and motor size · NPSH available against required · Pump curve against system curve (operating point) · Compressor polytropic head and power · Shaft torsion | Pipe pressure drop (Darcy–Weisbach, Colebrook) · Heat exchanger duty and LMTD · Tank volume and fill time · Pipe wall thickness | Thin-walled pressure vessel · Beams: deflection and bending stress · Bolt preload and tightening torque · Thermal expansion of a pipe · Column buckling (Euler) | Electric motor: current, power factor and starting current · Cable voltage drop |
 
 <table><tr>
 <td width="50%"><img src="docs/images/print.png" alt="The printed calc sheet with its title block"><br><sub>The printed calc sheet: title block, maths, results, PASS/FAIL checks, page numbers.</sub></td>
@@ -50,8 +50,8 @@ It is for mechanical, process, structural and electrical engineers, students and
 
 | Version | What |
 | --- | --- |
-| 0.1.0 – 0.1.5 ✅ | The calc sheet and its printing; units, equations, checks, solve and plot; tables and pictures; thirteen calc packs; equations with their numbers; a Getting Started sheet; hardening |
-| 0.1.6 | Fixes from trying every pack on a clean Windows PC and from the convention |
+| 0.1.0 – 0.1.6 ✅ | The calc sheet and its printing with a summary of checks; units, equations, checks, solve and plot; tables and pictures; sixteen calc packs; equations with their numbers; a Getting Started sheet; hardening |
+| 0.1.7 | Fixes from trying every pack on a clean Windows PC and from the convention |
 | 0.2 | Materials from Datum Atlas, more packs |
 | 0.3 – 1.0 | Matrices and ODEs, templates, a validation report, a signed installer |
 

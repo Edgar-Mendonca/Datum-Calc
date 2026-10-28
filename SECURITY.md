@@ -6,7 +6,7 @@ Please report a security problem privately: use **Security › Report a vulnerab
 
 ## What Datum Calc does and does not do
 
-- Calc sheets are `.dcalc` files (JSON) on your own computer. Keep them where you keep your other engineering documents.
+- Calc sheets are `.dcalc` files (JSON) on your own computer. Keep them where you keep your other engineering documents. Saving writes a temporary file and then replaces the sheet in one step, so an interrupted save never damages it.
 - The only network call is the update check and download from this repository's GitHub Releases. Every download is checked against its SHA-256 checksum before it installs.
 - The window can only open links to this repository and the Datum family site (`open_url` refuses anything else).
 - Opened files are treated as untrusted: the reader is tested with thousands of damaged files and must never crash the app; a damaged sheet opens with every region that can still be read.

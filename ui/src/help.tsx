@@ -12,7 +12,7 @@ export const HELP: Record<string, Topic> = {
   regions: { t: "Regions", what: "A calc sheet is a list of regions, read top to bottom like a calculation on paper. Each region is one equation, a paragraph of text, a check, a solve, a plot, a table or a picture.",
     how: ["Math adds an equation such as Q = 120 m^3/h.", "Text adds a heading, a paragraph or a reference.", "Check adds a test such as check sigma <= sigma_allow, shown as PASS or FAIL.", "The new region goes below the selected one."] },
   arrange: { t: "Arrange", what: "Move the selected region up or down the sheet, or delete it.",
-    how: ["Alt+↑ and Alt+↓ move the region; Delete removes it (Ctrl+Z brings it back).", "Order matters: a value must be defined above the line that uses it."] },
+    how: ["Alt+↑ and Alt+↓ move the region; Delete removes it (Ctrl+Z brings it back).", "Duplicate (Ctrl+D) copies the region below it; Insert Above (Ctrl+Shift+M) adds an equation above it.", "Order matters: a value must be defined above the line that uses it."] },
   sheetset: { t: "Sheet", what: "The title block printed at the top of every page (project, calc number, title, by, checked, date, revision) and the sheet's unit system.",
     how: ["Title Block opens the fields; they print on every page.", "SI or US sets the units results are shown in when you have not chosen one."] },
   print: { t: "Print", what: "Print the calc sheet or save it as a PDF, with the title block, page numbers “Page x of y” and the references at the end.",
@@ -33,6 +33,7 @@ export const HELP: Record<string, Topic> = {
     how: ["Type check sigma <= sigma_allow (or <, >, >=).", "The ratio is the left side over the right side: 0.82 means 82 % used."] },
   // View tab
   zoom: { t: "Zoom", what: "How large the page shows on the screen. Printing is not affected." },
+  figures: { t: "Significant figures", what: "How many figures every result on this sheet shows: 3 for a quick estimate, 4 as usual, 5 or 6 when results are compared closely. The engine always works at full precision; only the display changes. It is saved with the sheet." },
   show: { t: "Show", what: "Variables lists every name the sheet defines and every check. Numbers shows each equation a second time with the values put in (P = ρgQH/η = 998 kg/m³ · 9.807 m/s² · … = 19.57 kW), as on a hand calculation; it is saved with the sheet and printed." },
   vars: { t: "Variables", what: "Every name the sheet defines, with its value and unit, in the order they are defined. The checks and errors are counted at the bottom.",
     how: ["Click a name to go to the line that defines it.", "View › Variables shows or hides the panel."] },

@@ -541,7 +541,7 @@ fn region(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>, subst: bo
                 if subst && !o.input { o.subst_tex = substituted(env, e, f); }
                 // An input keeps the unit it was typed in (8356 cm⁴ stays cm⁴), unless it belongs to the other unit system.
                 let typed = match &e.e { E::Num(_, Some(u)) => Some(u.text.clone()), E::Neg(x) => match &x.e { E::Num(_, Some(u)) => Some(u.text.clone()), _ => None }, _ => None };
-                match typed.filter(|t| r.unit.trim().is_empty() && units::system(t).is_none_or(|us| us == f.us)) {
+                match typed.filter(|t| r.unit.trim().is_empty() && (units::system(t).is_none_or(|us| us == f.us) || !units::has_ladder(&v.dim, f.us))) {
                     Some(t) => set_result(&mut o, &v, &Region { unit: t, ..r.clone() }, f),
                     None => set_result(&mut o, &v, r, f),
                 }
@@ -579,7 +579,9 @@ fn region(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>, subst: bo
                 if t.vec { return fail("A check needs single values, not vectors (use max or min).", e.at); }
                 let pass = t.x() != 0.0;
                 let ratio = match *op { "<" | "<=" if y.x() != 0.0 => Some(x.x() / y.x()), ">" | ">=" if x.x() != 0.0 => Some(y.x() / x.x()), _ => None };
-                let (lt, _, _, lu) = show_val(&x, &r.unit, f);
+                // The left side reads in the check's own unit, else in the unit its name is shown in (3 %, not 0.03).
+                let want = if r.unit.trim().is_empty() { match &a.e { E::Var(n) => env.shown.get(&canon(n)).cloned().unwrap_or_default(), _ => String::new() } } else { r.unit.clone() };
+                let (lt, _, _, lu) = show_val(&x, &want, f);
                 let (rt, _, _, _) = show_val(&y, &lu, f);
                 o.check = Some(CheckOut { pass, ratio, lhs: lt, rhs: rt, op: op.to_string() });
                 let sym = match *op { "<=" => "≤", ">=" => "≥", "!=" => "≠", "==" => "=", o => o };

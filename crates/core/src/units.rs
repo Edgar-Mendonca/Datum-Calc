@@ -187,6 +187,9 @@ pub fn parse(s: &str) -> Result<UnitExpr, String> {
 }
 
 /// Preferred units to show a dimension in, smallest first; the largest whose value is ≥ 1 is used.
+/// Whether a dimension has named units to show it in for a unit system.
+pub fn has_ladder(dim: &Dim, us: bool) -> bool { ladder(dim, us).is_some() }
+
 fn ladder(dim: &Dim, us: bool) -> Option<&'static [&'static str]> {
     let k = |x: Dim| same(dim, &x);
     Some(match () {
@@ -222,7 +225,7 @@ fn ladder(dim: &Dim, us: bool) -> Option<&'static [&'static str]> {
         _ if k(d(0, 1, -3, -1, 0, 0, 0, 0)) => if us { &["BTU/(h*ft^2*°R)"] } else { &["W/(m^2*K)"] },
         _ if k(d(2, 0, -2, -1, 0, 0, 0, 0)) => if us { &["BTU/(lb*°R)"] } else { &["J/(kg*K)", "kJ/(kg*K)"] },
         _ if k(d(2, 1, -2, -1, 0, -1, 0, 0)) => &["J/(mol*K)"],
-        _ if k(d(2, 0, -2, 0, 0, 0, 0, 0)) => if us { &["ft^2/s^2"] } else { &["J/kg", "kJ/kg"] },
+        _ if k(d(2, 0, -2, 0, 0, 0, 0, 0)) => if us { &["BTU/lb"] } else { &["J/kg", "kJ/kg"] },
         _ if k(d(4, 0, 0, 0, 0, 0, 0, 0)) => if us { &["in^4"] } else { &["mm^4", "m^4"] },
         _ if k(d(-1, 0, 0, 0, 0, 0, 0, 0)) => &["1/m"],
         _ if k(d(0, 1, -2, 0, 0, 0, 0, 0)) => if us { &["lbf/ft"] } else { &["N/m", "kN/m"] },
@@ -304,7 +307,9 @@ pub fn list() -> Vec<(&'static str, &'static str, &'static str, String)> {
 /// US customary symbols (the rest are SI or neutral, such as s, A, V, rpm, %).
 const US_SYMS: [&str; 41] = ["in", "ft", "yd", "mi", "mil", "lb", "lbm", "oz", "slug", "ton_us", "grain", "°R", "degR", "Δ°F", "delta°F", "deltaF", "°F", "degF", "acre", "gal", "bbl",
     "lbf", "kip", "psi", "ksi", "psf", "psia", "inHg", "inH2O", "BTU", "Btu", "therm", "MMBTU", "hp", "TR", "mph", "fpm", "fps", "gpm", "cfm", "pcf"];
-const NEUTRAL: [&str; 24] = ["s", "ms", "µs", "us", "ns", "min", "h", "hr", "day", "week", "yr", "A", "mA", "kA", "µA", "uA", "V", "mV", "kV", "rpm", "rps", "rad", "deg", "°"];
+const NEUTRAL: [&str; 50] = ["s", "ms", "µs", "us", "ns", "min", "h", "hr", "day", "week", "yr", "A", "mA", "kA", "µA", "uA", "V", "mV", "kV", "rpm", "rps", "rad", "deg", "°",
+    // Electrical and viscosity units are used the same way in both systems.
+    "Ω", "ohm", "kΩ", "kohm", "MΩ", "mΩ", "GΩ", "S", "C", "Ah", "mAh", "F", "µF", "uF", "nF", "pF", "H", "mH", "µH", "Wb", "T", "mT", "µT", "G", "cP", "cSt"];
 
 /// Which system a unit expression belongs to: Some(true) for US customary, Some(false) for SI and
 /// metric, None when it only uses units common to both (s, A, V, rpm, %).

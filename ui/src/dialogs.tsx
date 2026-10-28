@@ -66,7 +66,7 @@ export const glossary = () => openDialog(() => {
 export const shortcuts = () => openDialog(() => (
   <Dialog title="Keyboard shortcuts">
     <table class="keys"><tbody><For each={[["Ctrl+M", "New math region"], ["Ctrl+T", "New text region"], ["Enter or F2", "Edit the selected region"], ["Esc", "Finish editing"], ["↑ / ↓", "Select the region above or below"],
-      ["Alt+↑ / Alt+↓", "Move the region up or down"], ["Delete", "Delete the region"], ["Ctrl+C / Ctrl+V", "Copy and paste regions"], ["Ctrl+Z / Ctrl+Y", "Undo, redo"],
+      ["Alt+↑ / Alt+↓", "Move the region up or down"], ["Delete", "Delete the region"], ["Ctrl+D", "Duplicate the region"], ["Ctrl+Shift+M", "New math region above"], ["Ctrl+C / Ctrl+V", "Copy and paste regions"], ["Ctrl+Z / Ctrl+Y", "Undo, redo"],
       ["Ctrl+S", "Save"], ["Ctrl+O", "Open"], ["Ctrl+N", "New sheet"], ["Ctrl+P", "Print or save as PDF"], ["Ctrl+K or Alt+Q", "Tell me what you want to do"], ["F1", "This list"]]}>{([k, v]) => <tr><td>{k}</td><td>{v}</td></tr>}</For></tbody></table>
   </Dialog>
 ));

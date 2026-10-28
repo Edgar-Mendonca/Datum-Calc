@@ -1,6 +1,6 @@
 // The calc sheet on screen: the page with its title block and regions, top to bottom.
 // Click selects a region; double-click or Enter edits it; Esc or a click outside finishes.
-import { For, Index, Show, createEffect, createSignal, onMount } from "solid-js";
+import { ErrorBoundary, For, Index, Show, createEffect, createSignal, onMount } from "solid-js";
 import { Region, TableData } from "./api";
 import { act, call, out, S, selId, setSelId, editId, setEditId, zoom, openMenu } from "./store";
 import { C, setField } from "./cmds";
@@ -163,7 +163,7 @@ export const SheetView = () => {
               <p>Write the calculation from top to bottom: an equation per line with its units, text for headings and references, and checks against your limits.</p>
               <p><button class="btn pri" onClick={() => C.insert("math")}>Math region</button> <button class="btn" onClick={() => C.insert("text")}>Text region</button> <button class="btn" onClick={() => C.insert("check")}>Check</button></p>
             </div>}>
-            <For each={S().regions}>{r => <RegionView r={r} />}</For>
+            <For each={S().regions}>{r => <ErrorBoundary fallback={e => <div class="region rerr" data-id={r.id} onClick={() => setSelId(r.id)}><span class="ico">⚠</span>This region could not be shown ({String(e).slice(0, 120)}). Its text is kept: select it and press Enter to edit it.</div>}><RegionView r={r} /></ErrorBoundary>}</For>
           </Show>
         </div>
       </div>

@@ -5,7 +5,7 @@
 | | |
 | --- | --- |
 | **Product** | Datum Calc: engineering calculation sheets with real units, readable maths, checks (PASS/FAIL with utilisation) and a printable calc sheet with a title block |
-| **Current version** | **0.1.5** (released 2026-10-28). Earlier: 0.1.0, 0.1.1, 0.1.2, 0.1.3 (the convention build), 0.1.4 |
+| **Current version** | **0.1.6** (released 2026-10-28). Earlier: 0.1.0, 0.1.1, 0.1.2, 0.1.3 (the convention build), 0.1.4, 0.1.5 |
 | **Repo** | `Edgar-Mendonca/Datum-Calc` · working branch `claude/festive-fermi-ir7jyi` (the first branch pushed, so also the default branch) |
 | **Stack** | Rust (engine `crates/core` + shell `src-tauri`), Tauri 2, WebView2, SolidJS + Vite UI in strict TypeScript (TSX), plain CSS with light/dark tokens, IBM Plex fonts; KaTeX for maths from 0.1.1; Chart.js for plots from 0.1.2. No Python |
 | **Code size** | About 4,000 lines at 0.1.1: core 2,000 (with 600 lines of tests), shell 350, UI 1,600 TSX + CSS |
@@ -46,7 +46,7 @@ crates/core/src/parse.rs       lexer and Pratt parser: assignments, user functio
 crates/core/src/eval.rs        values (SI + dimension + abs temperature + vector), operators with dimension rules, built-in functions and constants, the sheet top to bottom (RegionOut: LaTeX, result, unit choices, check, plot, error), Variables, number formatting
 crates/core/src/latex.rs       expression tree → LaTeX (fractions, roots, subscripts, Greek, units in roman)
 crates/core/src/solve.rs       Brent's method after a 200-step scan for a sign change
-crates/core/src/packs.rs       the thirteen calc packs (include_str! of crates/core/packs/*.dcalc), cards for File › New
+crates/core/src/packs.rs       the sixteen calc packs (include_str! of crates/core/packs/*.dcalc), cards for File › New
 crates/core/packs/getting-started.dcalc  the Getting Started sheet (packs::GETTING_STARTED, opened from File › Home and Help)
 crates/core/examples/dump.rs   also `-- <pack id> [us] [numbers]` dumps a pack as the window's state (used to render every pack in the built window for a check by eye)
 crates/core/examples/packs.rs  prints every pack worked out in SI and US units, for checking by eye
@@ -125,6 +125,11 @@ tests_ui/run.cjs               Playwright UI tests against ui/dist with a mocked
 | 0.1.4 | An input literal shows in its typed unit when that unit belongs to the sheet's system (or to both); otherwise the ladder converts it | 8356 cm⁴ must not read 83.56×10⁶ mm⁴; a US sheet should still show US units |
 | 0.1.4 | Numbers ≥ 10⁴ are rounded to the significant figures and grouped with thin spaces | 274863 showed six figures with digits = 4 |
 | 0.1.4 | Getting Started is a sheet (like a pack), not only a dialog | People learn by changing a working example |
+| 0.1.6 | `Doc::save` writes `name.dcalc.saving` and renames it over the sheet; `Doc::open` refuses files over 64 MB and reads bytes lossily; `normalize` cuts regions (5,000), text (20,000), pictures (8 MB), table rows (2,000) and columns (50); edits beyond them fail | A crash mid-save must never damage a sheet; a hostile file must not exhaust memory |
+| 0.1.6 | ErrorBoundary around each region, the sheet view, the Variables panel and each printed region; utilisation formatted by `ratio()` that accepts anything | A UI test with malformed engine output showed the panel's `toFixed` could blank the whole window |
+| 0.1.6 | A check's left side reads in the unit its name is shown in (`Env::shown`) | 0.0095 ≤ 0.03 for a percentage check |
+| 0.1.6 | An input keeps its typed unit when the other system has no ladder for it; electrical units and cP/cSt are neutral; US head is BTU/lb | ohm/km became SI base units on a US sheet; cP became Pa·s |
+| 0.1.6 | The print summary of checks is a pseudo-region (id −1) measured and packed like the others, saved in `sheet.ui.print.summary` | Reuses the page packing; a long summary moves the sheet down instead of overlapping |
 | 0.1.5 | Lines are limited to 60 nested levels and 1,000 symbols, trees deeper than 400 are refused, and the sheet is worked out on its own 64 MB-stack thread | Thousands of brackets overflowed the stack (an abort on any build); the release build aborts on any panic, so limits come first and the thread is a second guard |
 | 0.1.5 | Results must be finite and unit powers within ±60; unit powers in a unit expression above 60 are not read as units | 1e308×10 showed nothing; m^999 was silently m^127; i8 saturation made −128 whose abs() panicked (found by the new fuzz test) |
 | 0.1.5 | The angle tag is dropped by roots and fractional powers when it does not divide evenly | ∛ of a torque from P/n (rad⁻¹) failed in the shaft pack |
@@ -148,7 +153,8 @@ tests_ui/run.cjs               Playwright UI tests against ui/dist with a mocked
 | 0.1.3 | The 10 calc packs with their tests; File › New from pack; notes after #; Copy Result, Copy as LaTeX; CSV export; screenshots; README; site.json | ✅ |
 | 0.1.4 | Getting Started sheet; inputs keep their units; grouped numbers; packs convert in US units | ✅ |
 | 0.1.5 | Hardening (limits, finite results, fuzz from the grammar), equations with their numbers, checks list, three more packs (shaft, tank, thermal expansion) | ✅ |
-| 0.1.6 | Fixes from trying every pack on a clean Windows PC and from the convention | 🔜 |
+| 0.1.6 | Safe saving and file limits, UI error guards, packs 14–16 (pipe wall, column, cable drop), print summary of checks, figures per sheet, Duplicate and Insert Above | ✅ |
+| 0.1.7 | Fixes from trying every pack on a clean Windows PC and from the convention | 🔜 |
 | 0.2 | Materials from Datum Atlas, more packs, unit menus on results, symbolic simplify | ⬜ |
 | 0.3 | Matrices and linear systems, ODE solve, tables from CSV | ⬜ |
 | 0.4 | Programs inside a region, templates, a company title block | ⬜ |
@@ -198,6 +204,14 @@ tests_ui/run.cjs               Playwright UI tests against ui/dist with a mocked
 - Self-check: all 14 sheets rendered in the built window in SI with Numbers and in US units (no errors, warnings, KaTeX failures or overflowing lines), a look by eye at the new ones; the real app under Xvfb for Numbers on screen and in print, a damaged and a non-sheet file, and the dark theme.
 - Checks: clippy clean, 44 engine tests, 71 UI tests, cargo deny.
 - Released 0.1.5. Still not tested: a clean Windows PC, the real Save as PDF dialog, an update from one release to the next on Windows.
+
+### 2026-10-28: Session 1, continued (0.1.6)
+- The user asked to keep going the same way: self-checked, hardened, several features in one release.
+- Hardening: atomic save (temporary file and rename) with a test that a failed save leaves the sheet untouched; file size and content limits; lossy reading of damaged bytes; every pack saved, reopened and damaged 300 times; ErrorBoundary guards (a UI test with malformed engine output showed the Variables panel could blank the window; `ratio()` and the guards fixed it); 72,000 more random sheets and a release-build run.
+- Features: packs 14–16 (pipe wall thickness, Euler column, cable voltage drop) with hand values first; print summary of checks; View › Figures; Duplicate (Ctrl+D) and Insert Above (Ctrl+Shift+M).
+- Self-check: the packs in SI and US (`--example packs`) found a percentage check reading 0.0095 ≤ 0.03, ohm/km turning into base units and cP into Pa·s on a US sheet, US head in ft²/s² and a pinned kN on the Euler load; all fixed. All 17 sheets rendered in the built window in SI with Numbers and in US units without errors or overflow; the real app checked for the pack list, the print summary with a FAIL and the page count.
+- Checks: clippy clean, 49 engine tests, 77 UI tests, cargo deny.
+- Released 0.1.6. Still not tested: a clean Windows PC, the real Save as PDF dialog, an update from one release to the next on Windows.
 
 ## 5. Known limits and next steps
 

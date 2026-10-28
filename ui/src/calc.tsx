@@ -37,6 +37,9 @@ const Marked = (p: { text: string; from: number; to: number }) => {
   return <code class="marked">{c().slice(0, p.from).join("")}<mark>{c().slice(p.from, Math.max(p.to, p.from + 1)).join("") || " "}</mark>{c().slice(Math.max(p.to, p.from + 1)).join("")}</code>;
 };
 
+/** A utilisation as 0.82; anything that is not a finite number shows nothing. */
+export const ratio = (x: unknown, n = 2) => typeof x === "number" && Number.isFinite(x) ? x.toFixed(n) : "";
+
 export const Badge = (p: { pass: boolean }) => <span class="badge" classList={{ pass: p.pass, fail: !p.pass }}>{p.pass ? "✓ PASS" : "✗ FAIL"}</span>;
 
 /** A math, check, solve or plot region as maths with its result. `paper` drops the screen-only parts. */
@@ -52,7 +55,7 @@ export const MathView = (p: { r: Region; paper?: boolean }) => {
         <Show when={!p.paper && o().units.length && !o().check}>
           <button class="unitbtn" title="Show the result in another unit" onMouseDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); unitMenu(e, p.r, o()); }}>{p.r.unit ? "unit ▾" : "▾"}</button>
         </Show>
-        <Show when={o().check}>{c => <span class="checkout"><Badge pass={c().pass} /><Show when={c().ratio !== null}><span class="ratio">utilisation <b>{c().ratio!.toFixed(2)}</b></span></Show></span>}</Show>
+        <Show when={o().check}>{c => <span class="checkout"><Badge pass={c().pass} /><Show when={ratio(c().ratio)}><span class="ratio">utilisation <b>{ratio(c().ratio)}</b></span></Show></span>}</Show>
         <Show when={o().note}><span class="note">{o().note}</span></Show>
       </div>
       <Show when={o().check}>{c => <div class="checkvals">{c().lhs} {({ "<=": "≤", ">=": "≥", "!=": "≠", "==": "=" } as Record<string, string>)[c().op] ?? c().op} {c().rhs}</div>}</Show>
@@ -128,7 +131,7 @@ export const VarsPanel = () => {
       </Show>
       <Show when={(out()?.calc.checks ?? 0) > 0}>
         <div class="vsum"><b>Checks</b> {out()!.calc.checks - out()!.calc.failed} of {out()!.calc.checks} pass{out()!.calc.failed ? <span class="failn"> · {out()!.calc.failed} fail</span> : ""}</div>
-        <table class="vchecks"><tbody><For each={(out()?.calc.regions ?? []).filter(r => r.check)}>{r => <tr onClick={() => setSelId(r.id)} title="Go to the check"><td><Tex s={r.latex} /></td><td class="r">{r.check!.ratio === null ? "" : r.check!.ratio.toFixed(2)}</td><td><Badge pass={r.check!.pass} /></td></tr>}</For></tbody></table>
+        <table class="vchecks"><tbody><For each={(out()?.calc.regions ?? []).filter(r => r.check)}>{r => <tr onClick={() => setSelId(r.id)} title="Go to the check"><td><Tex s={r.latex} /></td><td class="r">{ratio(r.check!.ratio)}</td><td><Badge pass={r.check!.pass} /></td></tr>}</For></tbody></table>
       </Show>
       <Show when={(out()?.calc.errors ?? 0) > 0}><div class="vsum errn">{out()!.calc.errors} line{out()!.calc.errors > 1 ? "s" : ""} with errors</div></Show>
     </aside>

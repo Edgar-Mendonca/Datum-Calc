@@ -697,3 +697,15 @@ h3.packf { font: 500 10.5px var(--mono); letter-spacing: .12em; text-transform: 
 .vars .vchecks td:first-child, .vars .vchecks td:last-child { width: auto; overflow: visible; }
 .vchecks td { white-space: nowrap; }
 .vchecks .badge { font-size: 9px; padding: 1px 5px; }
+.figs { grid-template-rows: repeat(2, 22px); }
+.rb.key.on { border-color: var(--blue); background: var(--sel); }
+.psum { border: 1px solid #C9CFD8; padding: 6px 8px; margin-bottom: 8px; }
+.psum h4 { margin: 0 0 4px; font: 600 10px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: #33404F; }
+.psumv { margin: 0 0 4px; font-weight: 600; color: #1F7A4D; font-size: 12px; }
+.psumv.fail { color: #9B2C2C; }
+.psum table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.psum td { padding: 2px 4px; border-top: 1px solid #E6E9EE; }
+.psum td.r { text-align: right; font-family: var(--mono); }
+.psum .tex { font-size: 12px; }
+.crash { flex: 1; padding: 40px; color: var(--text); }
+.crash h3 { color: var(--crit); }

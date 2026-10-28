@@ -35,7 +35,7 @@ const check = (name, ok, info = "") => { console.log(`${ok ? "ok  " : "FAIL"} ${
   check("File page offers a blank sheet", (await p.textContent(".tiles")).includes("Blank Sheet"));
   // 1b. File › New lists the ten calc packs by field; a click opens one (0.1.3).
   await p.click(".bs aside button:has-text('New')"); await p.waitForTimeout(200);
-  check("New lists the thirteen calc packs", (await p.$$(".tiles.packs .tile")).length === 13 && (await p.$$eval("h3.packf", h => h.map(x => x.textContent))).join() === "Rotating equipment,Process,Mechanical,Electrical");
+  check("New lists the sixteen calc packs", (await p.$$(".tiles.packs .tile")).length === 16 && (await p.$$eval("h3.packf", h => h.map(x => x.textContent))).join() === "Rotating equipment,Process,Mechanical,Electrical");
   await p.click(".tiles.packs .tile:has-text('Pump power')"); await p.waitForTimeout(200);
   check("a pack tile opens that pack", JSON.stringify(await p.evaluate(() => window.__calls.filter(c => c[0] === "new_from_pack").pop())).includes("pump-power"));
   await p.click(".tabs .file").catch(() => {}); await p.waitForTimeout(100);
@@ -166,6 +166,17 @@ const check = (name, ok, info = "") => { console.log(`${ok ? "ok  " : "FAIL"} ${
   const badgeW = await p.$eval(".vars .vchecks .badge", b => b.scrollWidth <= b.clientWidth + 1);
   check("the check badge in the panel is not cut", badgeW);
 
+  // 5d. Figures per sheet, Duplicate, Insert Above (0.1.6).
+  await p.click(".tabs > button:text-is('View')"); await p.waitForTimeout(80);
+  await p.click(".figs button:text-is('5')"); await p.waitForTimeout(100);
+  check("View › Figures sets the sheet's significant figures", (await lastApply()).includes('"field":"digits"') && (await lastApply()).includes('"value":5'), await lastApply());
+  await (await R(5)).click(); await p.keyboard.press("Control+d"); await p.waitForTimeout(120);
+  const dup = await lastApply();
+  check("Ctrl+D duplicates the region below it with its style and unit", dup.includes('"Batch"') && dup.includes('"at":6') && dup.includes("rho*g*Q*H/eta") && dup.includes('"field":"unit"'), dup);
+  await (await R(5)).click(); await p.keyboard.press("Control+Shift+m"); await p.waitForTimeout(120);
+  check("Ctrl+Shift+M inserts a math region above", (await lastApply()).includes('"Insert"') && (await lastApply()).includes('"at":5'), await lastApply());
+  await p.keyboard.press("Escape"); await p.waitForTimeout(80);
+
   // 6. ? help opens a card.
   await p.click(".tabs > button:text-is('Home')");
   await p.click(".grp .cap .help"); await p.waitForTimeout(120);
@@ -191,6 +202,8 @@ const check = (name, ok, info = "") => { console.log(`${ok ? "ok  " : "FAIL"} ${
   check("references print at the end under their heading", (await p.$$eval(".pprev .ppage", ps => ps[ps.length - 1].textContent)).includes("References"));
   check("no region is cut at a page edge", await p.$$eval(".pprev .pbody", bs => bs.every(b => b.scrollHeight <= b.clientHeight + 1)));
   check("the printed sheet shows the maths and the PASS badge", (await p.$$(".pprev .katex")).length >= 9 && (await p.textContent(".pprev")).includes("PASS"));
+  await p.click(".pset label.chk:has-text('Summary of checks')"); await p.waitForTimeout(150);
+  check("Print › Summary of checks is saved with the sheet", (await lastApply()).includes('"Ui"') && (await lastApply()).includes('"summary":true'), await lastApply());
   check("the printed sheet hides the unit buttons", (await p.$$(".pprev .unitbtn, .pprev .pngbtn")).length === 0);
   await p.evaluate(() => { window.print = () => { window.__printed = [document.querySelectorAll("#printroot .ppage").length, [...document.querySelectorAll("style")].map(s => s.textContent).find(t => t.includes("@page")) || ""]; }; });
   await p.click(".pbtns .btn"); await p.waitForTimeout(500);
@@ -208,6 +221,19 @@ const check = (name, ok, info = "") => { console.log(`${ok ? "ok  " : "FAIL"} ${
   await p.evaluate(() => { document.documentElement.dataset.theme = "dark"; }); await p.waitForTimeout(100);
   const ink = await p.$eval(".region .rtxt", e => getComputedStyle(e).color);
   check("sheet text stays dark on the page in dark theme", ink === "rgb(27, 39, 51)", ink);
+
+  // 12. A region that cannot be drawn shows a note; the rest of the window still works (0.1.6).
+  const p2 = await b.newPage({ viewport: { width: 1440, height: 900 } });
+  const broken = JSON.parse(JSON.stringify(fix.state));
+  broken.calc.regions[7].check.ratio = "not a number";
+  broken.calc.regions[9].plot = { xs: null, series: null };
+  broken.sheet.ui = { print: { summary: true } };
+  await p2.addInitScript(st => { window.__TAURI__ = { core: { invoke: async c => c === "state" ? st : c === "options" ? { theme: "light", autosave: 0, units: "SI", digits: 4, paper: "A4", number: "auto" } : c === "recent" || c === "packs" ? [] : null }, event: { listen: async () => () => {} } }; }, broken);
+  await p2.goto(url); await p2.waitForTimeout(500); await p2.click(".bs aside .back"); await p2.waitForTimeout(400);
+  check("a region that cannot be drawn shows a note instead of blanking the window", (await p2.$$(".region")).length === 13 && (await p2.textContent(".cpage")).includes("could not be shown") && (await p2.$$(".region .katex")).length > 8);
+  await p2.keyboard.press("Control+p"); await p2.waitForTimeout(500);
+  check("the print summary lists the checks first", (await p2.textContent(".pprev .psum")).includes("Summary of checks"));
+  await p2.close();
 
   check("no script errors", errors.length === 0, errors.join(" | "));
   await b.close(); srv.close();

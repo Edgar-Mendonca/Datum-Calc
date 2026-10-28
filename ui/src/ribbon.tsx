@@ -97,7 +97,7 @@ export const Ribbon = () => (
     <Show when={tab() === "home"}>
       <G l="Clipboard" h="clipboard"><B big i="paste" l="Paste" run={() => C.paste()} /><S_><B i="copy" l="Copy" run={C.copy} /><B i="cut" l="Cut" run={() => C.copy().then(C.del)} /><B i="copy" l="Copy Result" run={C.copyResult} /></S_></G>
       <G l="Regions" h="regions"><B big i="math" l="Math" title="New math region (Ctrl+M)" run={() => C.insert("math")} /><B big i="text" l="Text" title="New text region (Ctrl+T)" run={() => C.insert("text")} /><B big i="check" l="Check" run={() => C.insert("check")} /></G>
-      <G l="Arrange" h="arrange"><S_><B i="up" l="Move Up" run={() => C.move(true)} /><B i="down" l="Move Down" run={() => C.move(false)} /><B i="del" l="Delete" run={C.del} /></S_></G>
+      <G l="Arrange" h="arrange"><S_><B i="up" l="Move Up" run={() => C.move(true)} /><B i="down" l="Move Down" run={() => C.move(false)} /><B i="del" l="Delete" run={C.del} /></S_><S_><B i="copy" l="Duplicate" title="Duplicate the region (Ctrl+D)" run={C.duplicate} /><B i="math" l="Insert Above" title="New math region above (Ctrl+Shift+M)" run={C.insertAbove} /></S_></G>
       <G l="Sheet" h="sheetset"><B big i="title" l="Title Block" run={() => D.titleBlock()} /><S_><B i="units" l="SI units" on={out()?.sheet.units === "SI"} run={() => C.units("SI")} /><B i="units" l="US units" on={out()?.sheet.units === "US"} run={() => C.units("US")} /></S_></G>
       <G l="Print" h="print"><B big i="print" l="Print / PDF" run={C.print} /></G>
     </Show>
@@ -119,6 +119,7 @@ export const Ribbon = () => (
     </Show>
     <Show when={tab() === "view"}>
       <G l="Zoom" h="zoom"><B big i="zin" l="Zoom In" run={C.zoomIn} /><B big i="zout" l="Zoom Out" run={C.zoomOut} /><S_><B i="fit" l="100 %" run={() => setZoom(100)} /><span class="muted zoomv">{zoom()} %</span></S_></G>
+      <G l="Figures" h="figures"><div class="keys2 figs"><For each={[3, 4, 5, 6]}>{n => <button class="rb key" classList={{ on: out()?.sheet.digits === n }} title={`${n} significant figures`} onClick={() => C.figures(n)}>{n}</button>}</For></div></G>
       <G l="Show" h="show"><B big i="vars" l="Variables" on={varsPanel()} run={C.vars} /><B big i="math" l="Numbers" title="Show each equation again with its numbers put in (also printed)" on={!!out()?.sheet.subst} run={() => act({ SheetSet: { field: "subst", value: !out()?.sheet.subst } })} /></G>
       <G l="Theme" h="theme"><S_><For each={[["auto", "Auto"], ["light", "Light"], ["dark", "Dark"]]}>{([k, l]) => <B i="theme" l={l} on={theme() === k} run={() => setTheme(k)} />}</For></S_></G>
     </Show>

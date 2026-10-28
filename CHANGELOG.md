@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.1.6 — 2026-10-28
+
+Safer saving, three more calc packs, a summary of checks on the printed sheet, figures per sheet, Duplicate and Insert Above.
+
+**More calc packs** (16 in all)
+- Pipe wall thickness for internal pressure, with corrosion allowance and mill tolerance, against the nominal wall of the schedule.
+- Column buckling (Euler): critical load, critical stress, slenderness, the load against the critical load with a safety factor, and whether Euler's formula applies.
+- Cable voltage drop (three-phase): from resistance and reactance per km, as a percentage of the line voltage, against a limit.
+- Each is checked against a hand calculation in the tests.
+
+**Printing**
+- Print › Summary of checks at the start: a box at the top of the first page lists every check with both values, the utilisation and PASS or FAIL, and says whether all pass. It is saved with the sheet.
+
+**Editing**
+- View › Figures sets how many significant figures this sheet shows (3 to 6); the engine always works at full precision.
+- Duplicate (Ctrl+D) copies a region below it with its style and unit; Insert Above (Ctrl+Shift+M) adds an equation above the selected one. Both are on Home › Arrange.
+
+**Results that read better**
+- A check reads in the unit its value is shown in: 0.95 % ≤ 3 %, not 0.0095 ≤ 0.03.
+- An input whose unit has no counterpart in the other unit system keeps its own unit (0.193 ohm/km on a US sheet). Electrical units and cP are used the same way in both systems.
+- Specific energy and head on a US sheet show in BTU/lb.
+
+**Sturdier**
+- Saving writes to a temporary file first and then replaces the sheet in one step, so a crash or a full disk never leaves a half-written sheet.
+- Files over 64 MB are refused; bytes that are not text are replaced, so a damaged sheet still opens as far as it can. Very long texts, huge pictures and oversized tables in a file are cut to the limits; an edit beyond them is refused with a message.
+- If one region (or the Variables panel) ever cannot be drawn, it shows a short note and the rest of the window keeps working. A utilisation that is not a number shows nothing instead of stopping the panel.
+- Every pack is saved, reopened and damaged hundreds of times in the tests; another 72,000 random sheets ran without a failure.
+
 ## 0.1.5 — 2026-10-28
 
 A bigger release: equations shown with their numbers, three more calc packs, a list of every check, and a round of hardening that found and fixed four ways the engine could fail.

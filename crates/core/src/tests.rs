@@ -188,6 +188,9 @@ fn display_picks_a_good_unit() {
     s.units = "US".into();
     let o = eval::run(&s);
     assert_eq!((o.regions[0].result.as_str(), o.regions[1].result.as_str()), ("3.937 ft", "3 ft"), "a metric input converts in a US sheet; a US input stays");
+    let mut s = sheet(&["R = 0.193 ohm/km"]);
+    s.units = "US".into();
+    assert_eq!(eval::run(&s).regions[0].result, "0.193 ohm/km", "with no US unit for it, an input keeps its own");
     assert_eq!(result(&["n = 1500 rpm"]), "1500 rpm");
     assert_eq!(result(&["n = 1500 rpm*1"]), "157.1 rad/s");
     let mut s = sheet(&["n = 1500 rpm"]);
@@ -488,7 +491,7 @@ mod packs {
     #[test]
     fn all_packs_open_and_list() {
         let cards = crate::packs::cards();
-        assert_eq!(cards.len(), 13);
+        assert_eq!(cards.len(), 16);
         for c in &cards { assert!(!c.name.is_empty() && !c.desc.is_empty() && !c.field.is_empty() && c.checks > 0, "{}", c.id); }
     }
 
@@ -541,6 +544,38 @@ mod packs {
         let c = checks(&o);
         assert!(c[0].0 && close(c[0].1, 0.825, 1e-9));
         assert!(!c[1].0, "the fully restrained case fails, as the pack explains");
+    }
+
+    #[test]
+    fn pipe_wall() {
+        // t = 4.0 MPa × 168.3/(2 (138 + 4.0 × 0.4)) = 2.411 mm; + 1.5 = 3.911 mm; /(1 − 0.125) = 4.470 mm ≤ 7.11 mm.
+        let (o, e) = run("pipe-wall");
+        assert!(close(v(&e, "t"), 2.411_174_8e-3, 1e-6));
+        assert!(close(v(&e, "t_req"), 4.469_914e-3, 1e-6));
+        assert!(checks(&o)[0].0 && close(checks(&o)[0].1, 0.628_680, 1e-5));
+    }
+
+    #[test]
+    fn column() {
+        // P_cr = π² × 200e9 × 603.8e-8/4² = 744.9 kN; σ = 138.5 MPa; r = 33.50 mm; λ = 119.4; 200/(744.9/3) = 0.805.
+        let (o, e) = run("column");
+        assert!(close(v(&e, "P_cr"), 744_908.39, 1e-6));
+        assert!(close(v(&e, "sigma_cr"), 138.458_81e6, 1e-6));
+        assert!(close(v(&e, "lambda"), 119.400_07, 1e-6));
+        assert!(o.regions.iter().any(|r| r.result == "744.9 kN"));
+        assert!(checks(&o).iter().all(|c| c.0));
+        assert!(close(checks(&o)[0].1, 0.805_468, 1e-5));
+    }
+
+    #[test]
+    fn cable_drop() {
+        // sin φ = √(1 − 0.86²) = 0.5103; ΔV = √3 × 132.5 × 0.08 km × (0.193 × 0.86 + 0.08 × 0.5103) Ω/km = 3.797 V = 0.949 %.
+        let (o, e) = run("cable-drop");
+        assert!(close(v(&e, "dV"), 3.796_858_6, 1e-6));
+        assert!(close(v(&e, "dV_pct"), 0.009_492_15, 1e-6));
+        assert!(o.regions.iter().any(|r| r.result == "0.9492 %"));
+        assert!(o.regions.iter().any(|r| r.result == "PASS (0.9492 % ≤ 3 %)"), "a check reads in the unit its name is shown in");
+        assert!(checks(&o)[0].0 && close(checks(&o)[0].1, 0.316_405, 1e-5));
     }
 
     #[test]

@@ -2,7 +2,7 @@
 import { act, call, loadOut, out, selId, setBackstage, setEditId, setOut, setSelId, setZoom, toast, zoom, setVarsPanel, varsPanel, S } from "./store";
 import { Kind, Out } from "./api";
 import * as D from "./dialogs";
-import { outs } from "./calc";
+import { outs, ratio } from "./calc";
 
 const GH = "https://github.com/Edgar-Mendonca/Datum-Calc";
 /** Where a new region goes: below the selected one, or at the end. */
@@ -33,6 +33,18 @@ export const C = {
     if (src && src.length > 5_500_000) return toast("Choose a picture smaller than 4 MB.");
     if (src) C.insert("image", "", { src, width: 60 });
   },
+  /** A copy of the selected region below it, with its style, unit and data. */
+  duplicate: async () => {
+    const i = S().regions.findIndex(r => r.id === selId()); if (i < 0) return toast("Select a region first.");
+    const r = S().regions[i], id = S().next_id;
+    if (await act({ Batch: [{ Insert: { at: i + 1, kind: r.kind, text: r.text, data: r.data } }, { Set: { id, field: "style", value: r.style } }, { Set: { id, field: "unit", value: r.unit } }] })) setSelId(id);
+  },
+  /** A new math region above the selected one. */
+  insertAbove: async () => {
+    const i = Math.max(0, S().regions.findIndex(r => r.id === selId())), id = S().next_id;
+    if (await act({ Insert: { at: i, kind: "math", text: "", data: null } })) { setSelId(id); setEditId(id); }
+  },
+  figures: (n: number) => act({ SheetSet: { field: "digits", value: n } }),
   del: () => { const id = selId(); if (!id) return toast("Select a region first."); const i = S().regions.findIndex(r => r.id === id); act({ Delete: { ids: [id] } }).then(ok => { if (ok) setSelId(S().regions[Math.min(i, S().regions.length - 1)]?.id ?? 0); }); },
   move: (up: boolean) => { const id = selId(); if (id) act({ Move: { ids: [id], up } }); },
   copy: async () => {
@@ -71,7 +83,7 @@ export const C = {
     for (const r of S().regions) {
       const o = outs().get(r.id);
       if (!o) continue;
-      if (o.check) rows.push([r.text.split("#")[0].replace(/^check\s*/, "").trim(), o.check.pass ? "PASS" : "FAIL", o.check.ratio === null ? "" : o.check.ratio.toFixed(3), "check", o.note]);
+      if (o.check) rows.push([r.text.split("#")[0].replace(/^check\s*/, "").trim(), o.check.pass ? "PASS" : "FAIL", ratio(o.check.ratio, 3), "check", o.note]);
       else if (o.name && o.value && !o.error) rows.push([o.name, o.value, o.unit, r.style === "input" ? "input" : "result", o.note]);
       for (const d of o.defs ?? []) rows.push([d.name, d.value, d.unit, "table", ""]);
     }
@@ -91,7 +103,7 @@ export const C = {
 /** Every command with a name, for Tell Me and the shortcut list. */
 export const ALL_CMDS: [string, () => void, string?][] = [
   ["Insert math region", () => C.insert("math"), "Ctrl+M"], ["Insert text region", () => C.insert("text"), "Ctrl+T"], ["Insert check", () => C.insert("check")], ["Insert table", () => C.insert("table")], ["Insert picture", () => C.picture()], ["Units list", () => D.unitsList()], ["Functions and constants", () => D.unitsList("functions")], ["Insert solve", () => C.insert("solve")], ["Insert plot", () => C.insert("plot")],
-  ["Delete region", C.del, "Delete"], ["Move region up", () => C.move(true), "Alt+↑"], ["Move region down", () => C.move(false), "Alt+↓"],
+  ["Delete region", C.del, "Delete"], ["Duplicate region", C.duplicate, "Ctrl+D"], ["Insert above", C.insertAbove, "Ctrl+Shift+M"], ["3 significant figures", () => C.figures(3)], ["4 significant figures", () => C.figures(4)], ["5 significant figures", () => C.figures(5)], ["Move region up", () => C.move(true), "Alt+↑"], ["Move region down", () => C.move(false), "Alt+↓"],
   ["Copy", C.copy, "Ctrl+C"], ["Copy result", C.copyResult], ["Copy as LaTeX", C.copyLatex], ["Export CSV (inputs and results)", C.csv], ["Show numbers in equations", () => act({ SheetSet: { field: "subst", value: !out()?.sheet.subst } })], ["New from pack", () => C.file("new")], ["Paste", () => C.paste(), "Ctrl+V"], ["Undo", C.undo, "Ctrl+Z"], ["Redo", C.redo, "Ctrl+Y"],
   ["Save", () => C.save(), "Ctrl+S"], ["Save as", () => C.save(true)], ["Open", C.open, "Ctrl+O"], ["New sheet", C.newSheet, "Ctrl+N"], ["Print / PDF", C.print, "Ctrl+P"],
   ["Title block", () => D.titleBlock()], ["SI units", () => C.units("SI")], ["US units", () => C.units("US")],

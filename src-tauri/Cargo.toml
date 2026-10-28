@@ -1,6 +1,6 @@
 [package]
 name = "datum-calc"
-version = "0.1.5"
+version = "0.1.6"
 edition = "2021"
 description = "Datum Calc: engineering calculations with real units for Windows."
 license = "MIT"

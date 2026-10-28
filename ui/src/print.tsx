@@ -1,19 +1,35 @@
 // File › Print: the calc sheet as pages, with the title block on every page, "Page x of y" and the
 // references at the end. Regions are measured at the page width, then packed into pages (a region is
 // never cut in two). The pages are printed with the WebView's print dialog, where "Save as PDF" makes a PDF.
-import { For, Show, JSX, createMemo, createSignal, onMount, onCleanup } from "solid-js";
+import { ErrorBoundary, For, Show, JSX, createMemo, createSignal, onMount, onCleanup } from "solid-js";
 import { Portal } from "solid-js/web";
 import { Region } from "./api";
 import { S, out, act } from "./store";
 import { Pick } from "./ui";
-import { MathView, ImageView } from "./calc";
+import { MathView, ImageView, Badge, Tex, outs, ratio } from "./calc";
 
 /** Paper sizes in millimetres (portrait). */
 export const PAPERS: [string, number, number][] = [["A4", 210, 297], ["Letter", 215.9, 279.4], ["A3", 297, 420], ["Legal", 215.9, 355.6]];
 export const MM = 96 / 25.4;
 
 /** How a region looks on paper. Shared by the measuring pass, the preview and the print. */
-export const PrintRegion = (p: { r: Region }) => (
+export const PrintRegion = (p: { r: Region }) => <ErrorBoundary fallback={<div class="pr"><div class="prtext">{p.r.text}</div></div>}><PrintRegionIn r={p.r} /></ErrorBoundary>;
+/** The summary of checks printed first when Print › Summary of checks is on (a region of its own, id −1). */
+const SUMMARY: Region = { id: -1, kind: "text", text: "", unit: "", style: "summary", data: null };
+const summaryOn = () => !!S().ui?.print?.summary;
+const SummaryBlock = () => {
+  const checks = () => S().regions.map(r => ({ r, o: outs().get(r.id) })).filter(x => x.o?.check);
+  const failed = () => checks().filter(x => !x.o!.check!.pass).length;
+  return (
+    <div class="psum">
+      <h4>Summary of checks</h4>
+      <p class="psumv" classList={{ fail: failed() > 0 }}>{checks().length === 0 ? "This sheet has no checks." : failed() ? `${failed()} of ${checks().length} checks fail.` : `All ${checks().length} checks pass.`}</p>
+      <table><tbody><For each={checks()}>{x => <tr><td><Tex s={x.o!.latex} /></td><td>{x.o!.check!.lhs} {({ "<=": "≤", ">=": "≥" } as Record<string, string>)[x.o!.check!.op] ?? x.o!.check!.op} {x.o!.check!.rhs}</td><td class="r">{ratio(x.o!.check!.ratio)}</td><td><Badge pass={x.o!.check!.pass} /></td></tr>}</For></tbody></table>
+    </div>
+  );
+};
+
+const PrintRegionIn = (p: { r: Region }) => p.r.id === -1 ? <SummaryBlock /> : (
   <div class={`pr k-${p.r.kind}`} classList={{ [`s-${p.r.style}`]: !!p.r.style }}>
     {p.r.kind === "image" ? <ImageView r={p.r} /> : p.r.kind === "table" || (p.r.kind !== "text" && p.r.text.trim()) ? <MathView r={p.r} paper /> : <div class="prtext">{p.r.text || " "}</div>}
   </div>
@@ -41,7 +57,7 @@ const TB_H = 124, FOOT_H = 26, GAP = 6;
 /** Packs measured regions into pages. References (style "ref") go to the end under their own heading. */
 const pack = (heights: Map<number, number>): PageOf[] => {
   const g = geom(), room = g.H - TB_H - FOOT_H - 12;
-  const body = S().regions.filter(r => r.style !== "ref"), refs = S().regions.filter(r => r.style === "ref");
+  const body = [...(summaryOn() ? [SUMMARY] : []), ...S().regions.filter(r => r.style !== "ref")], refs = S().regions.filter(r => r.style === "ref");
   const pages: PageOf[] = [{ regions: [], refs: false }];
   let used = 0;
   const put = (r: Region, refsPage: boolean) => {
@@ -111,6 +127,7 @@ export const PrintPage = () => {
         <div class="prow">{(["Top", "Right", "Bottom", "Left"] as const).map((l, i) => <label>{l}<input type="number" min="0" max="60" value={S().page.margins[i]} onChange={e => {
           const m = [...S().page.margins]; m[i] = Math.min(60, Math.max(0, +e.currentTarget.value)); act({ SheetSet: { field: "margins", value: m } }).then(() => requestAnimationFrame(measure));
         }} /></label>)}</div>
+        <label class="chk"><input type="checkbox" checked={summaryOn()} onChange={e => act({ Ui: { key: "print", value: { ...(S().ui?.print ?? {}), summary: e.currentTarget.checked } } }).then(() => requestAnimationFrame(measure))} />Summary of checks at the start</label>
         <p class="muted">The title block is set in Home › Title Block. Regions styled as Reference print at the end under “References”.</p>
         <Show when={!S().regions.length}><p class="warnline">The sheet is empty: only the title block will print.</p></Show>
       </div>
@@ -119,7 +136,7 @@ export const PrintPage = () => {
         <For each={pages()}>{(pg, k) => <div class="pwrap" style={{ width: `${geom().pw * MM * zoomP()}px`, height: `${geom().ph * MM * zoomP()}px` }}><div style={{ transform: `scale(${zoomP()})`, "transform-origin": "0 0" }}><Page pg={pg} n={k() + 1} pages={pages().length} firstRef={firstRef(k())} /></div></div>}</For>
       </div>
       {/* The measuring pass: every region at the printed width, off screen. */}
-      <div class="pmeasure" ref={meas} style={{ width: `${geom().W}px` }}><For each={S().regions}>{r => <div data-id={r.id}><PrintRegion r={r} /></div>}</For></div>
+      <div class="pmeasure" ref={meas} style={{ width: `${geom().W}px` }}><For each={[...(summaryOn() ? [SUMMARY] : []), ...S().regions]}>{r => <div data-id={r.id}><PrintRegion r={r} /></div>}</For></div>
       <Show when={printing()}><Portal mount={document.body}><div id="printroot"><For each={pages()}>{(pg, k) => <Page pg={pg} n={k() + 1} pages={pages().length} firstRef={firstRef(k())} />}</For></div></Portal></Show>
     </div>
   );
