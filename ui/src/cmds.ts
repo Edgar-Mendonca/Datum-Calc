@@ -1,0 +1,69 @@
+// Commands shared by the ribbon, menus, keys and Tell Me.
+import { act, call, loadOut, out, selId, setBackstage, setEditId, setOut, setSelId, setZoom, toast, zoom, setVarsPanel, varsPanel, S } from "./store";
+import { Kind, Out } from "./api";
+import * as D from "./dialogs";
+
+const GH = "https://github.com/Edgar-Mendonca/Datum-Calc";
+/** Where a new region goes: below the selected one, or at the end. */
+const below = () => { const i = out()?.sheet.regions.findIndex(r => r.id === selId()) ?? -1; return i >= 0 ? i + 1 : out()?.sheet.regions.length ?? 0; };
+const STARTER: Record<Kind, string> = { math: "", text: "", check: "check ", solve: "", plot: "", table: "", image: "" };
+
+/** The textarea being edited, so symbol buttons can type into it. */
+let field: HTMLTextAreaElement | null = null;
+export const setField = (el: HTMLTextAreaElement | null) => { field = el; };
+export const typeText = (t: string, back = 0) => {
+  if (!field || !document.body.contains(field)) return toast("Double-click a region to edit it first, then click the symbol.");
+  const a = field.selectionStart, b = field.selectionEnd;
+  field.setRangeText(t, a, b, "end");
+  if (back) field.selectionStart = field.selectionEnd = a + t.length - back;
+  field.dispatchEvent(new Event("input", { bubbles: true }));
+  field.focus();
+};
+
+export const C = {
+  insert: async (kind: Kind, text?: string) => {
+    if (!out()) return;
+    const at = below();
+    if (await act({ Insert: { at, kind, text: text ?? STARTER[kind] } })) { const r = S().regions[at]; if (r) { setSelId(r.id); setEditId(r.id); } }
+  },
+  del: () => { const id = selId(); if (!id) return toast("Select a region first."); const i = S().regions.findIndex(r => r.id === id); act({ Delete: { ids: [id] } }).then(ok => { if (ok) setSelId(S().regions[Math.min(i, S().regions.length - 1)]?.id ?? 0); }); },
+  move: (up: boolean) => { const id = selId(); if (id) act({ Move: { ids: [id], up } }); },
+  copy: async () => {
+    const r = out()?.sheet.regions.find(x => x.id === selId());
+    if (!r) return toast("Select a region first.");
+    await navigator.clipboard?.writeText(r.text).catch(() => {});
+    toast("Copied.", true);
+  },
+  paste: async () => {
+    const t = await navigator.clipboard?.readText().catch(() => "");
+    if (!t) return toast("The clipboard has no text.");
+    const lines = t.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    const at = below();
+    if (await act({ Batch: lines.map((l, k) => ({ Insert: { at: at + k, kind: /^check\b/.test(l) ? "check" : /[=]/.test(l) ? "math" : "text", text: l } })) })) setSelId(S().regions[at + lines.length - 1]?.id ?? 0);
+  },
+  undo: async () => setOut(await call<Out>("history", { redo: false })),
+  redo: async () => setOut(await call<Out>("history", { redo: true })),
+  save: async (asNew = false) => { const o = await call<Out | null>("save", { asNew }); if (o) { setOut(o); toast("Saved.", true); } },
+  open: () => loadOut("open", { path: null }),
+  newSheet: () => loadOut("new_sheet"),
+  print: () => { setEditId(0); setBackstage("print"); },
+  units: (u: "SI" | "US") => act({ SheetSet: { field: "units", value: u } }),
+  zoomIn: () => setZoom(Math.min(200, zoom() + 10)),
+  zoomOut: () => setZoom(Math.max(50, zoom() - 10)),
+  vars: () => setVarsPanel(!varsPanel()),
+  file: (page: string) => setBackstage(page),
+  options: () => setBackstage("options"),
+  github: (path = "") => call("open_url", { url: GH + path }),
+};
+
+/** Every command with a name, for Tell Me and the shortcut list. */
+export const ALL_CMDS: [string, () => void, string?][] = [
+  ["Insert math region", () => C.insert("math"), "Ctrl+M"], ["Insert text region", () => C.insert("text"), "Ctrl+T"], ["Insert check", () => C.insert("check")],
+  ["Delete region", C.del, "Delete"], ["Move region up", () => C.move(true), "Alt+↑"], ["Move region down", () => C.move(false), "Alt+↓"],
+  ["Copy", C.copy, "Ctrl+C"], ["Paste", C.paste, "Ctrl+V"], ["Undo", C.undo, "Ctrl+Z"], ["Redo", C.redo, "Ctrl+Y"],
+  ["Save", () => C.save(), "Ctrl+S"], ["Save as", () => C.save(true)], ["Open", C.open, "Ctrl+O"], ["New sheet", C.newSheet, "Ctrl+N"], ["Print / PDF", C.print, "Ctrl+P"],
+  ["Title block", () => D.titleBlock()], ["SI units", () => C.units("SI")], ["US units", () => C.units("US")],
+  ["Zoom in", C.zoomIn], ["Zoom out", C.zoomOut], ["Options", C.options], ["Check for updates", () => C.file("about")], ["Roadmap", () => C.file("roadmap")],
+  ["Keyboard shortcuts", () => D.shortcuts(), "F1"], ["Getting started", () => D.gettingStarted()], ["Glossary", () => D.glossary()],
+  ["GitHub page", () => C.github()], ["Report an issue", () => C.github("/issues/new")],
+];

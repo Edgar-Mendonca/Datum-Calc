@@ -1,0 +1,36 @@
+{
+  "$schema": "Datum family app summary, read by the Datum hub site (github.com/Edgar-Mendonca/Datum) and by File › Roadmap in the app.",
+  "id": "calc",
+  "name": "Datum Calc",
+  "accent": "#A8650F",
+  "logo": "docs/brand/datum-calc-icon.svg",
+  "tagline": "Engineering calculations with real units, as readable maths, with checks and a printable calc sheet.",
+  "for": "Mechanical, process, structural and electrical engineers, students and lecturers: everyone who writes calculations.",
+  "about": [
+    "Datum Calc is a desktop app for engineering calculation sheets. You type equations with their units, such as Q = 120 m^3/h or P = rho*g*Q*H/eta; Datum Calc shows them as readable maths, works out each answer with its unit, and catches mistakes such as adding metres to seconds on the line where they happen.",
+    "Checks compare results with their limits and show PASS or FAIL with the utilisation. The sheet prints as a clean, referenced calc sheet with a title block (project, calc number, by, checked, date, revision) and page numbers, ready to hand in. Ready-made calc packs for pumps, pipes, compressors, heat exchangers, vessels, beams, bolts and motors start you off."
+  ],
+  "steps": [
+    { "title": "Write the equations", "text": "Type each equation with its units, top to bottom, as on paper; the maths is shown as you would write it." },
+    { "title": "Check the results", "text": "Every answer carries its unit; checks against your limits show PASS or FAIL with the utilisation ratio." },
+    { "title": "Print the calc sheet", "text": "Fill in the title block and print or save a PDF with page numbers and references." }
+  ],
+  "highlights": [
+    "Equations with real units: SI with prefixes and US customary, absolute and difference temperatures, dimension errors caught on the line.",
+    "Readable maths: what is shown is drawn from the same expression the engine computes.",
+    "Checks with PASS or FAIL and the utilisation ratio.",
+    "Solve for the value that makes an equation zero within a range, and plot functions such as a pump curve against the system curve.",
+    "Ten ready calc packs, each with its reference and a test against a worked example.",
+    "A printable calc sheet with a title block, page numbers and references."
+  ],
+  "screenshots": [],
+  "roadmap": [
+    { "v": "0.1.1", "title": "The engine and the worksheet", "when": "Next", "items": ["Units, equations, results and checks worked out on the sheet", "Maths shown as you would write it", "A Variables panel with every name, value and unit", "Errors shown on the line they happen"] },
+    { "v": "0.1.2", "title": "Solve, plot and print", "when": "Soon", "items": ["Solve regions (find the root in a range)", "Plot regions", "Table regions with units per column", "Print to PDF with the title block"] },
+    { "v": "0.1.3", "title": "Calc packs", "when": "Soon", "items": ["Ten ready calc packs: pump power, NPSH, pipe pressure drop, pump operating point, compressor head, heat exchanger LMTD, pressure vessel, beams, bolt torque, motor current", "File › New from pack", "Export inputs and results as CSV"] },
+    { "v": "0.2", "title": "Materials and more packs", "when": "Later", "items": ["Material properties from Datum Atlas", "More calc packs", "Unit conversion menus on every result", "Symbolic simplify"] },
+    { "v": "0.3", "title": "Matrices and ODEs", "when": "Later", "items": ["Matrices and linear systems", "Solve ordinary differential equations", "Tables from CSV"] },
+    { "v": "0.4", "title": "Programs and templates", "when": "Later", "items": ["Loops and conditions inside a region", "Sheet templates", "A company title block"] },
+    { "v": "1.0", "title": "Validation", "when": "Goal", "items": ["A validation report: every pack against its reference", "A user guide", "A signed installer"] }
+  ]
+}
