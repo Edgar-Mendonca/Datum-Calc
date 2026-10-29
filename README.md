@@ -50,8 +50,8 @@ It is for mechanical, process, structural and electrical engineers, students and
 
 | Version | What |
 | --- | --- |
-| 0.1.0 – 0.1.6 ✅ | The calc sheet and its printing with a summary of checks; units, equations, checks, solve and plot; tables and pictures; sixteen calc packs; equations with their numbers; a Getting Started sheet; hardening |
-| 0.1.7 | Fixes from trying every pack on a clean Windows PC and from the convention |
+| 0.1.0 – 0.1.7 ✅ | The calc sheet and its printing with a summary of checks; units, equations, checks, solve and plot; tables and pictures; sixteen calc packs; equations with their numbers; a Getting Started sheet; hardening |
+| 0.1.8 | Fixes from trying every pack on a clean Windows PC and from the convention |
 | 0.2 | Materials from Datum Atlas, more packs |
 | 0.3 – 1.0 | Matrices and ODEs, templates, a validation report, a signed installer |
 

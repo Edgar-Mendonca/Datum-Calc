@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.7 — 2026-10-29
+
+- Windows now lists the publisher as Datum.
+
 ## 0.1.6 — 2026-10-28
 
 Safer saving, three more calc packs, a summary of checks on the printed sheet, figures per sheet, Duplicate and Insert Above.

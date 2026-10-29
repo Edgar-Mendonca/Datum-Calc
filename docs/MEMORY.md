@@ -136,6 +136,7 @@ tests_ui/run.cjs               Playwright UI tests against ui/dist with a mocked
 | 0.1.5 | Substituted values use the unit each name is shown in on its own line (`Env::shown`) | Base units (m²·kg/s²) for a torque read badly next to its N·m line |
 | 0.1.5 | The fuzz test builds random sheets from the grammar (numbers with units, names, operators, functions, checks, solve, plot, ranges, tables), 600 sheets per run in CI; 6,000 × 3 seeds and a release run before this release | Random characters rarely reach the evaluator; grammar-shaped input found two real panics at once |
 | 0.1.1 | `release.yml` ran once on a push trigger to register it (tag pushes are blocked from the session); later releases use workflow_dispatch | A workflow needs one run before GitHub lists it |
+| 0.1.7 | Windows publisher "Datum"; copyright stays "© 2026 Edgar Mendonca" | Family-wide rule (FAMILY §9) |
 
 ## 3. Roadmap
 
@@ -154,7 +155,8 @@ tests_ui/run.cjs               Playwright UI tests against ui/dist with a mocked
 | 0.1.4 | Getting Started sheet; inputs keep their units; grouped numbers; packs convert in US units | ✅ |
 | 0.1.5 | Hardening (limits, finite results, fuzz from the grammar), equations with their numbers, checks list, three more packs (shaft, tank, thermal expansion) | ✅ |
 | 0.1.6 | Safe saving and file limits, UI error guards, packs 14–16 (pipe wall, column, cable drop), print summary of checks, figures per sheet, Duplicate and Insert Above | ✅ |
-| 0.1.7 | Fixes from trying every pack on a clean Windows PC and from the convention | 🔜 |
+| 0.1.7 | Windows lists the publisher as Datum (family-wide change) | ✅ |
+| 0.1.8 | Fixes from trying every pack on a clean Windows PC and from the convention | 🔜 |
 | 0.2 | Materials from Datum Atlas, more packs, unit menus on results, symbolic simplify | ⬜ |
 | 0.3 | Matrices and linear systems, ODE solve, tables from CSV | ⬜ |
 | 0.4 | Programs inside a region, templates, a company title block | ⬜ |
@@ -212,6 +214,11 @@ tests_ui/run.cjs               Playwright UI tests against ui/dist with a mocked
 - Self-check: the packs in SI and US (`--example packs`) found a percentage check reading 0.0095 ≤ 0.03, ohm/km turning into base units and cP into Pa·s on a US sheet, US head in ft²/s² and a pinned kN on the Euler load; all fixed. All 17 sheets rendered in the built window in SI with Numbers and in US units without errors or overflow; the real app checked for the pack list, the print summary with a FAIL and the page count.
 - Checks: clippy clean, 49 engine tests, 77 UI tests, cargo deny.
 - Released 0.1.6. Still not tested: a clean Windows PC, the real Save as PDF dialog, an update from one release to the next on Windows.
+
+### 2026-10-29: Session 1, continued (0.1.7)
+- Family-wide change: the Windows publisher is "Datum" (`bundle.publisher` in `tauri.conf.json`); the copyright stays "© 2026 Edgar Mendonca". No other file writes the publisher. Noted in `docs/FAMILY.md`.
+- The convention fixes move to 0.1.8.
+- Released 0.1.7.
 
 ## 5. Known limits and next steps
 

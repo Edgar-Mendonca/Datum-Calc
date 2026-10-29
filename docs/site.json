@@ -30,7 +30,7 @@
     "docs/images/units.png"
   ],
   "roadmap": [
-    { "v": "0.1.7", "title": "Fixes from the convention", "when": "Next", "items": ["Fixes from trying every pack on a clean Windows PC", "What visitors ask for at the convention"] },
+    { "v": "0.1.8", "title": "Fixes from the convention", "when": "Next", "items": ["Fixes from trying every pack on a clean Windows PC", "What visitors ask for at the convention"] },
     { "v": "0.2", "title": "Materials and more packs", "when": "Soon", "items": ["Material properties from Datum Atlas", "More calc packs", "Symbolic simplify"] },
     { "v": "0.3", "title": "Matrices and ODEs", "when": "Later", "items": ["Matrices and linear systems", "Solve ordinary differential equations", "Tables from CSV"] },
     { "v": "0.4", "title": "Programs and templates", "when": "Later", "items": ["Loops and conditions inside a region", "Sheet templates", "A company title block"] },
