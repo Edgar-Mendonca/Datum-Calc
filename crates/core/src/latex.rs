@@ -87,7 +87,8 @@ fn nd(n: &Node, s: &Sub) -> String {
             match *op {
                 "/" => format!("\\frac{{{}}}{{{}}}", strip(a, s), strip(b, s)),
                 "^" => {
-                    let subbed = matches!(&a.e, E::Var(v) if s(v).is_some());
+                    // A substituted value is bracketed under a power; a symbol put in its place (j) is not.
+                    let subbed = matches!(&a.e, E::Var(v) if s(v).is_some_and(|t| !t.starts_with("\\mathrm{")));
                     let t = nd(a, s);
                     let base = if (!subbed && matches!(a.e, E::Var(_) | E::Num(_, None) | E::Group(_) | E::Call(..))) || t.starts_with("\\left(") { t } else { format!("\\left({t}\\right)") };
                     format!("{{{base}}}^{{{}}}", strip(b, s))
@@ -123,14 +124,18 @@ fn nd(n: &Node, s: &Sub) -> String {
 fn strip(n: &Node, s: &Sub) -> String { match &n.e { E::Group(e) => nd(e, s), _ => nd(n, s) } }
 
 /// LaTeX of a whole statement.
-pub fn stmt(s: &Stmt) -> String {
+pub fn stmt(s: &Stmt) -> String { stmt_with(s, &|_| None) }
+
+/// LaTeX of a whole statement with some names drawn differently (the imaginary unit j upright).
+pub fn stmt_with(s: &Stmt, sub: &Sub) -> String {
+    let node = |e: &Node| nd(e, sub);
     match s {
         Stmt::Assign { name: n, e, .. } => format!("{} = {}", name(n), node(e)),
         Stmt::Func { name: n, params, e } => format!("{}\\left({}\\right) = {}", name(n), params.iter().map(|p| name(p)).collect::<Vec<_>>().join(", "), node(e)),
         Stmt::Range { name: n, start, next, end, .. } => format!("{} = {}{} \\ldots {}", name(n), node(start), next.as_ref().map(|x| format!(", {}", node(x))).unwrap_or_default(), node(end)),
         Stmt::Check { e } => node(e),
         Stmt::Solve { lhs, rhs, var, lo, hi } => format!("{} = {} \\quad \\text{{for }} {} \\in \\left[{}, {}\\right]", node(lhs), node(rhs), name(var), node(lo), node(hi)),
-        Stmt::Plot { ys, var, lo, hi } => format!("{} \\quad \\text{{for }} {} \\in \\left[{}, {}\\right]", ys.iter().map(node).collect::<Vec<_>>().join(",\\; "), name(var), node(lo), node(hi)),
+        Stmt::Plot { ys, var, lo, hi } => format!("{} \\quad \\text{{for }} {} \\in \\left[{}, {}\\right]", ys.iter().map(&node).collect::<Vec<_>>().join(",\\; "), name(var), node(lo), node(hi)),
         Stmt::Show { e } => node(e),
         Stmt::Empty => String::new(),
     }

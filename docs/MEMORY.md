@@ -46,7 +46,7 @@ crates/core/src/parse.rs       lexer and Pratt parser: assignments, user functio
 crates/core/src/eval.rs        values (SI + dimension + abs temperature + vector + imaginary parts + the N·m reading), operators and complex arithmetic with dimension rules, built-in functions and constants, the sheet top to bottom (RegionOut: LaTeX, result, unit choices, check, plot, error), Variables, number formatting
 crates/core/src/latex.rs       expression tree → LaTeX (fractions, roots, subscripts, Greek, units in roman)
 crates/core/src/solve.rs       Brent's method after a 200-step scan for a sign change
-crates/core/src/packs.rs       the seventeen calc packs (include_str! of crates/core/packs/*.dcalc), cards for File › New
+crates/core/src/packs.rs       the nineteen calc packs (include_str! of crates/core/packs/*.dcalc), cards for File › New
 crates/core/packs/getting-started.dcalc  the Getting Started sheet (packs::GETTING_STARTED, opened from File › Home and Help)
 crates/core/examples/dump.rs   also `-- <pack id> [us] [numbers]` dumps a pack as the window's state (used to render every pack in the built window for a check by eye)
 crates/core/examples/packs.rs  prints every pack worked out in SI and US units, for checking by eye
@@ -142,6 +142,10 @@ tests_ui/run.cjs               Playwright UI tests against ui/dist with a mocked
 | 0.1.8 | A unit after brackets applies to the bracket: `(3 + 4j) Ω` (`E::Unit`), not when the word is one of the sheet's names | `3 + 4j Ω` adds a number to ohms, an error that would surprise every electrical user |
 | 0.1.8 | Polar form is a sheet setting (View › Polar, `Sheet.polar`), not per result | One reading per sheet, like Numbers and Figures |
 | 0.1.8 | `Val.nm`: a force (or load per length) times a length, a plain factor of it or a sum with it shows in N·m; energy with an angle tag (P/ω) uses the torque ladder | Issue 2: torque came out in J; no pack changed, as packs pinned their units |
+| 0.1.9 | Recovery copies are per window: `recovery/<pid>-<time>.dcalc/.json`, with `<id>.lock` held (`File::try_lock`) while the window runs; a copy whose lock is free is offered, newest first; 0.1.8's `recovery.dcalc` too | Two windows shared one copy and deleted each other's; the OS frees the lock when a window crashes, so no process list is needed |
+| 0.1.9 | Dialog `no` runs only on the cancel button; × and Esc just close | Discard must delete the copy, × means "not now" |
+| 0.1.9 | No utilisation for checks on absolute temperatures | A ratio of kelvins (0.91 for 30 °C ≤ 60 °C) reads as a margin it is not |
+| 0.1.9 | rad/s not added to the menu of Hz results | 50 Hz would read as 50 rad/s; the Hz/rpm mix-up is already a known limit, not to be widened |
 
 ## 3. Roadmap
 
@@ -162,7 +166,8 @@ tests_ui/run.cjs               Playwright UI tests against ui/dist with a mocked
 | 0.1.6 | Safe saving and file limits, UI error guards, packs 14–16 (pipe wall, column, cable drop), print summary of checks, figures per sheet, Duplicate and Insert Above | ✅ |
 | 0.1.7 | Windows lists the publisher as Datum (family-wide change) | ✅ |
 | 0.1.8 | Visitors' requests: complex numbers for AC circuits (View › Polar, re/im/arg/conj/polar), torque in N·m, AC circuit pack (17) | ✅ |
-| 0.1.9 | Fixes from trying every pack on a clean Windows PC and from the convention | 🔜 |
+| 0.1.9 | Recovery per window (two sheets open at once), Discard that deletes, packs 18–19 (insulated pipe, fillet weld), upright j, no utilisation for absolute temperatures | ✅ |
+| 0.1.10 | Fixes from trying every pack on a clean Windows PC and from the convention | 🔜 |
 | 0.2 | Materials from Datum Atlas, more packs, unit menus on results, symbolic simplify | ⬜ |
 | 0.3 | Matrices and linear systems, ODE solve, tables from CSV | ⬜ |
 | 0.4 | Programs inside a region, templates, a company title block | ⬜ |
@@ -234,10 +239,20 @@ tests_ui/run.cjs               Playwright UI tests against ui/dist with a mocked
 - Checks: clippy clean, 52 engine tests, 80 UI tests, cargo deny; 24,000 more random sheets (three seeds in release, one in debug) with complex values in the grammar.
 - Released 0.1.8. Still not tested: a clean Windows PC, the real Save as PDF dialog, an update from one release to the next on Windows.
 
+### 2026-10-30: Session 1, continued (0.1.9)
+- The user asked to keep going with 0.1.9. No new visitor issues; reading the shell for what a clean Windows PC would meet found that two windows (two sheets double-clicked in Explorer) shared one recovery copy and deleted each other's, and that Discard in the recovery box never deleted the copy.
+- Recovery per window with a lock file; tried in the real app under Xvfb: crashed window's copy offered and recovered (sheet intact), a running window's copy never offered, kill -9 then restart, Discard, a 0.1.8 copy, two windows at once.
+- Packs 18–19 (insulated pipe, fillet weld) with hand values first; the weld pack renamed to f_vw_d, F_w_Rd so subscripts read as in EN 1993-1-8.
+- Upright j in equations; no utilisation for checks on absolute temperatures (found writing the insulation pack).
+- Checks: clippy clean, 54 engine tests, 82 UI tests, cargo deny; all 20 sheets rendered in SI with Numbers and in US without errors or overflow; 18,000 more random sheets in release.
+- Released 0.1.9. Still not tested: a clean Windows PC, the real Save as PDF dialog, an update from one release to the next on Windows.
+
 ## 5. Known limits and next steps
 
 - Energy and torque share a dimension: a force times a length (and a power over a speed) shows in N·m, a power times a time in J; m·g·h shows in N·m too (choose J in the unit menu).
 - Complex values work in arithmetic and in sqrt, exp, ln, abs, re, im, arg, conj, polar, sum and mean; trigonometric functions, checks, solve, plots, ranges and tables take real values only. Results show j, also when i was typed.
+- Hz, rad/s and rpm are all 1/s (the SI convention), so f = 50 Hz shown in rpm reads 477.5, not 3000; write ω = 2*pi*f or n = 3000 rpm explicitly.
+- Two windows that crash together leave two copies; the newest is offered first, the other at the next start.
 - Vectors are shown as their first values and the last; there are no matrices yet (0.3).
 - Tables hold values and formula columns, not free spreadsheet formulas per cell.
 - The installer is not code-signed (1.0).

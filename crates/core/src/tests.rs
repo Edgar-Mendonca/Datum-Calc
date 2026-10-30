@@ -491,7 +491,7 @@ mod packs {
     #[test]
     fn all_packs_open_and_list() {
         let cards = crate::packs::cards();
-        assert_eq!(cards.len(), 17);
+        assert_eq!(cards.len(), 19);
         for c in &cards { assert!(!c.name.is_empty() && !c.desc.is_empty() && !c.field.is_empty() && c.checks > 0, "{}", c.id); }
     }
 
@@ -599,6 +599,35 @@ mod packs {
         let mut s = crate::packs::sheet("ac-circuit").unwrap();
         s.polar = true;
         assert!(eval::run(&s).regions.iter().any(|r| r.result == "12.5∠-15.53° A"), "polar form");
+    }
+
+    #[test]
+    fn insulated_pipe() {
+        // r₁ = 84.15 mm, r₂ = 134.15 mm; R_ins = ln(1.59418)/(2π 0.040) = 1.85558 K·m/W; R_o = 1/(2π 0.13415 × 10) = 0.118640 K·m/W;
+        // q = 160/1.97422 = 81.045 W/m; Q = 8.1045 kW over 100 m; T_s = 20 + 81.045 × 0.11864 = 29.615 °C.
+        let (o, e) = run("insulated-pipe");
+        assert!(close(v(&e, "R_ins"), 1.855_578_16, 1e-8));
+        assert!(close(v(&e, "R_o"), 0.118_639_54, 1e-8));
+        assert!(close(v(&e, "q"), 81.044_760_3, 1e-8));
+        assert!(close(v(&e, "Q"), 8_104.476_03, 1e-8));
+        assert!(close(v(&e, "T_s") - 273.15, 29.615_113_1, 1e-8));
+        assert!(o.regions.iter().any(|r| r.result == "29.62 °C") && o.regions.iter().any(|r| r.result == "81.04 W/m"));
+        let c = checks(&o);
+        assert!(c[0].0 && c[0].1.is_nan(), "no utilisation for absolute temperatures");
+        assert!(c[1].0 && close(c[1].1, 0.810_447_6, 1e-6));
+    }
+
+    #[test]
+    fn fillet_weld() {
+        // f_vw,d = 490/(√3 × 0.9 × 1.25) = 251.468 MPa; F_w,Rd = 251.468 × 6 = 1508.81 N/mm; F_w,Ed = 250 000/300 = 833.33 N/mm;
+        // F_Rd = 1508.81 × 300 = 452.64 kN; utilisation 0.5523; length limit max(30, 36) = 36 mm.
+        let (o, e) = run("fillet-weld");
+        assert!(close(v(&e, "f_vw_d"), 251.468_117e6, 1e-8));
+        assert!(close(v(&e, "F_w_Rd"), 1_508_808.70, 1e-8));
+        assert!(close(v(&e, "F_Rd"), 452_642.61, 1e-8));
+        assert!(o.regions.iter().any(|r| r.result == "1509 N/mm") && o.regions.iter().any(|r| r.result == "PASS (150 mm ≥ 36 mm)"));
+        let c = checks(&o);
+        assert!(c.iter().all(|c| c.0) && close(c[0].1, 0.552_312_1, 1e-6));
     }
 
     #[test]
@@ -806,5 +835,9 @@ fn complex_numbers() {
     let o = eval::run(&s);
     assert_eq!(o.regions[1].subst_tex, "\\frac{10\\,\\mathrm{V}}{\\left(3 + 4\\,\\mathrm{j}\\right)\\,\\mathrm{\\Omega }}");
     assert_eq!(o.regions[0].latex, "Z = \\left(3 + 4\\,\\mathrm{j}\\right)\\,\\mathrm{\\Omega }");
+    // j drawn upright when it is the imaginary unit; a parameter, a plot variable or a name on the sheet stays italic.
+    let o = run(&["w = 2", "Z = 3 + j*w", "f(j) = j^2", "plot i*w for i in 0 .. 1", "j = 5", "k = j*2"]);
+    let tex: Vec<&str> = o.regions.iter().map(|r| r.latex.as_str()).collect();
+    assert_eq!(tex[1..], ["Z = 3 + \\mathrm{j} \\cdot w", "f\\left(j\\right) = {j}^{2}", "i \\cdot w \\quad \\text{for } i \\in \\left[0, 1\\right]", "j = 5", "k = j \\cdot 2"]);
     assert!(!crate::sheet::Sheet::from_json(&serde_json::to_string(&s).unwrap()).unwrap().polar);
 }

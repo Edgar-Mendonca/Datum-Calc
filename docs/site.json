@@ -8,7 +8,7 @@
   "for": "Mechanical, process, structural and electrical engineers, students and lecturers: everyone who writes calculations.",
   "about": [
     "Datum Calc is a desktop app for engineering calculation sheets. You type equations with their units, such as Q = 120 m^3/h or P = rho*g*Q*H/eta; Datum Calc shows them as readable maths, works out each answer with its unit, and catches mistakes such as adding metres to seconds on the line where they happen.",
-    "Checks compare results with their limits and show PASS or FAIL with the utilisation. The sheet prints as a clean, referenced calc sheet with a title block (project, calc number, by, checked, date, revision) and page numbers, ready to hand in. Ready-made calc packs for pumps, pipes, compressors, heat exchangers, tanks, pipe walls, vessels, beams, columns, shafts, bolts, thermal expansion, motors, cables and AC circuits start you off. Complex numbers (3 + 4j) work out AC circuits, shown as 3 + 4j or as magnitude and angle."
+    "Checks compare results with their limits and show PASS or FAIL with the utilisation. The sheet prints as a clean, referenced calc sheet with a title block (project, calc number, by, checked, date, revision) and page numbers, ready to hand in. Ready-made calc packs for pumps, pipes, compressors, heat exchangers, tanks, pipe walls, pipe insulation, vessels, beams, columns, shafts, bolts, welds, thermal expansion, motors, cables and AC circuits start you off. Complex numbers (3 + 4j) work out AC circuits, shown as 3 + 4j or as magnitude and angle."
   ],
   "steps": [
     { "title": "Write the equations", "text": "Type each equation with its units, top to bottom, as on paper; the maths is shown as you would write it." },
@@ -20,7 +20,7 @@
     "Readable maths: what is shown is drawn from the same expression the engine computes.",
     "Checks with PASS or FAIL and the utilisation ratio.",
     "Solve for the value that makes an equation zero within a range, plot functions such as a pump curve against the system curve, and tables with units per column.",
-    "Seventeen ready calc packs, each with its reference and a test against a worked example.",
+    "Nineteen ready calc packs, each with its reference and a test against a worked example.",
     "Complex numbers for AC circuits: impedances such as (8 + 9.42j) Ω, phasors, complex power, in rectangular or polar form.",
     "Each equation can be shown again with its numbers put in, as on a hand calculation.",
     "A printable calc sheet with a title block, a summary of checks, page numbers and references; inputs and results export as CSV."
@@ -31,7 +31,7 @@
     "docs/images/units.png"
   ],
   "roadmap": [
-    { "v": "0.1.9", "title": "Fixes from the convention", "when": "Next", "items": ["Fixes from trying every pack on a clean Windows PC", "What visitors ask for at the convention"] },
+    { "v": "0.1.10", "title": "Fixes from the convention", "when": "Next", "items": ["Fixes from trying every pack on a clean Windows PC", "What visitors ask for at the convention"] },
     { "v": "0.2", "title": "Materials and more packs", "when": "Soon", "items": ["Material properties from Datum Atlas", "More calc packs", "Symbolic simplify"] },
     { "v": "0.3", "title": "Matrices and ODEs", "when": "Later", "items": ["Matrices and linear systems", "Solve ordinary differential equations", "Tables from CSV"] },
     { "v": "0.4", "title": "Programs and templates", "when": "Later", "items": ["Loops and conditions inside a region", "Sheet templates", "A company title block"] },

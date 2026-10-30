@@ -1,0 +1,197 @@
+{
+ "format": 1,
+ "name": "Fillet weld in shear",
+ "title": {
+  "project": "",
+  "number": "PACK-19",
+  "title": "Fillet weld in shear",
+  "by": "",
+  "checked": "",
+  "date": "",
+  "rev": "A",
+  "company": "",
+  "client": "",
+  "logo": ""
+ },
+ "page": {
+  "paper": "A4",
+  "margins": [
+   15.0,
+   15.0,
+   15.0,
+   20.0
+  ]
+ },
+ "units": "SI",
+ "digits": 4,
+ "regions": [
+  {
+   "id": 1,
+   "kind": "text",
+   "text": "Fillet weld in shear",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 2,
+   "kind": "text",
+   "text": "Two longitudinal fillet welds carry a design shear load. Simplified method: the design shear strength of the weld is fu/(√3 βw γM2) in any direction, times the throat thickness, per unit length of weld.",
+   "unit": "",
+   "style": "note",
+   "data": null
+  },
+  {
+   "id": 3,
+   "kind": "text",
+   "text": "Inputs",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 4,
+   "kind": "math",
+   "text": "F_Ed = 250 kN  # design load on the joint",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 5,
+   "kind": "math",
+   "text": "a = 6 mm  # throat thickness of each weld",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 6,
+   "kind": "math",
+   "text": "L_w = 150 mm  # effective length of each weld",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 7,
+   "kind": "math",
+   "text": "n = 2  # number of welds",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 8,
+   "kind": "math",
+   "text": "f_u = 490 MPa  # ultimate strength of the weaker part (S355, t ≤ 40 mm)",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 9,
+   "kind": "math",
+   "text": "beta_w = 0.9  # correlation factor for S355",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 10,
+   "kind": "math",
+   "text": "gamma_M2 = 1.25  # partial factor for welds",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 11,
+   "kind": "text",
+   "text": "Results",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 12,
+   "kind": "math",
+   "text": "f_vw_d = f_u/(sqrt(3)*beta_w*gamma_M2)  # design shear strength of the weld",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 13,
+   "kind": "math",
+   "text": "F_w_Rd = f_vw_d*a  # resistance per unit length",
+   "unit": "N/mm",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 14,
+   "kind": "math",
+   "text": "F_w_Ed = F_Ed/(n*L_w)  # load per unit length",
+   "unit": "N/mm",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 15,
+   "kind": "math",
+   "text": "F_Rd = F_w_Rd*n*L_w  # resistance of the joint",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 16,
+   "kind": "check",
+   "text": "check F_w_Ed <= F_w_Rd",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 17,
+   "kind": "check",
+   "text": "check a >= 3 mm",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 18,
+   "kind": "check",
+   "text": "check L_w >= max(30 mm, 6*a)",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 19,
+   "kind": "text",
+   "text": "Ref: EN 1993-1-8:2005, §4.5.3.3 (simplified method for fillet welds), Table 4.1 (correlation factor βw), §4.5.2 (throat at least 3 mm) and §4.5.1 (effective length at least 30 mm and 6a).",
+   "unit": "",
+   "style": "ref",
+   "data": null
+  },
+  {
+   "id": 20,
+   "kind": "text",
+   "text": "Ref: EN 1993-1-1:2005, Table 3.1: fu = 490 MPa for S355, t ≤ 40 mm; partial factor γM2 = 1.25 (recommended value).",
+   "unit": "",
+   "style": "ref",
+   "data": null
+  }
+ ],
+ "next_id": 21,
+ "ui": {
+  "pack": {
+   "id": "fillet-weld",
+   "field": "Mechanical",
+   "desc": "Design resistance of a pair of fillet welds by the simplified method, against the design load, with the minimum throat and length."
+  }
+ }
+}

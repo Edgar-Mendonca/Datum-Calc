@@ -647,6 +647,11 @@ fn defined_name(t: &str) -> Option<String> {
     }
 }
 
+/// `\\mathrm{j}` for j or i when the sheet has no name of that spelling.
+fn imag_unit(env: &Env, v: &str) -> Option<String> {
+    matches!(v, "i" | "j").then_some(()).filter(|_| !env.vars.contains_key(v)).map(|_| format!("\\mathrm{{{v}}}"))
+}
+
 /// The expression with each name replaced by its value in the unit it is shown in; π and e stay symbols.
 fn substituted(env: &Env, e: &Node, f: &Fmt) -> String {
     let has_name = |n: &Node| { let mut st = vec![n]; while let Some(x) = st.pop() { match &x.e { E::Var(v) if !matches!(canon(v).as_str(), "π" | "e") && !(matches!(v.as_str(), "i" | "j") && !env.vars.contains_key(v.as_str())) => return true, E::Neg(a) | E::Group(a) => st.push(a), E::Bin(_, a, b) => { st.push(a); st.push(b); } E::Call(_, a) => st.extend(a.iter()), _ => {} } } false };
@@ -654,6 +659,7 @@ fn substituted(env: &Env, e: &Node, f: &Fmt) -> String {
     let sub = |name: &str| -> Option<String> {
         let k = canon(name);
         if k == "π" || k == "e" { return None; }
+        if let Some(t) = imag_unit(env, name) { return Some(t); }
         let v = env.vars.get(&k).cloned().or_else(|| constant(&k).filter(|v| !v.cx())).filter(|v| !v.vec && !v.logic)?;
         let t = show_val(&v, env.shown.get(&k).map(|u| u.as_str()).unwrap_or(""), f).1;
         // A complex value inside a product is bracketed: (3 + 4j) · 2.
@@ -683,7 +689,9 @@ fn region(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>, subst: bo
         o.error = Some(ErrOut { msg: "A check starts with “check”, such as check sigma <= sigma_allow.".into(), from: 0, to: code.chars().count() });
         return o;
     }
-    o.latex = latex::stmt(&st);
+    // j and i, when they are the imaginary unit rather than a name of the sheet, are drawn upright like a unit.
+    let bound: Vec<&str> = match &st { Stmt::Func { params, .. } => params.iter().map(|p| p.as_str()).collect(), Stmt::Solve { var, .. } | Stmt::Plot { var, .. } => vec![var.as_str()], _ => vec![] };
+    o.latex = latex::stmt_with(&st, &|v| imag_unit(env, v).filter(|_| !bound.contains(&v)));
     let res: R<()> = (|| {
         match &st {
             Stmt::Empty => {}
@@ -735,7 +743,8 @@ fn region(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>, subst: bo
                 if subst { o.subst_tex = substituted(env, e, f); }
                 if t.vec { return fail("A check needs single values, not vectors (use max or min).", e.at); }
                 let pass = t.x() != 0.0;
-                let ratio = match *op { "<" | "<=" if y.x() != 0.0 => Some(x.x() / y.x()), ">" | ">=" if x.x() != 0.0 => Some(y.x() / x.x()), _ => None };
+                // A utilisation of absolute temperatures (in kelvin) means nothing: 30 °C against 60 °C is not 91 %.
+                let ratio = match *op { _ if x.abs || y.abs => None, "<" | "<=" if y.x() != 0.0 => Some(x.x() / y.x()), ">" | ">=" if x.x() != 0.0 => Some(y.x() / x.x()), _ => None };
                 // The left side reads in the check's own unit, else in the unit its name is shown in (3 %, not 0.03).
                 let want = if r.unit.trim().is_empty() { match &a.e { E::Var(n) => env.shown.get(&canon(n)).cloned().unwrap_or_default(), _ => String::new() } } else { r.unit.clone() };
                 let (lt, _, _, lu) = show_val(&x, &want, f);

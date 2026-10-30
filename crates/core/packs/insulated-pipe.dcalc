@@ -1,0 +1,229 @@
+{
+ "format": 1,
+ "name": "Heat loss from an insulated pipe",
+ "title": {
+  "project": "",
+  "number": "PACK-18",
+  "title": "Heat loss from an insulated pipe",
+  "by": "",
+  "checked": "",
+  "date": "",
+  "rev": "A",
+  "company": "",
+  "client": "",
+  "logo": ""
+ },
+ "page": {
+  "paper": "A4",
+  "margins": [
+   15.0,
+   15.0,
+   15.0,
+   20.0
+  ]
+ },
+ "units": "SI",
+ "digits": 4,
+ "regions": [
+  {
+   "id": 1,
+   "kind": "text",
+   "text": "Heat loss from an insulated pipe",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 2,
+   "kind": "text",
+   "text": "Steady radial conduction through the insulation in series with convection and radiation from its outer surface (a combined coefficient). The steel wall and the inside film are neglected: the pipe surface is taken at the fluid temperature.",
+   "unit": "",
+   "style": "note",
+   "data": null
+  },
+  {
+   "id": 3,
+   "kind": "text",
+   "text": "Inputs",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 4,
+   "kind": "math",
+   "text": "D_o = 168.3 mm  # pipe outside diameter (DN 150)",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 5,
+   "kind": "math",
+   "text": "t_ins = 50 mm  # insulation thickness",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 6,
+   "kind": "math",
+   "text": "k_ins = 0.040 W/(m*K)  # mineral wool at its mean temperature",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 7,
+   "kind": "math",
+   "text": "h_o = 10 W/(m^2*K)  # outer surface, still air (convection and radiation)",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 8,
+   "kind": "math",
+   "text": "T_p = 180 °C  # pipe surface (fluid temperature)",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 9,
+   "kind": "math",
+   "text": "T_a = 20 °C  # ambient air",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 10,
+   "kind": "math",
+   "text": "L = 100 m  # length of the line",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 11,
+   "kind": "math",
+   "text": "T_touch = 60 °C  # highest surface temperature for personnel protection",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 12,
+   "kind": "math",
+   "text": "q_max = 100 W/m  # allowed heat loss per metre",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 13,
+   "kind": "text",
+   "text": "Results",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 14,
+   "kind": "math",
+   "text": "r_1 = D_o/2  # pipe radius",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 15,
+   "kind": "math",
+   "text": "r_2 = r_1 + t_ins  # outer radius of the insulation",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 16,
+   "kind": "math",
+   "text": "R_ins = ln(r_2/r_1)/(2*pi*k_ins)  # insulation, per metre",
+   "unit": "K*m/W",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 17,
+   "kind": "math",
+   "text": "R_o = 1/(2*pi*r_2*h_o)  # outer surface, per metre",
+   "unit": "K*m/W",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 18,
+   "kind": "math",
+   "text": "q = (T_p - T_a)/(R_ins + R_o)  # heat loss per metre",
+   "unit": "W/m",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 19,
+   "kind": "math",
+   "text": "Q = q*L  # along the line",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 20,
+   "kind": "math",
+   "text": "T_s = T_a + q*R_o  # outer surface temperature",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 21,
+   "kind": "check",
+   "text": "check T_s <= T_touch",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 22,
+   "kind": "check",
+   "text": "check q <= q_max",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 23,
+   "kind": "text",
+   "text": "Ref: T. L. Bergman, A. S. Lavine, F. P. Incropera, D. P. DeWitt, Fundamentals of Heat and Mass Transfer, 7th ed., §3.3.1: the cylindrical wall, thermal resistances in series.",
+   "unit": "",
+   "style": "ref",
+   "data": null
+  },
+  {
+   "id": 24,
+   "kind": "text",
+   "text": "Ref: ASTM C1055: heated system surface conditions that produce contact burn injuries (60 °C for a short contact).",
+   "unit": "",
+   "style": "ref",
+   "data": null
+  }
+ ],
+ "next_id": 25,
+ "ui": {
+  "pack": {
+   "id": "insulated-pipe",
+   "field": "Process",
+   "desc": "Heat lost per metre through pipe insulation to still air, the outer surface temperature for personnel protection, and the loss along the line."
+  }
+ }
+}

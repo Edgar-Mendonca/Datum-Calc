@@ -506,7 +506,7 @@ dependencies = [
 
 [[package]]
 name = "datum-calc"
-version = "0.1.8"
+version = "0.1.9"
 dependencies = [
  "chrono",
  "datum-core",
@@ -521,7 +521,7 @@ dependencies = [
 
 [[package]]
 name = "datum-core"
-version = "0.1.8"
+version = "0.1.9"
 dependencies = [
  "serde",
  "serde_json",

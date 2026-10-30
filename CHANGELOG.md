@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.1.9 — 2026-10-30
+
+Safer recovery when several sheets are open, two more calc packs, and smaller fixes.
+
+**Recovery**
+- Each Datum Calc window keeps its own recovery copy. Two sheets double-clicked in Explorer run as two windows; before, they shared one copy, and closing or saving one deleted the other's. A copy is offered again only when the window that kept it is no longer running (closed without saving, or crashed).
+- Discard in the “Recover unsaved work?” box now deletes the copy; closing the box with × keeps it for next time. A copy kept by 0.1.8 is still offered.
+
+**More calc packs** (19 in all)
+- Heat loss from an insulated pipe: radial conduction through the insulation and the outer surface coefficient in series, the heat lost per metre and along the line, and the surface temperature for personnel protection.
+- Fillet weld in shear: the simplified method for a pair of fillet welds, with the minimum throat and length.
+- Each is checked against a hand calculation in the tests.
+
+**Smaller fixes**
+- j (or i) is drawn upright in equations when it is the imaginary unit, as in the results; a name of the sheet called j stays italic.
+- A check on absolute temperatures (29.6 °C ≤ 60 °C) shows no utilisation; a ratio of kelvins meant nothing.
+
+**Checks**
+- 54 engine tests, 82 UI tests (Discard and × in the recovery box); 18,000 more random sheets. Recovery was tried in the real window: a crashed window's copy offered and recovered, a running window's copy never offered, Discard, a copy from 0.1.8, and two windows at once.
+
 ## 0.1.8 — 2026-10-30
 
 What visitors asked for: complex numbers for AC circuits, and torque in N·m.

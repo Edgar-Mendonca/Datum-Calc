@@ -43,7 +43,7 @@ const App = () => {
       if (start) await call("open", { path: start }).then(r => { if (r) { setOut(r as Out); setBackstage(null); } });
       const rec = await invoke<{ name: string; saved: string } | null>("recovery");
       if (rec) openDialog(() => (
-        <Dialog title="Recover unsaved work?" okText="Recover" cancel="Discard" ok={async () => { const r = await call<Out>("recover", { keep: true }); if (r) { setOut(r); setBackstage(null); } }}>
+        <Dialog title="Recover unsaved work?" okText="Recover" cancel="Discard" no={() => { call("recover", { keep: false }); }} ok={async () => { const r = await call<Out>("recover", { keep: true }); if (r) { setOut(r); setBackstage(null); } }}>
           <p>Datum Calc closed before “{rec.name}” was saved. A copy from {rec.saved} was kept.</p>
         </Dialog>
       ));

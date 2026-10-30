@@ -40,6 +40,9 @@ impl Default for Options {
 struct App {
     doc: Doc,
     opts: Options,
+    /// This window's recovery name, and the lock it holds on `<id>.lock` while it runs.
+    id: String,
+    _lock: Option<std::fs::File>,
 }
 
 struct St(Mutex<App>);
@@ -165,7 +168,7 @@ async fn save(app: AppHandle, st: State<'_, St>, as_new: bool) -> R<Option<Out>>
     }
     a.doc.save(&path)?;
     remember(&app, &path);
-    clear_recovery(&app);
+    if let Some((x, y)) = own_files(&app, &a) { remove_all(&[Some(x), Some(y)]); }
     Ok(Some(out(&a)))
 }
 
@@ -233,22 +236,73 @@ fn set_options(app: AppHandle, st: State<St>, opts: Options) -> Out {
 }
 
 // ---------- recovery: a copy of unsaved work, kept until it is saved or discarded ----------
+// Each window (two sheets double-clicked in Explorer are two windows) keeps its own copy, `<id>.dcalc`
+// and `<id>.json`, and holds a lock on `<id>.lock` while it runs. A copy whose lock is free belongs to a
+// window that closed without saving or crashed, and is offered at the next start; a running window's
+// copy is never offered, overwritten or deleted by another.
 #[derive(Serialize, Deserialize)]
 struct Recovery { name: String, path: Option<String>, saved: String }
 
-fn recovery_files(app: &AppHandle) -> Option<(PathBuf, PathBuf)> { dir(app, true).map(|d| (d.join("recovery.dcalc"), d.join("recovery.json"))) }
+fn recovery_dir(app: &AppHandle) -> Option<PathBuf> { let d = dir(app, true)?.join("recovery"); std::fs::create_dir_all(&d).ok()?; Some(d) }
 
-fn clear_recovery(app: &AppHandle) {
-    if let Some((a, b)) = recovery_files(app) {
-        let _ = std::fs::remove_file(a);
-        let _ = std::fs::remove_file(b);
-    }
+/// This window's lock, taken at start.
+fn take_lock(app: &AppHandle, id: &str) -> Option<std::fs::File> {
+    let f = std::fs::File::create(recovery_dir(app)?.join(format!("{id}.lock"))).ok()?;
+    f.try_lock().ok()?;
+    Some(f)
 }
 
-#[tauri::command]
-fn autosave(app: AppHandle, st: State<St>) {
+/// The window that wrote a copy is still running when its lock is held.
+fn running(lock: &Path) -> bool {
+    matches!(std::fs::File::open(lock).map(|f| f.try_lock()), Ok(Err(std::fs::TryLockError::WouldBlock)))
+}
+
+/// The newest copy left by a window that is no longer running: (sheet, info, lock). Copies kept by
+/// 0.1.8 and earlier (recovery.dcalc in the data folder) count too.
+fn orphan(app: &AppHandle, own: &str) -> Option<(PathBuf, PathBuf, Option<PathBuf>)> {
+    let d = recovery_dir(app)?;
+    let mut found: Vec<(std::time::SystemTime, PathBuf, PathBuf, Option<PathBuf>)> = vec![];
+    for e in std::fs::read_dir(&d).ok()?.flatten() {
+        let p = e.path();
+        let (Some(stem), Some(ext)) = (p.file_stem().and_then(|s| s.to_str()), p.extension().and_then(|s| s.to_str())) else { continue };
+        if stem == own { continue; }
+        let lock = d.join(format!("{stem}.lock"));
+        match ext {
+            "json" if !running(&lock) && d.join(format!("{stem}.dcalc")).exists() => {
+                if let Ok(t) = e.metadata().and_then(|m| m.modified()) { found.push((t, d.join(format!("{stem}.dcalc")), p.clone(), Some(lock))); }
+            }
+            // A lock left by a window that closed or crashed with nothing to recover.
+            "lock" if !d.join(format!("{stem}.json")).exists() && !running(&p) => { let _ = std::fs::remove_file(&p); }
+            _ => {}
+        }
+    }
+    let old = dir(app, true)?;
+    let (sheet, meta) = (old.join("recovery.dcalc"), old.join("recovery.json"));
+    if let Ok(t) = std::fs::metadata(&meta).and_then(|m| m.modified()) { if sheet.exists() { found.push((t, sheet, meta, None)); } }
+    found.into_iter().max_by_key(|x| x.0).map(|x| (x.1, x.2, x.3))
+}
+
+fn remove_all(files: &[Option<PathBuf>]) { for f in files.iter().flatten() { let _ = std::fs::remove_file(f); } }
+
+/// This window's own copy (not its lock).
+fn own_files(app: &AppHandle, a: &App) -> Option<(PathBuf, PathBuf)> { recovery_dir(app).map(|d| (d.join(format!("{}.dcalc", a.id)), d.join(format!("{}.json", a.id)))) }
+
+fn clear_recovery(app: &AppHandle) {
+    let st = app.state::<St>();
     let a = st.lock();
-    if let (true, Some((sheet, meta))) = (a.doc.dirty, recovery_files(&app)) {
+    if let Some((x, y)) = own_files(app, &a) { remove_all(&[Some(x), Some(y)]); }
+}
+
+/// On closing: the copy and the lock go (a window that closes unsaved has already asked).
+fn leave(app: &AppHandle) {
+    clear_recovery(app);
+    let st = app.state::<St>();
+    let a = st.lock();
+    if let Some(d) = recovery_dir(app) { let _ = std::fs::remove_file(d.join(format!("{}.lock", a.id))); }
+}
+
+fn write_recovery(app: &AppHandle, a: &App) {
+    if let (true, Some((sheet, meta))) = (a.doc.dirty, own_files(app, a)) {
         let info = Recovery { name: a.doc.s.name.clone(), path: a.doc.path.as_ref().map(|p| p.display().to_string()), saved: chrono::Local::now().format("%d-%b-%y %H:%M").to_string() };
         let _ = std::fs::write(sheet, a.doc.s.json());
         let _ = std::fs::write(meta, serde_json::to_string(&info).unwrap_or_default());
@@ -256,26 +310,33 @@ fn autosave(app: AppHandle, st: State<St>) {
 }
 
 #[tauri::command]
-fn recovery(app: AppHandle) -> Option<Recovery> {
-    let (sheet, meta) = recovery_files(&app)?;
-    sheet.exists().then_some(())?;
+fn autosave(app: AppHandle, st: State<St>) { write_recovery(&app, &st.lock()); }
+
+#[tauri::command]
+fn recovery(app: AppHandle, st: State<St>) -> Option<Recovery> {
+    let own = st.lock().id.clone();
+    let (_, meta, _) = orphan(&app, &own)?;
     serde_json::from_str(&std::fs::read_to_string(meta).ok()?).ok()
 }
 
+/// Takes back (or discards) the copy `recovery` offered. A recovered sheet is written at once as this
+/// window's own copy before the old one is removed, so no moment is left without one.
 #[tauri::command]
 fn recover(app: AppHandle, st: State<St>, keep: bool) -> R<Option<Out>> {
-    let info = recovery(app.clone());
-    let files = recovery_files(&app);
+    let own = st.lock().id.clone();
+    let (sheet, meta, lock) = orphan(&app, &own).ok_or("No recovered sheet was found.")?;
     if !keep {
-        clear_recovery(&app);
+        remove_all(&[Some(sheet), Some(meta), lock]);
         return Ok(None);
     }
-    let (sheet, _) = files.ok_or("No recovered sheet was found.")?;
+    let info: Option<Recovery> = std::fs::read_to_string(&meta).ok().and_then(|t| serde_json::from_str(&t).ok());
     let mut d = Doc::open(&sheet)?;
     d.path = info.and_then(|i| i.path).map(PathBuf::from);
     d.dirty = true;
     let mut a = st.lock();
     a.doc = d;
+    write_recovery(&app, &a);
+    remove_all(&[Some(sheet), Some(meta), lock]);
     Ok(Some(out(&a)))
 }
 
@@ -344,7 +405,7 @@ fn version() -> &'static str { env!("CARGO_PKG_VERSION") }
 
 #[tauri::command]
 fn quit(app: AppHandle) {
-    clear_recovery(&app);
+    leave(&app);
     app.exit(0);
 }
 
@@ -364,18 +425,21 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let opts: Options = options_file(app.handle()).and_then(|f| std::fs::read_to_string(f).ok()).and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default();
-            let mut a = App { doc: Doc::new(Sheet::new("Calc1")), opts };
+            let id = format!("{}-{}", std::process::id(), chrono::Local::now().format("%Y%m%d%H%M%S%3f"));
+            let lock = take_lock(app.handle(), &id);
+            let mut a = App { doc: Doc::new(Sheet::new("Calc1")), opts, id, _lock: lock };
             a.doc = Doc::new(fresh(&a, Sheet::new("Calc1")));
             app.manage(St(Mutex::new(a)));
             Ok(())
         })
         .on_window_event(|w, e| {
             if let WindowEvent::CloseRequested { api, .. } = e {
-                if w.state::<St>().lock().doc.dirty {
+                let dirty = w.state::<St>().lock().doc.dirty;
+                if dirty {
                     api.prevent_close();
                     let _ = w.emit("close-requested", ());
                 } else {
-                    clear_recovery(w.app_handle());
+                    leave(w.app_handle());
                 }
             }
         })

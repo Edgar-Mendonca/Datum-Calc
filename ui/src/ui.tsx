@@ -43,7 +43,7 @@ export const Toast = () => (
 );
 
 /** A modal dialog. `ok` returns false to keep it open. */
-export const Dialog = (p: { title: string; wide?: boolean; children: JSX.Element; ok?: () => boolean | void | Promise<boolean | void>; okText?: string; extra?: JSX.Element; cancel?: string; help?: string }) => {
+export const Dialog = (p: { title: string; wide?: boolean; children: JSX.Element; ok?: () => boolean | void | Promise<boolean | void>; okText?: string; extra?: JSX.Element; cancel?: string; help?: string; no?: () => void }) => {
   const done = async () => { if (!p.ok || (await p.ok()) !== false) closeDialog(); };
   const key = (e: KeyboardEvent) => {
     if (e.key === "Escape") { e.stopPropagation(); closeDialog(); }
@@ -56,7 +56,7 @@ export const Dialog = (p: { title: string; wide?: boolean; children: JSX.Element
       <div class="dlg" classList={{ wide: p.wide }} ref={el}>
         <header>{p.title}{p.help && <Help k={p.help} />}<button class="x" onClick={closeDialog}>×</button></header>
         <div class="bd">{p.children}</div>
-        <footer>{p.extra}<span class="grow" />{p.ok && <button class="btn pri" onClick={done}>{p.okText ?? "OK"}</button>}<button class="btn" onClick={closeDialog}>{p.cancel ?? (p.ok ? "Cancel" : "Close")}</button></footer>
+        <footer>{p.extra}<span class="grow" />{p.ok && <button class="btn pri" onClick={done}>{p.okText ?? "OK"}</button>}<button class="btn" onClick={() => { p.no?.(); closeDialog(); }}>{p.cancel ?? (p.ok ? "Cancel" : "Close")}</button></footer>
       </div>
     </div>
   );
