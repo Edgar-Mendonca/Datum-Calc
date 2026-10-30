@@ -3,8 +3,8 @@ import { For, Show, createSignal, createResource, onMount, JSX } from "solid-js"
 import { PrintPage, PAPERS } from "./print";
 import { RoadmapPage } from "./roadmap";
 import { Options, Out, PackCard } from "./api";
-import { backstage, setBackstage, call, loadOut, out, setOut, opts, setOpts, toast, setThemeRaw, applyTheme } from "./store";
-import { C } from "./cmds";
+import { backstage, setBackstage, call, out, setOut, opts, setOpts, toast, setThemeRaw, applyTheme } from "./store";
+import { C, keep } from "./cmds";
 import * as D from "./dialogs";
 import { Icon, Text, Pick, Check } from "./ui";
 import { listen, invoke } from "./api";
@@ -58,13 +58,13 @@ const Home = () => {
         <div class="tiles">
           <button class="tile" onClick={C.newSheet}><div class="pic"><svg class="ic"><use href="#i-new" /></svg></div><b>Blank Sheet</b><span>An empty calc sheet with your title block.</span></button>
           <button class="tile" onClick={() => setBackstage("new")}><div class="pic"><svg class="ic"><use href="#i-math" /></svg><small>{packs()?.length ?? ""} packs</small></div><b>New from Pack</b><span>Ready, referenced calc sheets: pumps, pipes, compressors, vessels, beams, bolts, motors.</span></button>
-          <button class="tile" onClick={C.open}><div class="pic"><svg class="ic"><use href="#i-open" /></svg></div><b>Open</b><span>A Datum Calc sheet (.dcalc) on this computer.</span></button>
+          <button class="tile" onClick={() => C.open()}><div class="pic"><svg class="ic"><use href="#i-open" /></svg></div><b>Open</b><span>A Datum Calc sheet (.dcalc) on this computer.</span></button>
           <button class="tile" onClick={() => C.pack("getting-started")}><div class="pic"><svg class="ic"><use href="#i-report" /></svg></div><b>Getting Started</b><span>A short sheet that shows how Datum Calc works, by example.</span></button>
           <button class="tile" onClick={() => setBackstage("roadmap")}><div class="pic"><svg class="ic"><use href="#i-list" /></svg></div><b>Roadmap</b><span>Everything Datum Calc will do, and when.</span></button>
         </div>
         <h2>Recent</h2>
         <table class="recent"><tbody>
-          <For each={recent() ?? []} fallback={<tr><td class="muted">Sheets you open or save appear here.</td></tr>}>{r => <tr class="f" onClick={() => loadOut("open", { path: r.path })}><td><b>{r.name}</b><div class="p">{r.path}</div></td><td class="p">{r.modified}</td></tr>}</For>
+          <For each={recent() ?? []} fallback={<tr><td class="muted">Sheets you open or save appear here.</td></tr>}>{r => <tr class="f" onClick={() => C.open(r.path)}><td><b>{r.name}</b><div class="p">{r.path}</div></td><td class="p">{r.modified}</td></tr>}</For>
         </tbody></table>
       </div>
       <UpdateCard />
@@ -76,7 +76,7 @@ const UpdateCard = () => {
   const [pct, setPct] = createSignal<number | null>(null);
   const [ver] = createResource(() => call<string>("version"));
   onMount(() => { listen("update-progress", (p: number) => setPct(p)); if (!update()) checkUpdate(true); });
-  const install = async () => { const u = update(); if (!u?.url) return; setPct(0); await call("install_update", { url: u.url, sums: u.sums }); setPct(null); };
+  const install = () => keep(async () => { const u = update(); if (!u?.url) return; setPct(0); await call("install_update", { url: u.url, sums: u.sums }); setPct(null); });
   return (
     <div class="card">
       <div class="brand"><img src="logo.svg" alt="" /><div><b>Datum Calc</b><span class="muted">Version {ver()}{opts().beta ? " · beta channel" : ""}</span></div></div>

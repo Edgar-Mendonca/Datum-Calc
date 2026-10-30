@@ -1,5 +1,5 @@
 //! Updates from GitHub Releases: compare versions, download the installer, check its
-//! SHA-256 against SHA256SUMS.txt, then run it silently and restart.
+//! SHA-256 against SHA256SUMS.txt, then run it silently and restart (the caller exits).
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::io::{Read, Write};
@@ -88,6 +88,8 @@ pub fn install(app: &AppHandle, url: &str, sums: Option<&str>) -> Result<(), Str
     if !cfg!(windows) {
         return Err("Automatic install is for Windows. Download the new version from the releases page.".into());
     }
+    // An installer is only run once its checksum has been compared.
+    let Some(sums) = sums else { return Err("This release has no checksums, so it was not installed. Download it from the releases page.".into()) };
     let name = url.rsplit('/').next().unwrap_or("DatumCalc-setup.exe").to_string();
     let dest = std::env::temp_dir().join(&name);
     let resp = agent().get(url).call().map_err(|e| format!("Download failed: {e}"))?;
@@ -108,20 +110,16 @@ pub fn install(app: &AppHandle, url: &str, sums: Option<&str>) -> Result<(), Str
         }
     }
     drop(file);
-    if let Some(s) = sums {
-        let fail = |e: String| format!("Could not fetch checksums: {e}");
-        let list = agent().get(s).call().map_err(|e| fail(e.to_string()))?.into_string().map_err(|e| fail(e.to_string()))?;
-        let want = list.lines().find(|l| l.trim_end().ends_with(&name)).and_then(|l| l.split_whitespace().next()).unwrap_or("");
-        let got: String = hash.finalize().iter().map(|b| format!("{b:02x}")).collect();
-        if !want.eq_ignore_ascii_case(&got) {
-            let _ = std::fs::remove_file(&dest);
-            return Err("The download did not match its checksum and was deleted. Try again.".into());
-        }
+    let fail = |e: String| format!("Could not fetch checksums: {e}");
+    let list = agent().get(sums).call().map_err(|e| fail(e.to_string()))?.into_string().map_err(|e| fail(e.to_string()))?;
+    let want = list.lines().find(|l| l.trim_end().ends_with(&name)).and_then(|l| l.split_whitespace().next()).unwrap_or("");
+    let got: String = hash.finalize().iter().map(|b| format!("{b:02x}")).collect();
+    if want.is_empty() || !want.eq_ignore_ascii_case(&got) {
+        let _ = std::fs::remove_file(&dest);
+        return Err("The download did not match its checksum and was deleted. Try again.".into());
     }
     let _ = app.emit("update-progress", 100u64);
-    launch(&dest)?;
-    app.exit(0);
-    Ok(())
+    launch(&dest)
 }
 
 /// Waits for this process to exit, installs silently, then starts the new version.

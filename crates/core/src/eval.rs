@@ -647,6 +647,21 @@ fn defined_name(t: &str) -> Option<String> {
     }
 }
 
+/// A complex number written out, such as 3 + 4j, -2j or (8 + 6j) Ω: an input, so its value is not repeated.
+fn complex_literal(n: &Node) -> bool {
+    fn lit(n: &Node, im: &mut bool) -> bool {
+        match &n.e {
+            E::Num(..) => true,
+            E::Im(..) => { *im = true; true }
+            E::Neg(x) | E::Group(x) | E::Unit(x, _) => lit(x, im),
+            E::Bin("+" | "-", a, b) => lit(a, im) && lit(b, im),
+            _ => false,
+        }
+    }
+    let mut im = false;
+    lit(n, &mut im) && im
+}
+
 /// `\\mathrm{j}` for j or i when the sheet has no name of that spelling.
 fn imag_unit(env: &Env, v: &str) -> Option<String> {
     matches!(v, "i" | "j").then_some(()).filter(|_| !env.vars.contains_key(v)).map(|_| format!("\\mathrm{{{v}}}"))
@@ -698,7 +713,7 @@ fn region(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>, subst: bo
             Stmt::Assign { name, e, .. } => {
                 o.name = canon(name);
                 let v = env.eval(e)?;
-                o.input = matches!(e.e, E::Num(..)) || matches!(&e.e, E::Neg(x) if matches!(x.e, E::Num(..)));
+                o.input = matches!(e.e, E::Num(..)) || matches!(&e.e, E::Neg(x) if matches!(x.e, E::Num(..))) || complex_literal(e);
                 if subst && !o.input { o.subst_tex = substituted(env, e, f); }
                 // An input keeps the unit it was typed in (8356 cm⁴ stays cm⁴), unless it belongs to the other unit system.
                 let typed = match &e.e { E::Num(_, Some(u)) | E::Unit(_, u) => Some(u.text.clone()), E::Im(_, x) => match &x.e { E::Num(_, Some(u)) => Some(u.text.clone()), _ => None }, E::Neg(x) => match &x.e { E::Num(_, Some(u)) => Some(u.text.clone()), _ => None }, _ => None };

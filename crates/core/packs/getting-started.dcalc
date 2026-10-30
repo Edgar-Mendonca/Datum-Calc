@@ -247,7 +247,7 @@
   {
    "id": 25,
    "kind": "text",
-   "text": "6. Print",
+   "text": "6. Torque and complex numbers",
    "unit": "",
    "style": "heading",
    "data": null
@@ -255,13 +255,69 @@
   {
    "id": 26,
    "kind": "text",
-   "text": "Fill in the title block (click it at the top of the page), then press Ctrl+P and choose Save as PDF. Lines styled as References print at the end.",
+   "text": "A force times a length shows as a torque in N·m; choose J in the unit menu for work or energy. For AC circuits, 4j is 4 times the imaginary unit j, and a unit after brackets applies to all of them.",
    "unit": "",
    "style": "",
    "data": null
   },
   {
    "id": 27,
+   "kind": "math",
+   "text": "T = 2.5 kN * 0.2 m  # a torque",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 28,
+   "kind": "math",
+   "text": "Z = (8 + 6j) Ω  # an impedance",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 29,
+   "kind": "math",
+   "text": "I = 230 V/Z  # a current phasor",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 30,
+   "kind": "math",
+   "text": "I_rms = abs(I)  # its magnitude; arg(I) is its angle",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 31,
+   "kind": "text",
+   "text": "View › Polar shows complex results as magnitude and angle instead: 23∠−36.87° A.",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 32,
+   "kind": "text",
+   "text": "7. Print",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 33,
+   "kind": "text",
+   "text": "Fill in the title block (click it at the top of the page), then press Ctrl+P and choose Save as PDF. Lines styled as References print at the end.",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 34,
    "kind": "text",
    "text": "Ref: the cubic x³ − 2x − 5 = 0 is the classic test equation of J. Wallis (root 2.0946).",
    "unit": "",
@@ -269,7 +325,7 @@
    "data": null
   }
  ],
- "next_id": 28,
+ "next_id": 35,
  "ui": {
   "pack": {
    "id": "getting-started",

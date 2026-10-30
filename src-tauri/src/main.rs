@@ -135,6 +135,15 @@ fn new_from_pack(st: State<St>, id: String) -> R<Out> {
     Ok(out(&a))
 }
 
+/// A saved file keeps its extension even when the name typed in the save box has none (`pump` → `pump.dcalc`),
+/// so Explorer still opens it with Datum Calc.
+fn with_ext(path: PathBuf, ext: &str) -> PathBuf {
+    if path.extension().is_some_and(|e| e.eq_ignore_ascii_case(ext)) { return path; }
+    let mut p = path.into_os_string();
+    p.push(format!(".{ext}"));
+    PathBuf::from(p)
+}
+
 fn pick(app: &AppHandle, name: &str, exts: &[&str]) -> Option<PathBuf> {
     app.dialog().file().add_filter(name, exts).blocking_pick_file().and_then(|f| f.into_path().ok())
 }
@@ -158,7 +167,7 @@ async fn save(app: AppHandle, st: State<'_, St>, as_new: bool) -> R<Option<Out>>
     let path = match known {
         Some(p) => p,
         None => match app.dialog().file().add_filter("Datum Calc", &["dcalc"]).set_file_name(format!("{name}.dcalc")).blocking_save_file() {
-            Some(f) => f.into_path().map_err(|e| e.to_string())?,
+            Some(f) => with_ext(f.into_path().map_err(|e| e.to_string())?, "dcalc"),
             None => return Ok(None),
         },
     };
@@ -176,7 +185,7 @@ async fn save(app: AppHandle, st: State<'_, St>, as_new: bool) -> R<Option<Out>>
 #[tauri::command]
 async fn save_file(app: AppHandle, name: String, data: String) -> R<Option<String>> {
     let ext = name.rsplit('.').next().unwrap_or("txt").to_string();
-    let Some(path) = app.dialog().file().add_filter(ext.to_uppercase(), &[&ext]).set_file_name(&name).blocking_save_file().and_then(|f| f.into_path().ok()) else { return Ok(None) };
+    let Some(path) = app.dialog().file().add_filter(ext.to_uppercase(), &[&ext]).set_file_name(&name).blocking_save_file().and_then(|f| f.into_path().ok()).map(|p| with_ext(p, &ext)) else { return Ok(None) };
     let bytes = match data.strip_prefix("data:").and_then(|d| d.split_once(";base64,")) {
         Some((_, b64)) => base64_decode(b64)?,
         None => data.into_bytes(),
@@ -417,7 +426,13 @@ async fn check_update(st: State<'_, St>) -> R<update::Info> {
 
 #[tauri::command]
 async fn install_update(app: AppHandle, url: String, sums: Option<String>) -> R<()> {
-    tauri::async_runtime::spawn_blocking(move || update::install(&app, &url, sums.as_deref())).await.map_err(|e| e.to_string())?
+    let a2 = app.clone();
+    tauri::async_runtime::spawn_blocking(move || update::install(&a2, &url, sums.as_deref())).await.map_err(|e| e.to_string())??;
+    // The installer waits for this window to close. Unsaved work goes into a recovery copy first, so the
+    // new version offers it at its first start.
+    write_recovery(&app, &app.state::<St>().lock());
+    app.exit(0);
+    Ok(())
 }
 
 fn main() {
@@ -449,4 +464,17 @@ fn main() {
         ])
         .run(tauri::generate_context!())
         .expect("Datum Calc failed to start");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn saved_files_keep_their_extension() {
+        assert_eq!(with_ext("calcs/pump".into(), "dcalc"), PathBuf::from("calcs/pump.dcalc"));
+        assert_eq!(with_ext("calcs/pump.DCALC".into(), "dcalc"), PathBuf::from("calcs/pump.DCALC"));
+        assert_eq!(with_ext("calcs/rev 1.2".into(), "dcalc"), PathBuf::from("calcs/rev 1.2.dcalc"), "a dot in the name is not an extension to replace");
+        assert_eq!(with_ext("out/results".into(), "csv"), PathBuf::from("out/results.csv"));
+    }
 }

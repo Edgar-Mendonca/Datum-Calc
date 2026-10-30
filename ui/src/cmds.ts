@@ -5,6 +5,8 @@ import * as D from "./dialogs";
 import { outs, ratio } from "./calc";
 
 const GH = "https://github.com/Edgar-Mendonca/Datum-Calc";
+/** Runs `then` once unsaved changes are saved or let go: New, Open, a pack or an update replaces the sheet. */
+export const keep = (then: () => void) => out()?.dirty ? D.confirmClose(then) : then();
 /** Where a new region goes: below the selected one, or at the end. */
 const below = () => { const i = out()?.sheet.regions.findIndex(r => r.id === selId()) ?? -1; return i >= 0 ? i + 1 : out()?.sheet.regions.length ?? 0; };
 const STARTER: Record<Kind, string> = { math: "", text: "", check: "check ", solve: "solve x^2 = 2 for x in 0 .. 10", plot: "plot sin(x), cos(x) for x in 0 .. 2*pi", table: "", image: "" };
@@ -63,9 +65,9 @@ export const C = {
   undo: async () => setOut(await call<Out>("history", { redo: false })),
   redo: async () => setOut(await call<Out>("history", { redo: true })),
   save: async (asNew = false) => { const o = await call<Out | null>("save", { asNew }); if (o) { setOut(o); toast("Saved.", true); } },
-  open: () => loadOut("open", { path: null }),
-  newSheet: () => loadOut("new_sheet"),
-  pack: (id: string) => loadOut("new_from_pack", { id }),
+  open: (path: string | null = null) => keep(() => loadOut("open", { path })),
+  newSheet: () => keep(() => loadOut("new_sheet")),
+  pack: (id: string) => keep(() => loadOut("new_from_pack", { id })),
   /** The selected region's result ("19.61 kW"), to paste into a spreadsheet or a report. */
   copyResult: async () => {
     const o = outs().get(selId());
@@ -105,7 +107,7 @@ export const ALL_CMDS: [string, () => void, string?][] = [
   ["Insert math region", () => C.insert("math"), "Ctrl+M"], ["Insert text region", () => C.insert("text"), "Ctrl+T"], ["Insert check", () => C.insert("check")], ["Insert table", () => C.insert("table")], ["Insert picture", () => C.picture()], ["Units list", () => D.unitsList()], ["Functions and constants", () => D.unitsList("functions")], ["Insert solve", () => C.insert("solve")], ["Insert plot", () => C.insert("plot")],
   ["Delete region", C.del, "Delete"], ["Duplicate region", C.duplicate, "Ctrl+D"], ["Insert above", C.insertAbove, "Ctrl+Shift+M"], ["3 significant figures", () => C.figures(3)], ["4 significant figures", () => C.figures(4)], ["5 significant figures", () => C.figures(5)], ["Move region up", () => C.move(true), "Alt+↑"], ["Move region down", () => C.move(false), "Alt+↓"],
   ["Copy", C.copy, "Ctrl+C"], ["Copy result", C.copyResult], ["Copy as LaTeX", C.copyLatex], ["Export CSV (inputs and results)", C.csv], ["Show numbers in equations", () => act({ SheetSet: { field: "subst", value: !out()?.sheet.subst } })], ["Polar form for complex values", () => act({ SheetSet: { field: "polar", value: !out()?.sheet.polar } })], ["New from pack", () => C.file("new")], ["Paste", () => C.paste(), "Ctrl+V"], ["Undo", C.undo, "Ctrl+Z"], ["Redo", C.redo, "Ctrl+Y"],
-  ["Save", () => C.save(), "Ctrl+S"], ["Save as", () => C.save(true)], ["Open", C.open, "Ctrl+O"], ["New sheet", C.newSheet, "Ctrl+N"], ["Print / PDF", C.print, "Ctrl+P"],
+  ["Save", () => C.save(), "Ctrl+S"], ["Save as", () => C.save(true)], ["Open", () => C.open(), "Ctrl+O"], ["New sheet", C.newSheet, "Ctrl+N"], ["Print / PDF", C.print, "Ctrl+P"],
   ["Title block", () => D.titleBlock()], ["SI units", () => C.units("SI")], ["US units", () => C.units("US")],
   ["Zoom in", C.zoomIn], ["Zoom out", C.zoomOut], ["Options", C.options], ["Check for updates", () => C.file("about")], ["Roadmap", () => C.file("roadmap")],
   ["Keyboard shortcuts", () => D.shortcuts(), "F1"], ["Getting started sheet", () => C.pack("getting-started")], ["Getting started summary", () => D.gettingStarted()], ["Glossary", () => D.glossary()],

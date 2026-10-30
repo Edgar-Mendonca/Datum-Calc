@@ -68,7 +68,7 @@ const App = () => {
     const typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
     if ((ctrl && k === "k") || (e.altKey && k === "q")) { e.preventDefault(); palette(); }
     else if (ctrl && k === "s") { e.preventDefault(); C.save(e.shiftKey); }
-    else if (ctrl && k === "o") { e.preventDefault(); C.open(); }
+    else if (ctrl && k === "o") { e.preventDefault(); C.open(null); }
     else if (ctrl && k === "n") { e.preventDefault(); setBackstage("home"); }
     else if (ctrl && k === "p") { e.preventDefault(); C.print(); }
     else if (ctrl && e.shiftKey && k === "m" && out()) { e.preventDefault(); C.insertAbove(); }

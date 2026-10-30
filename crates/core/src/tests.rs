@@ -503,6 +503,10 @@ mod packs {
         assert!(close(v(&e, "r"), 2.094_551_48, 1e-7));
         assert!(close(v(&e, "H_75"), 37.5, 1e-9));
         assert_eq!(o.regions.iter().find(|r| r.name == "dT").unwrap().result, "15 K");
+        // T = 2.5 kN × 0.2 m = 500 N·m; I = 230/(8 + 6j) = 230 (8 − 6j)/100 = 18.4 − 13.8j A; |I| = 23 A.
+        assert_eq!(o.regions.iter().find(|r| r.name == "T").unwrap().result, "500 N·m");
+        assert_eq!(o.regions.iter().find(|r| r.name == "I").unwrap().result, "(18.4 − 13.8j) A");
+        assert!(close(v(&e, "I_rms"), 23.0, 1e-12));
         assert!(checks(&o)[0].0);
     }
 

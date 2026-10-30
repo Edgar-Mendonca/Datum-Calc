@@ -261,6 +261,25 @@ const check = (name, ok, info = "") => { console.log(`${ok ? "ok  " : "FAIL"} ${
     await p4.close();
   }
 
+  // 15. Unsaved changes: New, a pack, Open and a recent sheet ask first; Cancel keeps the sheet, Don't save goes on (0.1.10).
+  const p5 = await b.newPage({ viewport: { width: 1440, height: 900 } });
+  p5.on("pageerror", e => errors.push(String(e)));
+  const dirty = { ...fix.state, dirty: true };
+  await p5.addInitScript(st => { window.__calls = []; window.__TAURI__ = { core: { invoke: async (c, a) => { window.__calls.push([c, a]); return c === "state" ? st : c === "options" ? { theme: "light", autosave: 0, units: "SI", digits: 4, paper: "A4", number: "auto" } : c === "recent" ? [{ path: "C:/calcs/old.dcalc", name: "old", modified: "29-Oct-26 09:00" }] : c === "packs" ? [{ id: "pump-power", name: "Pump power", field: "Rotating equipment", desc: "", checks: 1, regions: 9 }] : null; } }, event: { listen: async () => () => {} } }; }, dirty);
+  await p5.goto(url); await p5.waitForTimeout(600);
+  const replaced = () => p5.evaluate(() => window.__calls.filter(c => ["new_sheet", "new_from_pack", "open"].includes(c[0])).length);
+  await p5.click(".tiles .tile:has-text('Blank Sheet')"); await p5.waitForTimeout(150);
+  check("New with unsaved changes asks to save first", (await p5.textContent(".dlg"))?.includes("Save changes?") && (await replaced()) === 0);
+  await p5.click(".dlg footer .btn:text-is('Cancel')"); await p5.waitForTimeout(100);
+  check("Cancel keeps the sheet", (await p5.$$(".dlg")).length === 0 && (await replaced()) === 0);
+  await p5.click(".bs table tr.f"); await p5.waitForTimeout(150);
+  await p5.click(".dlg footer .btn:text-is(\"Don't save\")"); await p5.waitForTimeout(150);
+  check("a recent sheet opens after Don't save", JSON.stringify(await p5.evaluate(() => window.__calls.filter(c => c[0] === "open").pop())).includes("old.dcalc"));
+  await p5.click(".bs aside button:has-text('New')"); await p5.waitForTimeout(150);
+  await p5.click(".tiles.packs .tile"); await p5.waitForTimeout(150);
+  check("a pack asks too", (await p5.textContent(".dlg"))?.includes("Save changes?"));
+  await p5.close();
+
   check("no script errors", errors.length === 0, errors.join(" | "));
   await b.close(); srv.close();
   console.log(failed ? `${failed} failed` : "all passed");
