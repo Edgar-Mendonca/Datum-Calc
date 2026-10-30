@@ -35,7 +35,7 @@ const check = (name, ok, info = "") => { console.log(`${ok ? "ok  " : "FAIL"} ${
   check("File page offers a blank sheet", (await p.textContent(".tiles")).includes("Blank Sheet"));
   // 1b. File › New lists the ten calc packs by field; a click opens one (0.1.3).
   await p.click(".bs aside button:has-text('New')"); await p.waitForTimeout(200);
-  check("New lists the sixteen calc packs", (await p.$$(".tiles.packs .tile")).length === 16 && (await p.$$eval("h3.packf", h => h.map(x => x.textContent))).join() === "Rotating equipment,Process,Mechanical,Electrical");
+  check("New lists the seventeen calc packs", (await p.$$(".tiles.packs .tile")).length === 17 && (await p.$$eval("h3.packf", h => h.map(x => x.textContent))).join() === "Rotating equipment,Process,Mechanical,Electrical");
   await p.click(".tiles.packs .tile:has-text('Pump power')"); await p.waitForTimeout(200);
   check("a pack tile opens that pack", JSON.stringify(await p.evaluate(() => window.__calls.filter(c => c[0] === "new_from_pack").pop())).includes("pump-power"));
   await p.click(".tabs .file").catch(() => {}); await p.waitForTimeout(100);
@@ -234,6 +234,20 @@ const check = (name, ok, info = "") => { console.log(`${ok ? "ok  " : "FAIL"} ${
   await p2.keyboard.press("Control+p"); await p2.waitForTimeout(500);
   check("the print summary lists the checks first", (await p2.textContent(".pprev .psum")).includes("Summary of checks"));
   await p2.close();
+
+  // 13. Complex values in polar form, with their numbers, draw without a KaTeX error; View › Polar turns it off (0.1.8).
+  const p3 = await b.newPage({ viewport: { width: 1440, height: 900 } });
+  p3.on("pageerror", e => errors.push(String(e)));
+  await p3.addInitScript(st => { window.__calls = []; window.__TAURI__ = { core: { invoke: async (c, a) => { window.__calls.push([c, a]); return c === "state" || c === "apply" ? st : c === "options" ? { theme: "light", autosave: 0, units: "SI", digits: 4, paper: "A4", number: "auto" } : c === "recent" || c === "packs" ? [] : null; } }, event: { listen: async () => () => {} } }; }, fix.ac);
+  await p3.goto(url); await p3.waitForTimeout(500); await p3.click(".bs aside .back"); await p3.waitForTimeout(400);
+  const acText = await p3.textContent(".cpage");
+  check("complex results draw in polar form", acText.includes("∠") && (await p3.$$(".cpage .katex-error")).length === 0 && (await p3.$$(".cpage .region .katex")).length > 20, String((await p3.$$(".cpage .katex-error")).length));
+  check("the AC pack passes both checks", (await p3.$$(".cpage .badge.pass")).length === 2, String((await p3.$$(".cpage .badge.pass")).length));
+  await p3.click(".tabs > button:text-is('View')"); await p3.waitForTimeout(100);
+  await p3.click(".ribbon button:has-text('Polar')"); await p3.waitForTimeout(120);
+  const acApply = await p3.evaluate(() => JSON.stringify(window.__calls.filter(c => c[0] === "apply").pop() ?? null));
+  check("View › Polar turns polar form off", acApply.includes('"field":"polar"') && acApply.includes('"value":false'), acApply);
+  await p3.close();
 
   check("no script errors", errors.length === 0, errors.join(" | "));
   await b.close(); srv.close();

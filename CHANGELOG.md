@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.1.8 — 2026-10-30
+
+What visitors asked for: complex numbers for AC circuits, and torque in N·m.
+
+**Complex numbers**
+- Type 4j (or 4i) for an imaginary number, and j (or i) on its own for the imaginary unit: Z = R + j*omega*L. A name on the sheet called j or i takes their place; 4j stays imaginary.
+- A unit after brackets applies to all of them: Z = (8 + 9.42j) Ω.
+- +, −, ×, ÷ and powers work on complex values, as do sqrt, exp, ln, abs (the magnitude), sum and mean. New functions: re, im, arg (the angle), conj and polar(r, θ).
+- Results show as (3 + 4j) Ω, or as magnitude and angle (5∠53.13° Ω) with View › Polar, saved with the sheet. Equations with their numbers show the complex values too.
+- Checks, comparisons, solve, plots, ranges and tables work on real values and say so: compare abs(I), plot abs(Z) or arg(Z).
+- New calc pack (17 in all): AC circuit, an R–L load with a capacitor in parallel for power-factor correction, with its impedance, current phasor, complex power and power factor checked against a hand calculation.
+
+**Torque**
+- A force times a length shows in N·m (lbf·ft in US units), and so does a power over a speed: 120 N × 0.35 m = 42 N·m, not 42 J. A power times a time still shows in J.
+- N·m, kN·m, N·mm, MN·m, lbf·ft, lbf·in and kip·ft are in the unit menu of every torque and energy result.
+
+**Checks**
+- 52 engine tests (three new ones for complex numbers, torque and the AC pack, with the hand values first), 80 UI tests. The random-sheet test now also writes complex numbers and units after brackets; 24,000 more random sheets came through without a fault.
+
 ## 0.1.7 — 2026-10-29
 
 - Windows now lists the publisher as Datum.

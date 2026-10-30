@@ -162,13 +162,15 @@ fn evaluation_speed_gate() {
 fn random_expr(r: &mut Rng, depth: u32) -> String {
     const UNITS: [&str; 14] = ["m", "mm", "kg", "s", "N", "kN*m", "m^3/h", "MPa", "°C", "°F", "K", "rpm", "W/(m^2*K)", "%"];
     const NUMS: [&str; 10] = ["0", "1", "2.5", "-3", "1e-9", "1e9", "1e300", "1e-300", "0.0001", "42"];
-    const FUNCS: [&str; 16] = ["sqrt", "sin", "cos", "ln", "log", "exp", "abs", "min", "max", "round", "sum", "mean", "len", "if", "hypot", "f"];
+    const FUNCS: [&str; 21] = ["sqrt", "sin", "cos", "ln", "log", "exp", "abs", "min", "max", "round", "sum", "mean", "len", "if", "hypot", "f", "re", "im", "arg", "conj", "polar"];
+    // Complex values and units after brackets (0.1.8).
+    const CX: [&str; 9] = ["4j", "-2.5j V", "(1 + 2j) Ω", "j", "1e300j", "(a) m", "0j", "2i kN*m", "(b - 1j) mA"];
     if depth == 0 || r.below(4) == 0 {
-        return match r.below(4) { 0 => NUMS[r.below(10)].into(), 1 => format!("{} {}", NUMS[r.below(10)], UNITS[r.below(14)]), 2 => ["a", "b", "v", "g", "pi", "zz"][r.below(6)].into(), _ => format!("({})", random_expr(r, depth.saturating_sub(1))) };
+        return match r.below(5) { 4 => CX[r.below(9)].into(), 0 => NUMS[r.below(10)].into(), 1 => format!("{} {}", NUMS[r.below(10)], UNITS[r.below(14)]), 2 => ["a", "b", "v", "g", "pi", "zz"][r.below(6)].into(), _ => format!("({})", random_expr(r, depth.saturating_sub(1))) };
     }
     match r.below(4) {
         0 | 1 => format!("{} {} {}", random_expr(r, depth - 1), ["+", "-", "*", "/", "^", "<=", ">"][r.below(7)], random_expr(r, depth - 1)),
-        2 => { let f = FUNCS[r.below(16)]; let n = if f == "if" { 3 } else if matches!(f, "min" | "max" | "round" | "hypot") { 2 } else { 1 }; format!("{f}({})", (0..n).map(|_| random_expr(r, depth - 1)).collect::<Vec<_>>().join(", ")) }
+        2 => { let f = FUNCS[r.below(21)]; let n = if f == "if" { 3 } else if matches!(f, "min" | "max" | "round" | "hypot" | "polar") { 2 } else { 1 }; format!("{f}({})", (0..n).map(|_| random_expr(r, depth - 1)).collect::<Vec<_>>().join(", ")) }
         _ => format!("-{}", random_expr(r, depth - 1)),
     }
 }
@@ -202,7 +204,7 @@ fn random_expressions_never_panic() {
             push(kind, text, json!(null));
         }
         for us in [false, true] {
-            let o = crate::eval::run_with(&s, &crate::eval::Fmt { digits: [2, 4, 10][round % 3], eng: round % 7 == 0, us });
+            let o = crate::eval::run_with(&s, &crate::eval::Fmt { digits: [2, 4, 10][round % 3], eng: round % 7 == 0, us, polar: round % 5 == 0 });
             assert_eq!(o.regions.len(), s.regions.len());
             for g in &o.regions {
                 assert!(g.result.len() < 2000 && g.latex.len() < 20_000, "{}", g.latex);

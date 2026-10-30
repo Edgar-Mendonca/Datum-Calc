@@ -425,7 +425,7 @@ fn whole_sheet_pump_power() {
     assert_eq!(o.vars.len(), 6);
     assert_eq!(o.vars[4].name, "P");
     assert_eq!(o.errors, 0);
-    let f = Fmt { digits: 3, eng: false, us: true };
+    let f = Fmt { digits: 3, eng: false, us: true, polar: false };
     let o = eval::run_with(&s, &f);
     assert_eq!(o.regions[5].result, "26.3 hp");
 }
@@ -479,7 +479,7 @@ mod packs {
 
     fn run(id: &str) -> (eval::SheetOut, eval::Env) {
         let s = crate::packs::sheet(id).unwrap_or_else(|| panic!("{id} does not open"));
-        let r = eval::run_env(&s, &Fmt { digits: 4, eng: false, us: false });
+        let r = eval::run_env(&s, &Fmt { digits: 4, eng: false, us: false, polar: false });
         let errs: Vec<String> = r.0.regions.iter().filter_map(|o| o.error.as_ref().map(|e| format!("region {}: {}", o.id, e.msg))).collect();
         assert!(errs.is_empty(), "{id}: {errs:?}");
         assert!(r.0.regions.iter().all(|o| o.warn.is_empty()), "{id}: a unit cannot show its value");
@@ -491,7 +491,7 @@ mod packs {
     #[test]
     fn all_packs_open_and_list() {
         let cards = crate::packs::cards();
-        assert_eq!(cards.len(), 16);
+        assert_eq!(cards.len(), 17);
         for c in &cards { assert!(!c.name.is_empty() && !c.desc.is_empty() && !c.field.is_empty() && c.checks > 0, "{}", c.id); }
     }
 
@@ -576,6 +576,29 @@ mod packs {
         assert!(o.regions.iter().any(|r| r.result == "0.9492 %"));
         assert!(o.regions.iter().any(|r| r.result == "PASS (0.9492 % ≤ 3 %)"), "a check reads in the unit its name is shown in");
         assert!(checks(&o)[0].0 && close(checks(&o)[0].1, 0.316_405, 1e-5));
+    }
+
+    #[test]
+    fn ac_circuit() {
+        // ω = 100π = 314.16 rad/s; Z_L = 8 + 9.4248j Ω; I_L = 230/Z_L = 12.040 − 14.184j A, |I_L| = 18.605 A; PF_L = 8/|Z_L| = 0.64713;
+        // Z_C = −21.2207j Ω; Y = 1/Z_L + jωC = 0.052347 − 0.014546j S; I = 230 Y = 12.0398 − 3.34556j A, |I| = 12.4960 A, ∠ −15.529°;
+        // S = V I* = 2769.15 + 769.48j VA; PF = 2769.15/2873.98 = 0.96349.
+        let (o, e) = run("ac-circuit");
+        let z = |n: &str| { let x = e.vars.get(&eval::canon(n)).unwrap(); (x.v[0], x.im.first().copied().unwrap_or(0.0)) };
+        assert!(close(z("I").0, 12.039_801_5, 1e-8) && close(z("I").1, -3.345_562_35, 1e-8));
+        assert!(close(z("S").0, 2_769.154_35, 1e-8) && close(z("S").1, 769.479_34, 1e-8));
+        assert!(close(v(&e, "I_L_rms"), 18.604_953_5, 1e-8));
+        assert!(close(v(&e, "PF_L"), 0.647_128_8, 1e-6));
+        assert!(close(v(&e, "I_rms"), 12.495_983_7, 1e-8));
+        assert!(close(v(&e, "phi").to_degrees(), -15.529_293, 1e-6));
+        assert!(close(v(&e, "PF"), 0.963_493_7, 1e-7));
+        for (want, why) in [("(8 + 9.425j) Ω", "rectangular with its unit"), ("(12.04 − 3.346j) A", "the supply current"), ("-21.22j Ω", "pure imaginary, no brackets"), ("314.2 rad/s", "ω in its unit"), ("2.769 kW", "real power")] {
+            assert!(o.regions.iter().any(|r| r.result == want), "{why}: {want}");
+        }
+        assert!(checks(&o).iter().all(|c| c.0));
+        let mut s = crate::packs::sheet("ac-circuit").unwrap();
+        s.polar = true;
+        assert!(eval::run(&s).regions.iter().any(|r| r.result == "12.5∠-15.53° A"), "polar form");
     }
 
     #[test]
@@ -715,4 +738,73 @@ fn equations_with_numbers_substituted() {
     assert_eq!(eval::run(&s).regions[3].subst_tex, "483.9\\,\\mathrm{N\\cdot m} \\cdot 2", "a value is put in with the unit it is shown in");
     let s2 = Sheet { subst: true, ..Default::default() };
     assert!(Sheet::from_json(&s2.json()).unwrap().subst, "the setting is saved with the sheet");
+}
+
+#[test]
+fn torque_reads_in_newton_metres() {
+    // Issue 2: 120 N × 0.35 m = 42 N·m, not 42 J; w L²/8 = 12 kN/m × 36 m²/8 = 54 kN·m; P/n = 75 kW/(1480 × 2π/60 s⁻¹) = 483.9 N·m.
+    assert_eq!(result(&["F = 120 N", "d = 0.35 m", "T = F*d"]), "42 N·m");
+    assert_eq!(result(&["F = 120 N", "d = 0.35 m", "T = F*d/2 + 1 N*m"]), "22 N·m", "a moment keeps its reading through plain factors and sums");
+    assert_eq!(result(&["M = 12 kN/m * (6 m)^2/8"]), "54 kN·m");
+    assert_eq!(result(&["T = 75 kW/(1480 rpm)"]), "483.9 N·m");
+    assert_eq!(result(&["F = 20 N", "T = F*2 mm"]), "40 N·mm");
+    assert_eq!(result(&["E = 2 kW * 3 h"]), "21.6 MJ", "a power times a time is an energy");
+    let mut s = sheet(&["F = 100 lbf", "T = F*3 ft"]);
+    s.units = "US".into();
+    assert_eq!(eval::run(&s).regions[1].result, "300 lbf·ft");
+    let o = run(&["F = 120 N", "d = 0.35 m", "T = F*d", "E = 2 kW * 3 h"]);
+    assert_eq!(o.regions[2].units[..3], ["N·m", "kN·m", "N·mm"], "torque units first for a moment");
+    assert!(o.regions[3].units.contains(&"N·m".to_string()) && o.regions[3].units[0] == "J", "and offered for any energy");
+    let mut s = sheet(&["T = 120 N * 0.35 m"]);
+    s.regions[0].unit = "kN·m".into();
+    assert_eq!(eval::run(&s).regions[0].result, "0.042 kN·m");
+}
+
+#[test]
+fn complex_numbers() {
+    // Issue 1. (3 + 4j)(1 − 2j) = 3 − 6j + 4j + 8 = 11 − 2j; (3 + 4j)/(1 − 2j) = (3 + 4j)(1 + 2j)/5 = (−5 + 10j)/5 = −1 + 2j.
+    assert_eq!(result(&["z = 3 + 4j", "z*(1 - 2j)"]), "11 − 2j");
+    assert_eq!(result(&["z = 3 + 4j", "z/(1 - 2j)"]), "-1 + 2j");
+    assert_eq!(result(&["j*j"]), "-1", "j² is real");
+    assert_eq!(result(&["i^2"]), "-1", "i is the same unit");
+    assert_eq!(result(&["exp(j*pi) + 1"]), "0", "Euler's identity, the round-off tidied");
+    assert_eq!(result(&["z = 3 + 4j", "abs(z)"]), "5");
+    assert_eq!(result(&["z = 3 + 4j", "arg(z)"]), "53.13°");
+    assert_eq!(result(&["z = 3 + 4j", "conj(z)"]), "3 − 4j");
+    assert_eq!(result(&["z = 3 + 4j", "re(z) + im(z)"]), "7");
+    assert_eq!(result(&["sqrt(-3 - 4j)"]), "1 − 2j", "principal root");
+    assert_eq!(result(&["z = 3 + 4j", "z^2"]), "-7 + 24j");
+    assert_eq!(result(&["z = 3 + 4j", "ln(z)"]), "1.609 + 0.9273j");
+    assert_eq!(result(&["polar(2, 90 deg)"]), "2j");
+    assert_eq!(result(&["Z = (3 + 4j) kΩ"]), "(3 + 4j) kΩ", "a unit after brackets, kept as typed");
+    assert_eq!(result(&["V = 10 V", "Z = (3 + 4j) kΩ", "I = V/Z"]), "(1.2 − 1.6j) mA");
+    assert_eq!(result(&["X = 5j mA"]), "5j mA");
+    assert_eq!(result(&["x = 1, 2 .. 3", "x*(1 + 1j)"]), "[1 + 1j, 2 + 2j, 3 + 3j]");
+    assert_eq!(result(&["x = 1, 2 .. 3", "sum(x*1j)"]), "6j");
+    assert_eq!(result(&["j = 3", "2*j + 4j"]), "6 + 4j", "a name on the sheet takes j's place; 4j stays imaginary");
+    // Real-only places say so.
+    for (lines, msg) in [
+        (&["z = 3 + 4j", "check z <= 5"][..], "A check needs a real value"),
+        (&["z = 3 + 4j", "z < 5"][..], "Complex values cannot be compared"),
+        (&["z = 3 + 4j", "sin(z)"][..], "sin needs real values"),
+        (&["x = 0 .. 1j"][..], "A range needs a real value"),
+        (&["3 + 4j Ω"][..], "Cannot add a pure number and"),
+        (&["z = 1j", "z/(0j)"][..], "Division by zero"),
+        (&["(2 + 1j) m ^ (1j)"][..], "A complex power needs a plain number"),
+    ] { assert!(error(lines).starts_with(msg), "{lines:?}: {}", error(lines)); }
+    let o = run(&["z = 1j", "plot z*x for x in 0 .. 1", "solve z*x = 1 for x in 0 .. 2"]);
+    assert!(o.regions[1].error.as_ref().unwrap().msg.starts_with("A plot shows real values"));
+    assert!(o.regions[2].error.as_ref().unwrap().msg.starts_with("solve needs a real value"));
+    // Polar form, and the substituted line brackets a complex value.
+    let mut s = sheet(&["Z = (3 + 4j) Ω", "I = 10 V/Z"]);
+    s.polar = true;
+    s.subst = true;
+    let o = eval::run(&s);
+    assert_eq!(o.regions[0].result, "5∠53.13° Ω");
+    assert_eq!(o.regions[1].result, "2∠-53.13° A");
+    s.polar = false;
+    let o = eval::run(&s);
+    assert_eq!(o.regions[1].subst_tex, "\\frac{10\\,\\mathrm{V}}{\\left(3 + 4\\,\\mathrm{j}\\right)\\,\\mathrm{\\Omega }}");
+    assert_eq!(o.regions[0].latex, "Z = \\left(3 + 4\\,\\mathrm{j}\\right)\\,\\mathrm{\\Omega }");
+    assert!(!crate::sheet::Sheet::from_json(&serde_json::to_string(&s).unwrap()).unwrap().polar);
 }

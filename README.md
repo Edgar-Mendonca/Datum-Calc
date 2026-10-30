@@ -29,15 +29,15 @@
 Datum Calc is a desktop app for engineering calculation sheets. You write the calculation top to bottom, as on paper: an equation per line with its units, text for headings and references, and checks against your limits. It prints as a clean calc sheet with a title block and page numbers, ready to hand in.
 
 1. **Write the equations.** `Q = 120 m^3/h`, `H = 45 m`, `P = rho*g*Q*H/eta`. Greek letters and subscripts are typed simply (`sigma_allow`).
-2. **Check the results.** Every answer carries its unit, and `check sigma <= sigma_allow` shows PASS or FAIL with the utilisation ratio.
+2. **Check the results.** Every answer carries its unit (a torque in N·m, an AC current as a complex phasor such as (12.04 − 3.346j) A), and `check sigma <= sigma_allow` shows PASS or FAIL with the utilisation ratio.
 3. **Show the numbers.** View › Numbers repeats each equation with its values put in, as on a hand calculation.
 4. **Print the calc sheet.** Fill in the title block (project, calc number, by, checked, date, revision) and save a PDF.
 
-**Sixteen calc packs** start you off (File › New from pack), each with its inputs at the top, its results and checks below and its references at the end, and each checked against a hand calculation in the tests:
+**Seventeen calc packs** start you off (File › New from pack), each with its inputs at the top, its results and checks below and its references at the end, and each checked against a hand calculation in the tests:
 
 | Rotating equipment | Process | Mechanical | Electrical |
 | --- | --- | --- | --- |
-| Pump power, efficiency and motor size · NPSH available against required · Pump curve against system curve (operating point) · Compressor polytropic head and power · Shaft torsion | Pipe pressure drop (Darcy–Weisbach, Colebrook) · Heat exchanger duty and LMTD · Tank volume and fill time · Pipe wall thickness | Thin-walled pressure vessel · Beams: deflection and bending stress · Bolt preload and tightening torque · Thermal expansion of a pipe · Column buckling (Euler) | Electric motor: current, power factor and starting current · Cable voltage drop |
+| Pump power, efficiency and motor size · NPSH available against required · Pump curve against system curve (operating point) · Compressor polytropic head and power · Shaft torsion | Pipe pressure drop (Darcy–Weisbach, Colebrook) · Heat exchanger duty and LMTD · Tank volume and fill time · Pipe wall thickness | Thin-walled pressure vessel · Beams: deflection and bending stress · Bolt preload and tightening torque · Thermal expansion of a pipe · Column buckling (Euler) | Electric motor: current, power factor and starting current · Cable voltage drop · AC circuit: impedance, current and power factor |
 
 <table><tr>
 <td width="50%"><img src="docs/images/print.png" alt="The printed calc sheet with its title block"><br><sub>The printed calc sheet: title block, maths, results, PASS/FAIL checks, page numbers.</sub></td>
@@ -50,8 +50,8 @@ It is for mechanical, process, structural and electrical engineers, students and
 
 | Version | What |
 | --- | --- |
-| 0.1.0 – 0.1.7 ✅ | The calc sheet and its printing with a summary of checks; units, equations, checks, solve and plot; tables and pictures; sixteen calc packs; equations with their numbers; a Getting Started sheet; hardening |
-| 0.1.8 | Fixes from trying every pack on a clean Windows PC and from the convention |
+| 0.1.0 – 0.1.8 ✅ | The calc sheet and its printing with a summary of checks; units, equations, checks, solve and plot; tables and pictures; seventeen calc packs; equations with their numbers; complex numbers for AC circuits; a Getting Started sheet; hardening |
+| 0.1.9 | Fixes from trying every pack on a clean Windows PC and from the convention |
 | 0.2 | Materials from Datum Atlas, more packs |
 | 0.3 – 1.0 | Matrices and ODEs, templates, a validation report, a signed installer |
 

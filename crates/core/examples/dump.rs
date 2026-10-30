@@ -39,5 +39,9 @@ fn main() {
     d.apply(Op::Insert { at, kind: Kind::Table, text: "Pump curve".into(), data: table }).unwrap();
     d.apply(Op::Insert { at: at + 1, kind: Kind::Image, text: "Free-body diagram".into(), data: serde_json::json!({ "src": png, "width": 40 }) }).unwrap();
     let state = serde_json::json!({ "sheet": d.s, "calc": eval::run(&d.s), "path": null, "dirty": false, "undo": true, "redo": false, "rev": d.rev() });
-    println!("{}", serde_json::json!({ "state": state, "packs": datum_core::packs::cards() }));
+    // The AC circuit pack in polar form with its numbers: complex results drawn in the window (0.1.8).
+    let mut ac = datum_core::packs::sheet("ac-circuit").expect("the AC pack opens");
+    (ac.polar, ac.subst) = (true, true);
+    let ac = serde_json::json!({ "sheet": ac, "calc": eval::run(&ac), "path": null, "dirty": false, "undo": false, "redo": false, "rev": 1 });
+    println!("{}", serde_json::json!({ "state": state, "packs": datum_core::packs::cards(), "ac": ac }));
 }

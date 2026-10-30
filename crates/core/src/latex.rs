@@ -53,7 +53,7 @@ pub fn unit(label: &str) -> String {
 
 fn unit_of(u: &crate::units::UnitExpr) -> String { unit(&crate::units::pretty(&u.text)) }
 
-const FUNCS: [&str; 22] = ["sin", "cos", "tan", "sinh", "cosh", "tanh", "ln", "log", "exp", "min", "max", "asin", "acos", "atan", "atan2", "abs", "round", "floor", "ceil", "sum", "mean", "len"];
+const FUNCS: [&str; 26] = ["sin", "cos", "tan", "sinh", "cosh", "tanh", "ln", "log", "exp", "min", "max", "asin", "acos", "atan", "atan2", "abs", "round", "floor", "ceil", "sum", "mean", "len", "re", "im", "arg", "conj"];
 
 fn prec(n: &Node) -> u8 {
     match &n.e { E::Bin(op, ..) => match *op { "<" | "<=" | ">" | ">=" | "==" | "!=" => 1, "+" | "-" => 3, "*" => 5, "/" => 9, _ => 7 }, E::Neg(_) => 4, _ => 9 }
@@ -74,6 +74,11 @@ fn nd(n: &Node, s: &Sub) -> String {
             let t = if *x != 0.0 && !(1e-3..1e6).contains(&x.abs()) { let s = format!("{x:e}"); let (m, e) = s.split_once('e').unwrap_or((&s, "0")); format!("{m} \\times 10^{{{e}}}") } else { format!("{x}") };
             match u { Some(u) => format!("{t}\\,{}", unit_of(u)), None => t }
         }
+        E::Im(c, e) => match &e.e {
+            E::Num(x, u) => format!("{}\\,\\mathrm{{{c}}}{}", nd(&Node { e: E::Num(*x, None), at: e.at }, s), u.as_ref().map(|u| format!("\\,{}", unit_of(u))).unwrap_or_default()),
+            _ => format!("{}\\,\\mathrm{{{c}}}", nd(e, s)),
+        },
+        E::Unit(e, u) => format!("{}\\,{}", nd(e, s), unit_of(u)),
         E::Var(v) => s(v).map(|t| if t.starts_with('-') { format!("\\left({t}\\right)") } else { t }).unwrap_or_else(|| name(v)),
         E::Group(e) => format!("\\left({}\\right)", nd(e, s)),
         E::Neg(e) => if prec(e) < 5 { format!("-\\left({}\\right)", nd(e, s)) } else { format!("-{}", nd(e, s)) },
@@ -102,10 +107,12 @@ fn nd(n: &Node, s: &Sub) -> String {
                 "sqrt" if a.len() == 1 => format!("\\sqrt{{{}}}", a[0]),
                 "cbrt" if a.len() == 1 => format!("\\sqrt[3]{{{}}}", a[0]),
                 "abs" if a.len() == 1 => format!("\\left|{}\\right|", a[0]),
+                "conj" if a.len() == 1 => format!("\\overline{{{}}}", a[0]),
+                "polar" if a.len() == 2 => format!("{}\\angle {}", a[0], a[1]),
                 "exp" if a.len() == 1 => format!("e^{{{}}}", a[0]),
                 "if" if a.len() == 3 => format!("\\begin{{cases}} {} & \\text{{if }} {} \\\\ {} & \\text{{otherwise}} \\end{{cases}}", a[1], a[0], a[2]),
                 "log" if a.len() == 1 => format!("\\log_{{10}}\\left({}\\right)", a[0]),
-                f if FUNCS.contains(&f) => format!("\\{}\\left({}\\right)", if matches!(f, "atan2" | "round" | "floor" | "ceil" | "sum" | "mean" | "len" | "asin" | "acos" | "atan" | "abs") { format!("operatorname{{{f}}}") } else { f.to_string() }, a.join(", ")),
+                f if FUNCS.contains(&f) => format!("\\{}\\left({}\\right)", if matches!(f, "atan2" | "round" | "floor" | "ceil" | "sum" | "mean" | "len" | "asin" | "acos" | "atan" | "abs" | "re" | "im" | "arg" | "conj") { format!("operatorname{{{f}}}") } else { f.to_string() }, a.join(", ")),
                 f => format!("{}\\left({}\\right)", name(f), a.join(", ")),
             }
         }
@@ -133,6 +140,8 @@ pub fn stmt(s: &Stmt) -> String {
 pub fn plain(n: &Node) -> String {
     match &n.e {
         E::Num(x, u) => match u { Some(u) => format!("{x} {}", crate::units::pretty(&u.text)), None => format!("{x}") },
+        E::Im(c, e) => match &e.e { E::Num(x, Some(u)) => format!("{x}{c} {}", crate::units::pretty(&u.text)), E::Num(x, None) => format!("{x}{c}"), _ => plain(e) },
+        E::Unit(e, u) => format!("{} {}", plain(e), crate::units::pretty(&u.text)),
         E::Var(v) => canon(v),
         E::Group(e) => format!("({})", plain(e)),
         E::Neg(e) => format!("−{}", plain(e)),

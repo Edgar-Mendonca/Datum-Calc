@@ -49,6 +49,8 @@ const GLOSSARY: [string, [string, string][]][] = [
     ["Reference", "The textbook, standard or paper an equation comes from, printed at the end of the sheet."]]],
   ["Units", [["Dimension", "What kind of quantity a value is: length, mass, time, temperature, current, amount of substance, luminous intensity, or a combination such as force (mass × length / time²)."],
     ["Absolute and difference temperature", "20 °C is a temperature (293.15 K); a rise of 20 °C is a difference of 20 K. Datum Calc keeps them apart so conversions are right."],
+    ["Torque and energy", "Both are a force times a length. A force times a length, or a power over a speed, shows in N·m (lbf·ft); a power times a time shows in J (BTU). Either can be chosen in the unit menu."],
+    ["Complex number", "A value with a real and an imaginary part, used for AC circuits: (3 + 4j) Ω. Shown as 3 + 4j, or as magnitude and angle (5∠53.13°) with View › Polar."],
     ["SI and US", "The two unit systems results can be shown in: SI (m, kg, s, N, Pa, W) or US customary (ft, lb, psi, hp, °F)."]]],
   ["Checks", [["Utilisation", "The value checked divided by its limit. 0.82 means 82 % of the limit is used; above 1.00 the check fails."],
     ["PASS / FAIL", "Whether the comparison in a check region holds."]]],

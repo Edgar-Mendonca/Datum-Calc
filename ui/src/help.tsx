@@ -23,18 +23,18 @@ export const HELP: Record<string, Topic> = {
   // Math tab
   symbols: { t: "Symbols", what: "Greek letters and operators. They type into the region you are editing.",
     how: ["Or type the name: sigma becomes σ, sigma_allow becomes σ with “allow” as a subscript, sqrt(x) becomes a root.", "Powers: x^2. Multiplication: *. Division: /."] },
-  functions: { t: "Functions", what: "Built-in functions: sqrt, sin, cos, tan (degrees or radians), ln, log, exp, min, max, abs, round, if, sum, mean.",
-    how: ["Click one to insert it with its brackets, then type the arguments.", "if(a > b, x, y) gives x when a > b, otherwise y."] },
+  functions: { t: "Functions", what: "Built-in functions: sqrt, sin, cos, tan (degrees or radians), ln, log, exp, min, max, abs, round, if, sum, mean, and for complex values re, im, abs, arg, conj and polar.",
+    how: ["Click one to insert it with its brackets, then type the arguments.", "if(a > b, x, y) gives x when a > b, otherwise y.", "Complex numbers: 4j (or 4i) is 4 times the imaginary unit j. Z = (8 + 9.42j) Ω, Z = R + j*omega*L; abs(Z) is the magnitude, arg(Z) the angle, polar(230 V, -30 deg) is 230 V∠−30°."] },
   // Units tab
   units: { t: "Units", what: "Every number can carry a unit: 120 m^3/h, 45 m, 7.5 kW, 20 °C. Results keep their units, and adding metres to seconds is an error on that line.",
-    how: ["Type the unit after the number: 2.5 kN*m, 9.81 m/s^2, 1.2 W/(m^2*K).", "SI or US sets the default units of results; a result's own unit can be chosen next to it."] },
+    how: ["Type the unit after the number: 2.5 kN*m, 9.81 m/s^2, 1.2 W/(m^2*K), or after brackets: (3 + 4j) Ω.", "A force times a length shows as a torque in N·m (lbf·ft in US units); choose J for work or energy.", "SI or US sets the default units of results; a result's own unit can be chosen next to it."] },
   // Check tab
   checks: { t: "Checks", what: "A check compares two values, such as a stress against its allowable, and shows PASS in green or FAIL in red, with the utilisation ratio.",
     how: ["Type check sigma <= sigma_allow (or <, >, >=).", "The ratio is the left side over the right side: 0.82 means 82 % used."] },
   // View tab
   zoom: { t: "Zoom", what: "How large the page shows on the screen. Printing is not affected." },
   figures: { t: "Significant figures", what: "How many figures every result on this sheet shows: 3 for a quick estimate, 4 as usual, 5 or 6 when results are compared closely. The engine always works at full precision; only the display changes. It is saved with the sheet." },
-  show: { t: "Show", what: "Variables lists every name the sheet defines and every check. Numbers shows each equation a second time with the values put in (P = ρgQH/η = 998 kg/m³ · 9.807 m/s² · … = 19.57 kW), as on a hand calculation; it is saved with the sheet and printed." },
+  show: { t: "Show", what: "Variables lists every name the sheet defines and every check. Numbers shows each equation a second time with the values put in (P = ρgQH/η = 998 kg/m³ · 9.807 m/s² · … = 19.57 kW), as on a hand calculation; it is saved with the sheet and printed. Polar shows complex values as magnitude and angle (5∠53.13° Ω) instead of (3 + 4j) Ω." },
   vars: { t: "Variables", what: "Every name the sheet defines, with its value and unit, in the order they are defined. The checks and errors are counted at the bottom.",
     how: ["Click a name to go to the line that defines it.", "View › Variables shows or hides the panel."] },
   results: { t: "Results", what: "Each equation shows its answer with a unit chosen for it: kW for power, MPa for stress, m³/h for flow. The unit system (SI or US) sets the defaults.",

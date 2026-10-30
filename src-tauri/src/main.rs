@@ -66,7 +66,7 @@ struct Out {
 
 fn out(a: &App) -> Out {
     let d = &a.doc;
-    let f = eval::Fmt { digits: d.s.digits, eng: a.opts.number == "eng", us: d.s.units == "US" };
+    let f = eval::Fmt { digits: d.s.digits, eng: a.opts.number == "eng", us: d.s.units == "US", polar: d.s.polar };
     Out { sheet: d.s.clone(), calc: eval::run_with(&d.s, &f), path: d.path.as_ref().map(|p| p.display().to_string()), dirty: d.dirty, undo: d.can_undo(), redo: d.can_redo(), rev: d.rev() }
 }
 

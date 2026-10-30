@@ -42,11 +42,11 @@ flowchart LR
 crates/core/src/lib.rs         the engine's modules
 crates/core/src/sheet.rs       Sheet (title block, page, units, digits, regions), Region (id, kind, text, unit, style, data), Op (Insert, Set, Delete, Move, Title, SheetSet, Ui, Batch), Doc (apply on a copy, undo/redo, open/save), tolerant .dcalc reader
 crates/core/src/units.rs       dimensions (7 SI exponents + an angle tag), ~200 units with NIST factors, absolute temperatures (°C, °F with offsets), unit expressions, the display ladders (SI and US), labels (m³/h, W/(m²·K))
-crates/core/src/parse.rs       lexer and Pratt parser: assignments, user functions, ranges, check, solve … for x in a .. b, plot … for x in a .. b; units after numbers; character spans for errors
-crates/core/src/eval.rs        values (SI + dimension + abs temperature + vector), operators with dimension rules, built-in functions and constants, the sheet top to bottom (RegionOut: LaTeX, result, unit choices, check, plot, error), Variables, number formatting
+crates/core/src/parse.rs       lexer and Pratt parser: assignments, user functions, ranges, check, solve … for x in a .. b, plot … for x in a .. b; units after numbers and after brackets; 4j imaginary numbers; character spans for errors
+crates/core/src/eval.rs        values (SI + dimension + abs temperature + vector + imaginary parts + the N·m reading), operators and complex arithmetic with dimension rules, built-in functions and constants, the sheet top to bottom (RegionOut: LaTeX, result, unit choices, check, plot, error), Variables, number formatting
 crates/core/src/latex.rs       expression tree → LaTeX (fractions, roots, subscripts, Greek, units in roman)
 crates/core/src/solve.rs       Brent's method after a 200-step scan for a sign change
-crates/core/src/packs.rs       the sixteen calc packs (include_str! of crates/core/packs/*.dcalc), cards for File › New
+crates/core/src/packs.rs       the seventeen calc packs (include_str! of crates/core/packs/*.dcalc), cards for File › New
 crates/core/packs/getting-started.dcalc  the Getting Started sheet (packs::GETTING_STARTED, opened from File › Home and Help)
 crates/core/examples/dump.rs   also `-- <pack id> [us] [numbers]` dumps a pack as the window's state (used to render every pack in the built window for a check by eye)
 crates/core/examples/packs.rs  prints every pack worked out in SI and US units, for checking by eye
@@ -137,6 +137,11 @@ tests_ui/run.cjs               Playwright UI tests against ui/dist with a mocked
 | 0.1.5 | The fuzz test builds random sheets from the grammar (numbers with units, names, operators, functions, checks, solve, plot, ranges, tables), 600 sheets per run in CI; 6,000 × 3 seeds and a release run before this release | Random characters rarely reach the evaluator; grammar-shaped input found two real panics at once |
 | 0.1.1 | `release.yml` ran once on a push trigger to register it (tag pushes are blocked from the session); later releases use workflow_dispatch | A workflow needs one run before GitHub lists it |
 | 0.1.7 | Windows publisher "Datum"; copyright stays "© 2026 Edgar Mendonca" | Family-wide rule (FAMILY §9) |
+| 0.1.8 | Complex values are `Val.im` beside `Val.v` (empty when real) and become real again when the imaginary part is round-off (j² = −1) | One value type keeps vectors, units and errors working for both; tests compare strings like "-1" |
+| 0.1.8 | `4j`/`4i` (letter touching the number) is always imaginary; `j`/`i` alone are constants a name on the sheet replaces; results always use j | Same as the built-in constants (g, e); j is the electrical habit |
+| 0.1.8 | A unit after brackets applies to the bracket: `(3 + 4j) Ω` (`E::Unit`), not when the word is one of the sheet's names | `3 + 4j Ω` adds a number to ohms, an error that would surprise every electrical user |
+| 0.1.8 | Polar form is a sheet setting (View › Polar, `Sheet.polar`), not per result | One reading per sheet, like Numbers and Figures |
+| 0.1.8 | `Val.nm`: a force (or load per length) times a length, a plain factor of it or a sum with it shows in N·m; energy with an angle tag (P/ω) uses the torque ladder | Issue 2: torque came out in J; no pack changed, as packs pinned their units |
 
 ## 3. Roadmap
 
@@ -156,7 +161,8 @@ tests_ui/run.cjs               Playwright UI tests against ui/dist with a mocked
 | 0.1.5 | Hardening (limits, finite results, fuzz from the grammar), equations with their numbers, checks list, three more packs (shaft, tank, thermal expansion) | ✅ |
 | 0.1.6 | Safe saving and file limits, UI error guards, packs 14–16 (pipe wall, column, cable drop), print summary of checks, figures per sheet, Duplicate and Insert Above | ✅ |
 | 0.1.7 | Windows lists the publisher as Datum (family-wide change) | ✅ |
-| 0.1.8 | Fixes from trying every pack on a clean Windows PC and from the convention | 🔜 |
+| 0.1.8 | Visitors' requests: complex numbers for AC circuits (View › Polar, re/im/arg/conj/polar), torque in N·m, AC circuit pack (17) | ✅ |
+| 0.1.9 | Fixes from trying every pack on a clean Windows PC and from the convention | 🔜 |
 | 0.2 | Materials from Datum Atlas, more packs, unit menus on results, symbolic simplify | ⬜ |
 | 0.3 | Matrices and linear systems, ODE solve, tables from CSV | ⬜ |
 | 0.4 | Programs inside a region, templates, a company title block | ⬜ |
@@ -220,9 +226,18 @@ tests_ui/run.cjs               Playwright UI tests against ui/dist with a mocked
 - The convention fixes move to 0.1.8.
 - Released 0.1.7.
 
+### 2026-10-30: Session 1, continued (0.1.8)
+- The user asked to keep going with 0.1.8 the same way. Two visitors had opened issues: complex numbers for AC circuits (#1) and N·m as a unit of torque (#2); both went into 0.1.8, and the convention fixes moved to 0.1.9.
+- Torque: N·m, kN·m, N·mm, MN·m, lbf·ft, lbf·in, kip·ft in the unit menu; a force times a length reads in N·m automatically. Every pack's output in SI and US was compared before and after: no change.
+- Complex numbers: `4j`, `j`, units after brackets, complex arithmetic and functions, polar form, real-only errors elsewhere; pack 17 (AC circuit) checked against a hand calculation.
+- Self-check: all 18 sheets rendered in the built window (SI with Numbers, and US) without errors or overflow; the AC sheet looked at by eye in both forms, which found KaTeX spacing a minus after ∠ as subtraction (fixed with a group). A probe of edge cases found 0^(1j) giving 0 and re() of a temperature losing °C (both fixed).
+- Checks: clippy clean, 52 engine tests, 80 UI tests, cargo deny; 24,000 more random sheets (three seeds in release, one in debug) with complex values in the grammar.
+- Released 0.1.8. Still not tested: a clean Windows PC, the real Save as PDF dialog, an update from one release to the next on Windows.
+
 ## 5. Known limits and next steps
 
-- Energy and torque share a dimension, so a torque shows in J unless its unit is chosen (N·m in the unit menu).
+- Energy and torque share a dimension: a force times a length (and a power over a speed) shows in N·m, a power times a time in J; m·g·h shows in N·m too (choose J in the unit menu).
+- Complex values work in arithmetic and in sqrt, exp, ln, abs, re, im, arg, conj, polar, sum and mean; trigonometric functions, checks, solve, plots, ranges and tables take real values only. Results show j, also when i was typed.
 - Vectors are shown as their first values and the last; there are no matrices yet (0.3).
 - Tables hold values and formula columns, not free spreadsheet formulas per cell.
 - The installer is not code-signed (1.0).

@@ -73,6 +73,10 @@ pub enum E {
     Call(String, Vec<Node>),
     /// Brackets the user typed (kept so the maths shows them).
     Group(Box<Node>),
+    /// An imaginary number typed as `4j` or `4i` (with its unit, `4j Ω`): the letter and the number.
+    Im(char, Box<Node>),
+    /// Brackets followed by a unit: `(3 + 4j) Ω`.
+    Unit(Box<Node>, UnitExpr),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -202,6 +206,18 @@ impl P<'_> {
         match self.t.get(self.i).cloned() {
             Some((Tok::Num(v), at)) => {
                 self.i += 1;
+                // 4j and 4i (the letter right after the number) are imaginary: 3 + 4j Ω.
+                if let Some((Tok::Id(w), wat)) = self.t.get(self.i).cloned() {
+                    if (w == "j" || w == "i") && wat.0 == at.1 {
+                        self.i += 1;
+                        let mut up = UnitParser { toks: &self.t, i: self.i, known: self.known };
+                        let u = up.expr();
+                        let end = if u.is_some() { self.t[up.i - 1].1 .1 } else { wat.1 };
+                        self.i = up.i;
+                        let num = Node { e: E::Num(v, u), at: (at.0, end) };
+                        return Ok(Node { e: E::Im(if w == "j" { 'j' } else { 'i' }, Box::new(num)), at: (at.0, end) });
+                    }
+                }
                 let mut up = UnitParser { toks: &self.t, i: self.i, known: self.known };
                 let u = up.expr();
                 let end = if u.is_some() { self.t[up.i - 1].1 .1 } else { at.1 };
@@ -238,7 +254,13 @@ impl P<'_> {
                 self.i += 1;
                 let e = self.expr(1)?;
                 let close = self.eat(")")?;
-                Ok(Node { e: E::Group(Box::new(e)), at: (at.0, close.1) })
+                let g = Node { e: E::Group(Box::new(e)), at: (at.0, close.1) };
+                // A unit after the brackets applies to all of it, (3 + 4j) Ω, unless it is one of the sheet's names.
+                let mut up = UnitParser { toks: &self.t, i: self.i, known: self.known };
+                match up.expr_inner(false) {
+                    Some(u) if u.offset == 0.0 => { let end = self.t[up.i - 1].1 .1; self.i = up.i; Ok(Node { e: E::Unit(Box::new(g), u), at: (at.0, end) }) }
+                    _ => Ok(g),
+                }
             }
             Some((Tok::Op(o), _)) => err(format!("“{o}” cannot start a value here."), a),
             None => err("Something is missing at the end.", a),
@@ -278,7 +300,7 @@ pub fn depth(n: &Node) -> usize {
     while let Some((n, d)) = stack.pop() {
         max = max.max(d);
         match &n.e {
-            E::Neg(a) | E::Group(a) => stack.push((a, d + 1)),
+            E::Neg(a) | E::Group(a) | E::Im(_, a) | E::Unit(a, _) => stack.push((a, d + 1)),
             E::Bin(_, a, b) => { stack.push((a, d + 1)); stack.push((b, d + 1)); }
             E::Call(_, args) => stack.extend(args.iter().map(|a| (a, d + 1))),
             _ => {}

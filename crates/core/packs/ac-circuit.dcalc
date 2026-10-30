@@ -1,0 +1,269 @@
+{
+ "format": 1,
+ "name": "AC circuit: impedance, current and power factor",
+ "title": {
+  "project": "",
+  "number": "PACK-17",
+  "title": "AC circuit: impedance, current and power factor",
+  "by": "",
+  "checked": "",
+  "date": "",
+  "rev": "A",
+  "company": "",
+  "client": "",
+  "logo": ""
+ },
+ "page": {
+  "paper": "A4",
+  "margins": [
+   15.0,
+   15.0,
+   15.0,
+   20.0
+  ]
+ },
+ "units": "SI",
+ "digits": 4,
+ "regions": [
+  {
+   "id": 1,
+   "kind": "text",
+   "text": "AC circuit: impedance, current and power factor",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 2,
+   "kind": "text",
+   "text": "An R–L load with a capacitor in parallel to correct its power factor, worked out with complex numbers: 4j is 4 times the imaginary unit j. The supply voltage is the reference phasor (angle 0°); View › Polar shows the results as magnitude and angle.",
+   "unit": "",
+   "style": "note",
+   "data": null
+  },
+  {
+   "id": 3,
+   "kind": "text",
+   "text": "Inputs",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 4,
+   "kind": "math",
+   "text": "V = 230 V  # supply voltage (rms), the reference phasor",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 5,
+   "kind": "math",
+   "text": "f = 50 Hz  # supply frequency",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 6,
+   "kind": "math",
+   "text": "R = 8 Ω  # load resistance",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 7,
+   "kind": "math",
+   "text": "L = 30 mH  # load inductance",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 8,
+   "kind": "math",
+   "text": "C = 150 µF  # power-factor correction capacitor",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 9,
+   "kind": "math",
+   "text": "I_max = 25 A  # rating of the circuit",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 10,
+   "kind": "math",
+   "text": "PF_min = 0.95  # power factor the supplier asks for",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 11,
+   "kind": "text",
+   "text": "Load alone",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 12,
+   "kind": "math",
+   "text": "omega = 2*pi*f  # angular frequency",
+   "unit": "rad/s",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 13,
+   "kind": "math",
+   "text": "Z_L = R + j*omega*L  # load impedance",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 14,
+   "kind": "math",
+   "text": "I_L = V/Z_L  # load current",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 15,
+   "kind": "math",
+   "text": "I_L_rms = abs(I_L)  # its magnitude",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 16,
+   "kind": "math",
+   "text": "PF_L = cos(arg(Z_L))  # power factor without the capacitor",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 17,
+   "kind": "text",
+   "text": "With the capacitor",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 18,
+   "kind": "math",
+   "text": "Z_C = 1/(j*omega*C)  # capacitor impedance",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 19,
+   "kind": "math",
+   "text": "Z = Z_L*Z_C/(Z_L + Z_C)  # load and capacitor in parallel",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 20,
+   "kind": "math",
+   "text": "I = V/Z  # supply current",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 21,
+   "kind": "math",
+   "text": "I_rms = abs(I)  # its magnitude",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 22,
+   "kind": "math",
+   "text": "phi = arg(I)  # its angle (negative: lagging)",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 23,
+   "kind": "math",
+   "text": "S = V*conj(I)  # complex power",
+   "unit": "kVA",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 24,
+   "kind": "math",
+   "text": "P = re(S)  # real power",
+   "unit": "kW",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 25,
+   "kind": "math",
+   "text": "Q = im(S)  # reactive power",
+   "unit": "kvar",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 26,
+   "kind": "math",
+   "text": "PF = P/abs(S)  # power factor",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 27,
+   "kind": "check",
+   "text": "check I_rms <= I_max",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 28,
+   "kind": "check",
+   "text": "check PF >= PF_min",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 29,
+   "kind": "text",
+   "text": "Ref: J. W. Nilsson, S. A. Riedel, Electric Circuits, 11th ed., ch. 9 and 10: phasors, impedance, complex power S = V I*, power-factor correction.",
+   "unit": "",
+   "style": "ref",
+   "data": null
+  }
+ ],
+ "next_id": 30,
+ "ui": {
+  "pack": {
+   "id": "ac-circuit",
+   "field": "Electrical",
+   "desc": "A single-phase R–L load with a parallel capacitor, worked out with complex numbers: impedance, current phasor, complex power and power factor, against the circuit rating."
+  }
+ }
+}
