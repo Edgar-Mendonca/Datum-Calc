@@ -6,7 +6,7 @@ import { outs, ratio } from "./calc";
 
 const GH = "https://github.com/Edgar-Mendonca/Datum-Calc";
 /** Runs `then` once unsaved changes are saved or let go: New, Open, a pack or an update replaces the sheet. */
-export const keep = (then: () => void) => out()?.dirty ? D.confirmClose(then) : then();
+export const keep = (then: (discarded?: boolean) => void) => out()?.dirty ? D.confirmClose(then) : then();
 /** Where a new region goes: below the selected one, or at the end. */
 const below = () => { const i = out()?.sheet.regions.findIndex(r => r.id === selId()) ?? -1; return i >= 0 ? i + 1 : out()?.sheet.regions.length ?? 0; };
 const STARTER: Record<Kind, string> = { math: "", text: "", check: "check ", solve: "solve x^2 = 2 for x in 0 .. 10", plot: "plot sin(x), cos(x) for x in 0 .. 2*pi", table: "", image: "" };

@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.1.10 — 2026-10-30
+
+Unsaved work is safer: New, Open and an update ask first. Fixes found by an independent review of 0.1.8 and 0.1.9.
+
+**Unsaved work**
+- New, Open, a calc pack, a recent sheet, Getting Started and installing an update now ask “Save changes?” when the sheet has unsaved changes. Before, they replaced it without asking; only closing the window asked.
+- An update writes a recovery copy of unsaved work before the window closes, so the new version offers it back (not when you chose Don't save).
+- An update installs only once its checksum has been compared with SHA256SUMS.txt.
+- The recovery box names the copy it offers, and Recover or Discard acts on that copy only. With two copies and two windows starting together, Discard in one window could delete a copy the other had not shown.
+- A window that cannot lock its recovery copy tries another name, and a lock made in the last minute is never cleaned away, so a running window's copy never looks abandoned.
+- A sheet saved under a name typed without .dcalc gets the extension, so Explorer opens it with Datum Calc; it never replaces an existing file without asking.
+
+**Results**
+- A torque typed with its unit (50 N*m) keeps reading in N·m in later lines (M2*2 = 100 N·m, not 100 J); 50 J stays an energy. A torque times an angle is work, in J.
+- A unit after brackets gives a plain or complex number its unit, (8 + 6j) Ω; on a value that already has units, such as (F/A) MPa, it is an error that points to the unit menu, as before 0.1.8.
+- A complex number written out (Z = (8 + 6j) Ω) is an input, so its value is not repeated; 0j is real.
+- Getting Started shows torque and complex numbers.
+
+**Checks**
+- 54 engine tests and a shell test, 86 UI tests (Save changes? before New, a pack and a recent sheet; Cancel and Don't save). Recovery tried again in the real window with two copies and two windows. 12,000 more random sheets.
+
 ## 0.1.9 — 2026-10-30
 
 Safer recovery when several sheets are open, two more calc packs, and smaller fixes.

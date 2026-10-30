@@ -167,7 +167,13 @@ async fn save(app: AppHandle, st: State<'_, St>, as_new: bool) -> R<Option<Out>>
     let path = match known {
         Some(p) => p,
         None => match app.dialog().file().add_filter("Datum Calc", &["dcalc"]).set_file_name(format!("{name}.dcalc")).blocking_save_file() {
-            Some(f) => with_ext(f.into_path().map_err(|e| e.to_string())?, "dcalc"),
+            Some(f) => {
+                let typed = f.into_path().map_err(|e| e.to_string())?;
+                let p = with_ext(typed.clone(), "dcalc");
+                // The save box asked about replacing the name typed, not this one.
+                if p != typed && p.exists() { return Err(format!("{} already exists. Save again and choose it to replace it.", p.display())); }
+                p
+            }
             None => return Ok(None),
         },
     };
@@ -250,14 +256,15 @@ fn set_options(app: AppHandle, st: State<St>, opts: Options) -> Out {
 // window that closed without saving or crashed, and is offered at the next start; a running window's
 // copy is never offered, overwritten or deleted by another.
 #[derive(Serialize, Deserialize)]
-struct Recovery { name: String, path: Option<String>, saved: String }
+struct Recovery { name: String, path: Option<String>, saved: String, #[serde(default)] id: String }
 
 fn recovery_dir(app: &AppHandle) -> Option<PathBuf> { let d = dir(app, true)?.join("recovery"); std::fs::create_dir_all(&d).ok()?; Some(d) }
 
 /// This window's lock, taken at start.
 fn take_lock(app: &AppHandle, id: &str) -> Option<std::fs::File> {
-    let f = std::fs::File::create(recovery_dir(app)?.join(format!("{id}.lock"))).ok()?;
-    f.try_lock().ok()?;
+    let path = recovery_dir(app)?.join(format!("{id}.lock"));
+    let f = std::fs::File::create(&path).ok()?;
+    if f.try_lock().is_err() { drop(f); let _ = std::fs::remove_file(&path); return None; }
     Some(f)
 }
 
@@ -266,28 +273,29 @@ fn running(lock: &Path) -> bool {
     matches!(std::fs::File::open(lock).map(|f| f.try_lock()), Ok(Err(std::fs::TryLockError::WouldBlock)))
 }
 
-/// The newest copy left by a window that is no longer running: (sheet, info, lock). Copies kept by
-/// 0.1.8 and earlier (recovery.dcalc in the data folder) count too.
-fn orphan(app: &AppHandle, own: &str) -> Option<(PathBuf, PathBuf, Option<PathBuf>)> {
+/// The newest copy left by a window that is no longer running, or the one named `want`: (sheet, info, lock).
+/// Copies kept by 0.1.8 and earlier (recovery.dcalc in the data folder, named "") count too.
+fn orphan(app: &AppHandle, own: &str, want: Option<&str>) -> Option<(PathBuf, PathBuf, Option<PathBuf>)> {
     let d = recovery_dir(app)?;
     let mut found: Vec<(std::time::SystemTime, PathBuf, PathBuf, Option<PathBuf>)> = vec![];
     for e in std::fs::read_dir(&d).ok()?.flatten() {
         let p = e.path();
         let (Some(stem), Some(ext)) = (p.file_stem().and_then(|s| s.to_str()), p.extension().and_then(|s| s.to_str())) else { continue };
-        if stem == own { continue; }
+        if stem == own || want.is_some_and(|w| w != stem) { continue; }
         let lock = d.join(format!("{stem}.lock"));
         match ext {
             "json" if !running(&lock) && d.join(format!("{stem}.dcalc")).exists() => {
                 if let Ok(t) = e.metadata().and_then(|m| m.modified()) { found.push((t, d.join(format!("{stem}.dcalc")), p.clone(), Some(lock))); }
             }
             // A lock left by a window that closed or crashed with nothing to recover.
-            "lock" if !d.join(format!("{stem}.json")).exists() && !running(&p) => { let _ = std::fs::remove_file(&p); }
+            // (Not one made in the last minute: a window starting now creates its lock just before locking it.)
+            "lock" if !d.join(format!("{stem}.json")).exists() && e.metadata().and_then(|m| m.modified()).is_ok_and(|t| t.elapsed().is_ok_and(|a| a.as_secs() > 60)) && !running(&p) => { let _ = std::fs::remove_file(&p); }
             _ => {}
         }
     }
     let old = dir(app, true)?;
     let (sheet, meta) = (old.join("recovery.dcalc"), old.join("recovery.json"));
-    if let Ok(t) = std::fs::metadata(&meta).and_then(|m| m.modified()) { if sheet.exists() { found.push((t, sheet, meta, None)); } }
+    if let (Ok(t), None | Some("")) = (std::fs::metadata(&meta).and_then(|m| m.modified()), want) { if sheet.exists() { found.push((t, sheet, meta, None)); } }
     found.into_iter().max_by_key(|x| x.0).map(|x| (x.1, x.2, x.3))
 }
 
@@ -312,7 +320,7 @@ fn leave(app: &AppHandle) {
 
 fn write_recovery(app: &AppHandle, a: &App) {
     if let (true, Some((sheet, meta))) = (a.doc.dirty, own_files(app, a)) {
-        let info = Recovery { name: a.doc.s.name.clone(), path: a.doc.path.as_ref().map(|p| p.display().to_string()), saved: chrono::Local::now().format("%d-%b-%y %H:%M").to_string() };
+        let info = Recovery { name: a.doc.s.name.clone(), path: a.doc.path.as_ref().map(|p| p.display().to_string()), saved: chrono::Local::now().format("%d-%b-%y %H:%M").to_string(), id: a.id.clone() };
         let _ = std::fs::write(sheet, a.doc.s.json());
         let _ = std::fs::write(meta, serde_json::to_string(&info).unwrap_or_default());
     }
@@ -324,16 +332,18 @@ fn autosave(app: AppHandle, st: State<St>) { write_recovery(&app, &st.lock()); }
 #[tauri::command]
 fn recovery(app: AppHandle, st: State<St>) -> Option<Recovery> {
     let own = st.lock().id.clone();
-    let (_, meta, _) = orphan(&app, &own)?;
-    serde_json::from_str(&std::fs::read_to_string(meta).ok()?).ok()
+    let (_, meta, lock) = orphan(&app, &own, None)?;
+    let r: Recovery = serde_json::from_str(&std::fs::read_to_string(meta).ok()?).ok()?;
+    // The copy is named, so Recover and Discard act on the one the window showed, not on whichever is newest by then.
+    Some(Recovery { id: lock.and_then(|l| l.file_stem().map(|s| s.to_string_lossy().into_owned())).unwrap_or_default(), ..r })
 }
 
 /// Takes back (or discards) the copy `recovery` offered. A recovered sheet is written at once as this
 /// window's own copy before the old one is removed, so no moment is left without one.
 #[tauri::command]
-fn recover(app: AppHandle, st: State<St>, keep: bool) -> R<Option<Out>> {
+fn recover(app: AppHandle, st: State<St>, keep: bool, id: Option<String>) -> R<Option<Out>> {
     let own = st.lock().id.clone();
-    let (sheet, meta, lock) = orphan(&app, &own).ok_or("No recovered sheet was found.")?;
+    let (sheet, meta, lock) = orphan(&app, &own, Some(id.as_deref().unwrap_or(""))).ok_or("That recovered sheet is no longer there (another window took it).")?;
     if !keep {
         remove_all(&[Some(sheet), Some(meta), lock]);
         return Ok(None);
@@ -425,12 +435,12 @@ async fn check_update(st: State<'_, St>) -> R<update::Info> {
 }
 
 #[tauri::command]
-async fn install_update(app: AppHandle, url: String, sums: Option<String>) -> R<()> {
+async fn install_update(app: AppHandle, url: String, sums: Option<String>, discard: Option<bool>) -> R<()> {
     let a2 = app.clone();
     tauri::async_runtime::spawn_blocking(move || update::install(&a2, &url, sums.as_deref())).await.map_err(|e| e.to_string())??;
     // The installer waits for this window to close. Unsaved work goes into a recovery copy first, so the
     // new version offers it at its first start.
-    write_recovery(&app, &app.state::<St>().lock());
+    if discard != Some(true) { write_recovery(&app, &app.state::<St>().lock()); }
     app.exit(0);
     Ok(())
 }
@@ -440,8 +450,9 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let opts: Options = options_file(app.handle()).and_then(|f| std::fs::read_to_string(f).ok()).and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default();
-            let id = format!("{}-{}", std::process::id(), chrono::Local::now().format("%Y%m%d%H%M%S%3f"));
-            let lock = take_lock(app.handle(), &id);
+            // A window whose lock cannot be taken tries another name: without its lock, its copy would look abandoned.
+            let new_id = |k: u32| format!("{}-{}-{k}", std::process::id(), chrono::Local::now().format("%Y%m%d%H%M%S%3f"));
+            let (id, lock) = (0..5).map(|k| { let id = new_id(k); let l = take_lock(app.handle(), &id); (id, l) }).find(|x| x.1.is_some()).unwrap_or_else(|| (new_id(9), None));
             let mut a = App { doc: Doc::new(Sheet::new("Calc1")), opts, id, _lock: lock };
             a.doc = Doc::new(fresh(&a, Sheet::new("Calc1")));
             app.manage(St(Mutex::new(a)));

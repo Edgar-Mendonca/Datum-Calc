@@ -74,9 +74,9 @@ export const shortcuts = () => openDialog(() => (
 ));
 
 /** Confirms closing with unsaved changes. */
-export const confirmClose = (then: () => void) => openDialog(() => (
+export const confirmClose = (then: (discarded?: boolean) => void) => openDialog(() => (
   <Dialog title="Save changes?" okText="Save" cancel="Cancel" ok={async () => { const o = await call<Out | null>("save", { asNew: false }); if (o) then(); return !!o; }}
-    extra={<button class="btn" onClick={() => { closeDialog(); then(); }}>Don't save</button>}>
+    extra={<button class="btn" onClick={() => { closeDialog(); then(true); }}>Don't save</button>}>
     <p>Do you want to save the changes to “{S().name}”?</p>
   </Dialog>
 ));

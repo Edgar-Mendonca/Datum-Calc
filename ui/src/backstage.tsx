@@ -76,7 +76,7 @@ const UpdateCard = () => {
   const [pct, setPct] = createSignal<number | null>(null);
   const [ver] = createResource(() => call<string>("version"));
   onMount(() => { listen("update-progress", (p: number) => setPct(p)); if (!update()) checkUpdate(true); });
-  const install = () => keep(async () => { const u = update(); if (!u?.url) return; setPct(0); await call("install_update", { url: u.url, sums: u.sums }); setPct(null); });
+  const install = () => keep(async discarded => { const u = update(); if (!u?.url) return; setPct(0); await call("install_update", { url: u.url, sums: u.sums, discard: !!discarded }); setPct(null); });
   return (
     <div class="card">
       <div class="brand"><img src="logo.svg" alt="" /><div><b>Datum Calc</b><span class="muted">Version {ver()}{opts().beta ? " · beta channel" : ""}</span></div></div>

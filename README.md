@@ -50,8 +50,8 @@ It is for mechanical, process, structural and electrical engineers, students and
 
 | Version | What |
 | --- | --- |
-| 0.1.0 – 0.1.9 ✅ | The calc sheet and its printing with a summary of checks; units, equations, checks, solve and plot; tables and pictures; nineteen calc packs; equations with their numbers; complex numbers for AC circuits; a Getting Started sheet; recovery per window; hardening |
-| 0.1.10 | Fixes from trying every pack on a clean Windows PC and from the convention |
+| 0.1.0 – 0.1.10 ✅ | The calc sheet and its printing with a summary of checks; units, equations, checks, solve and plot; tables and pictures; nineteen calc packs; equations with their numbers; complex numbers for AC circuits; a Getting Started sheet; recovery per window; Save changes? before a sheet is replaced; hardening |
+| 0.1.11 | Fixes from trying every pack on a clean Windows PC and from the convention |
 | 0.2 | Materials from Datum Atlas, more packs |
 | 0.3 – 1.0 | Matrices and ODEs, templates, a validation report, a signed installer |
 

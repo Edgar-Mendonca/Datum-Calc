@@ -200,7 +200,7 @@ fn ladder(dim: &Dim, us: bool) -> Option<&'static [&'static str]> {
         _ if k(VOL) => if us { &["in^3", "ft^3"] } else { &["mm^3", "L", "m^3"] },
         _ if k(FORCE) => if us { &["lbf", "kip"] } else { &["N", "kN", "MN"] },
         _ if k(PRESS) => if us { &["psi", "ksi"] } else { &["Pa", "kPa", "MPa", "GPa"] },
-        _ if k(ENERGY) && dim[7] == 0 => if us { &["BTU"] } else { &["J", "kJ", "MJ", "GJ"] },
+        _ if k(ENERGY) && dim[7] >= 0 => if us { &["BTU"] } else { &["J", "kJ", "MJ", "GJ"] },
         // A torque: a power over a speed (J/rad), or a force times a length.
         _ if k(ENERGY) => if us { &["lbf*in", "lbf*ft", "kip*ft"] } else { &["N*mm", "N*m", "kN*m", "MN*m"] },
         _ if k(POWER) => if us { &["hp"] } else { &["W", "kW", "MW", "GW"] },

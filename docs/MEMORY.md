@@ -146,6 +146,12 @@ tests_ui/run.cjs               Playwright UI tests against ui/dist with a mocked
 | 0.1.9 | Dialog `no` runs only on the cancel button; × and Esc just close | Discard must delete the copy, × means "not now" |
 | 0.1.9 | No utilisation for checks on absolute temperatures | A ratio of kelvins (0.91 for 30 °C ≤ 60 °C) reads as a margin it is not |
 | 0.1.9 | rad/s not added to the menu of Hz results | 50 Hz would read as 50 rad/s; the Hz/rpm mix-up is already a known limit, not to be widened |
+| 0.1.10 | `keep(then)` in cmds.ts guards every way a sheet is replaced (New, Open, pack, recent, update); `then(true)` after Don't save | Only window close asked; a new route must go through `C.open/newSheet/pack` or `keep` |
+| 0.1.10 | `recovery` returns the copy's id; `recover(keep, id)` acts on that copy only | Two windows starting together saw the same newest copy; Discard in the second removed one never shown |
+| 0.1.10 | Lock files younger than a minute are never cleaned; `take_lock` retries with a new id and removes a lock it could not take | A window between creating and locking its lock looked abandoned |
+| 0.1.10 | Updates need SHA256SUMS.txt; the shell writes a recovery copy, then exits (unless the user chose Don't save) | Installing exits at once; unsaved edits since the last autosave were lost |
+| 0.1.10 | A unit after brackets only on a plain or complex value; `nm` set for typed units with `*` (N*m), cleared by an angle factor | Review found (F/A) MPa multiplying instead of erroring, and M2*2 shown in J |
+| 0.1.10 | An independent review (a fresh agent, read-only, given the diff, not my conclusions) before a release that changes the engine or the shell | It found two recovery data-loss paths and two misleading units that my own checks missed |
 
 ## 3. Roadmap
 
@@ -167,7 +173,8 @@ tests_ui/run.cjs               Playwright UI tests against ui/dist with a mocked
 | 0.1.7 | Windows lists the publisher as Datum (family-wide change) | ✅ |
 | 0.1.8 | Visitors' requests: complex numbers for AC circuits (View › Polar, re/im/arg/conj/polar), torque in N·m, AC circuit pack (17) | ✅ |
 | 0.1.9 | Recovery per window (two sheets open at once), Discard that deletes, packs 18–19 (insulated pipe, fillet weld), upright j, no utilisation for absolute temperatures | ✅ |
-| 0.1.10 | Fixes from trying every pack on a clean Windows PC and from the convention | 🔜 |
+| 0.1.10 | Save changes? before New/Open/pack/update; safer updates; review fixes (named recovery copy, lock age, typed torque, unit after brackets); Getting Started with torque and complex numbers | ✅ |
+| 0.1.11 | Fixes from trying every pack on a clean Windows PC and from the convention | 🔜 |
 | 0.2 | Materials from Datum Atlas, more packs, unit menus on results, symbolic simplify | ⬜ |
 | 0.3 | Matrices and linear systems, ODE solve, tables from CSV | ⬜ |
 | 0.4 | Programs inside a region, templates, a company title block | ⬜ |
@@ -246,6 +253,13 @@ tests_ui/run.cjs               Playwright UI tests against ui/dist with a mocked
 - Upright j in equations; no utilisation for checks on absolute temperatures (found writing the insulation pack).
 - Checks: clippy clean, 54 engine tests, 82 UI tests, cargo deny; all 20 sheets rendered in SI with Numbers and in US without errors or overflow; 18,000 more random sheets in release.
 - Released 0.1.9. Still not tested: a clean Windows PC, the real Save as PDF dialog, an update from one release to the next on Windows.
+
+### 2026-10-30: Session 1, continued (0.1.10)
+- The user asked to keep going with 0.1.10; no new visitor issues. Reading the window code for what a Windows user meets found that New, Open, a pack, a recent sheet, Getting Started and an update replaced unsaved work without asking (only closing asked): fixed with one guard, and UI tests for it.
+- Updater: checksums required; a recovery copy written before the installer takes over. Saved names get .dcalc.
+- An independent review of the 0.1.8–0.1.10 diff (a fresh read-only agent) found: Recover/Discard acting on a different copy than shown, a lock-file race, typed N·m losing its reading, (F/A) MPa multiplying. All fixed with tests; the named-copy fix tried in the real window with two copies and two windows (screenshots checked: which button was clicked matters, the box is centred on its text).
+- Checks: clippy clean, 54 engine tests + 1 shell test, 86 UI tests, cargo deny; every sheet rendered in SI with Numbers and in US; 12,000 more random sheets.
+- Released 0.1.10. Still not tested: a clean Windows PC, the real Save as PDF dialog, an update from one release to the next on Windows.
 
 ## 5. Known limits and next steps
 

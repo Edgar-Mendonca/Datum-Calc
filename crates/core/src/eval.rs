@@ -108,10 +108,16 @@ impl Env {
         match &n.e {
             E::Num(x, u) => Ok(match u {
                 None => Val::plain(*x),
-                Some(u) => Val { v: vec![x * u.factor + u.offset], dim: u.dim, abs: u.offset != 0.0, ..Default::default() },
+                // A torque typed as a force times a length (50 N*m, 2 kN·m) keeps that reading in later lines; 50 J stays energy.
+                Some(u) => Val { v: vec![x * u.factor + u.offset], dim: u.dim, abs: u.offset != 0.0, nm: units::same(&u.dim, &ENERGY) && u.text.contains('*'), ..Default::default() },
             }),
-            E::Im(_, e) => { let v = self.eval(e)?; if v.abs { return fail("A temperature cannot be imaginary.", n.at); } Ok(Val { im: v.v.clone(), v: vec![0.0; v.v.len()], ..v }) }
-            E::Unit(e, u) => { let v = self.eval(e)?; bin("*", v, Val::num(u.factor, u.dim), n.at, n.at) }
+            E::Im(_, e) => { let v = self.eval(e)?; if v.abs { return fail("A temperature cannot be imaginary.", n.at); } Ok(Val { im: v.v.clone(), v: vec![0.0; v.v.len()], ..v }.tidy()) }
+            E::Unit(e, u) => {
+                let v = self.eval(e)?;
+                // (3 + 4j) Ω gives a plain number its unit; it is not a conversion of a value that has one.
+                if !units::is_none(&v.dim) { return fail(format!("A unit after brackets needs a plain number inside, not {}; to show a result in {}, choose it in the result's unit menu.", dim_name(&v.dim), units::pretty(&u.text)), n.at); }
+                bin("*", v, Val::num(u.factor, u.dim), n.at, n.at)
+            }
             E::Var(s) => self.var(s, n.at),
             E::Group(e) => self.eval(e),
             E::Neg(e) => { let mut v = self.eval(e)?; v.v.iter_mut().chain(v.im.iter_mut()).for_each(|x| *x = -*x); v.abs = false; v.logic = false; Ok(v) }
@@ -202,8 +208,8 @@ fn moment(op: &str, a: &Val, b: &Val, dim: &Dim) -> bool {
     let force = |v: &Val| units::same(&v.dim, &FORCE) || units::same(&v.dim, &[0, 1, -2, 0, 0, 0, 0, 0]);
     match op {
         "+" | "-" => a.nm || b.nm,
-        "*" => units::same(dim, &ENERGY) && (force(a) || force(b) || (a.nm && units::is_none(&b.dim)) || (b.nm && units::is_none(&a.dim))),
-        "/" => a.nm && units::is_none(&b.dim),
+        "*" => units::same(dim, &ENERGY) && dim[7] == 0 && (force(a) || force(b) || (a.nm && units::is_none(&b.dim)) || (b.nm && units::is_none(&a.dim))),
+        "/" => a.nm && units::is_none(&b.dim) && dim[7] == 0,
         _ => false,
     }
 }
@@ -535,7 +541,7 @@ pub fn show_val(v: &Val, want: &str, f: &Fmt) -> (String, String, String, String
     }
     let big = (0..v.v.len()).map(|k| { let (x, y) = v.at(k); x.hypot(y) }).filter(|x| x.is_finite()).fold(0.0f64, f64::max);
     // A force times a length reads as a torque (N·m), as a power over a speed does (J/rad).
-    let dim = if v.nm && want.trim().is_empty() { let mut d = v.dim; d[7] = -1; d } else { v.dim };
+    let dim = if v.nm && v.dim[7] == 0 && want.trim().is_empty() { let mut d = v.dim; d[7] = -1; d } else { v.dim };
     let (k, off, label) = units::display(big, &dim, v.abs, want, f.us);
     let one = |(x, y): (f64, f64)| if v.cx() { fmt_cx((x - off) / k, y / k, f) } else { fmt_num((x - off) / k, f.digits, f.eng) };
     let (text, tex) = if v.vec {
@@ -580,9 +586,9 @@ fn unit_choices(dim: &Dim, abs: bool, nm: bool) -> Vec<String> {
     // Torque and moments share the units of energy.
     if units::same(dim, &ENERGY) {
         let t = ["N·m", "kN·m", "N·mm", "MN·m", "lbf·ft", "lbf·in", "kip·ft"].map(String::from);
-        v = if nm || dim[7] != 0 { [t.to_vec(), v].concat() } else { [v, t.to_vec()].concat() };
+        v = if nm || dim[7] < 0 { [t.to_vec(), v].concat() } else { [v, t.to_vec()].concat() };
     }
-    let dim = &if nm { let mut d = *dim; d[7] = -1; d } else { *dim };
+    let dim = &if nm && dim[7] == 0 { let mut d = *dim; d[7] = -1; d } else { *dim };
     for us in [false, true] {
         let (_, _, l) = units::display(1.0, dim, abs, "", us);
         if !l.is_empty() && !v.iter().any(|x| units::pretty(x) == l) { v.push(l); }

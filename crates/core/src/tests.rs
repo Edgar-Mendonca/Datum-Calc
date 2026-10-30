@@ -788,6 +788,11 @@ fn torque_reads_in_newton_metres() {
     let o = run(&["F = 120 N", "d = 0.35 m", "T = F*d", "E = 2 kW * 3 h"]);
     assert_eq!(o.regions[2].units[..3], ["N·m", "kN·m", "N·mm"], "torque units first for a moment");
     assert!(o.regions[3].units.contains(&"N·m".to_string()) && o.regions[3].units[0] == "J", "and offered for any energy");
+    // A torque typed with its unit keeps the reading; a torque times an angle is work (review of 0.1.8).
+    assert_eq!(result(&["M2 = 50 N*m", "M3 = M2*2"]), "100 N·m");
+    assert_eq!(result(&["M2 = 50 N*m", "M2 + M2"]), "100 N·m");
+    assert_eq!(result(&["E = 50 J", "E*2"]), "100 J", "an energy typed in J stays an energy");
+    assert_eq!(result(&["F = 20 kN", "d = 1 m", "M = F*d", "W = M*(90 deg)"]), "31.42 kJ");
     let mut s = sheet(&["T = 120 N * 0.35 m"]);
     s.regions[0].unit = "kN·m".into();
     assert_eq!(eval::run(&s).regions[0].result, "0.042 kN·m");
@@ -812,6 +817,9 @@ fn complex_numbers() {
     assert_eq!(result(&["Z = (3 + 4j) kΩ"]), "(3 + 4j) kΩ", "a unit after brackets, kept as typed");
     assert_eq!(result(&["V = 10 V", "Z = (3 + 4j) kΩ", "I = V/Z"]), "(1.2 − 1.6j) mA");
     assert_eq!(result(&["X = 5j mA"]), "5j mA");
+    assert_eq!(result(&["x = 0j", "check x < 1"]), "PASS (0 < 1)", "0j is real");
+    assert!(run(&["Z = (8 + 6j) Ω"]).regions[0].input, "a complex number written out is an input");
+    assert!(!run(&["x = 2 + 3"]).regions[0].input, "a sum still shows its result");
     assert_eq!(result(&["x = 1, 2 .. 3", "x*(1 + 1j)"]), "[1 + 1j, 2 + 2j, 3 + 3j]");
     assert_eq!(result(&["x = 1, 2 .. 3", "sum(x*1j)"]), "6j");
     assert_eq!(result(&["j = 3", "2*j + 4j"]), "6 + 4j", "a name on the sheet takes j's place; 4j stays imaginary");
@@ -824,6 +832,7 @@ fn complex_numbers() {
         (&["3 + 4j Ω"][..], "Cannot add a pure number and"),
         (&["z = 1j", "z/(0j)"][..], "Division by zero"),
         (&["(2 + 1j) m ^ (1j)"][..], "A complex power needs a plain number"),
+        (&["F = 10 kN", "A = 2 m^2", "(F/A) MPa"][..], "A unit after brackets needs a plain number inside"),
     ] { assert!(error(lines).starts_with(msg), "{lines:?}: {}", error(lines)); }
     let o = run(&["z = 1j", "plot z*x for x in 0 .. 1", "solve z*x = 1 for x in 0 .. 2"]);
     assert!(o.regions[1].error.as_ref().unwrap().msg.starts_with("A plot shows real values"));
