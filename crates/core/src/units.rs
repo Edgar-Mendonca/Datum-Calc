@@ -281,7 +281,8 @@ fn named(dim: &Dim) -> Option<String> {
     let target: [i8; 7] = std::array::from_fn(|i| dim[i]);
     if target == [0; 7] { return None; }
     // (parts, sum of all powers, a named unit at all, its rank, its power) → label: J·s before W·s² and kg·m²/s.
-    let mut best: Option<((usize, u8, bool, usize, i8), String)> = None;
+    type Key = (usize, u8, bool, usize, i8);
+    let mut best: Option<(Key, String)> = None;
     for (rank, (sym, dd)) in std::iter::once(("", NONE)).chain(DERIVED).enumerate() {
         for p in if sym.is_empty() { vec![0i8] } else { vec![1, -1] } {
             let rest: [i8; 7] = std::array::from_fn(|i| target[i] - dd[i] * p);
