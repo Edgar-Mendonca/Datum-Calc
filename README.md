@@ -73,3 +73,5 @@ npx tauri build --bundles nsis
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the checks, and [docs/MEMORY.md](docs/MEMORY.md) for the architecture and decisions.
+
+Product and file-format names are trademarks of their owners and are used only to describe file compatibility.

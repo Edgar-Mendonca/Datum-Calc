@@ -275,6 +275,9 @@ tests_ui/run.cjs               Playwright UI tests against ui/dist with a mocked
 - Checks: clippy clean, 57 engine tests + 1 shell test, 89 UI tests, cargo deny; every earlier pack prints exactly as in 0.1.10; all sheets rendered in SI with Numbers and in US; the RC filter's Bode plots looked at by eye; 18,000 more random sheets with the new syntax; an independent review of the diff.
 - Released 0.1.11. Still not tested: a clean Windows PC, the real Save as PDF dialog, an update from one release to the next on Windows.
 
+### 2026-11-01: Session 1, continued (wording cleanup, no release)
+- Family-wide cleanup of comments naming commercial products: none in Calc (the comments copied from Plan were already neutral); the bare "Polish" comment in styles.css now says what the block does. README and NOTICE end with: "Product and file-format names are trademarks of their owners and are used only to describe file compatibility." No functional change, so no version bump.
+
 ## 5. Known limits and next steps
 
 - Energy and torque share a dimension: a force times a length (and a power over a speed) shows in N·m, a power times a time in J; m·g·h shows in N·m too (choose J in the unit menu).

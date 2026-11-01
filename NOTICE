@@ -4,3 +4,5 @@ Copyright (c) 2026 Edgar Mendonca. MIT licence.
 It bundles SolidJS (MIT), Chart.js (MIT, https://www.chartjs.org) and the IBM Plex
 fonts (SIL Open Font Licence 1.1). Rust crates used by the engine and the shell are listed
 in Cargo.lock; their licences are checked by `cargo deny check` (deny.toml).
+
+Product and file-format names are trademarks of their owners and are used only to describe file compatibility.

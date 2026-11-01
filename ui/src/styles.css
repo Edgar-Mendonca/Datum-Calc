@@ -309,7 +309,7 @@ tr.link:hover td { background: var(--pale); }
 .fbar input { flex: 1; border: 0 !important; height: 100%; padding: 0 8px !important; font: 12.5px var(--mono); background: transparent !important; outline: none !important; }
 .fbar .agg { padding: 0 12px; font: 11px var(--mono); color: var(--muted); white-space: nowrap; border-left: 1px solid var(--line); line-height: 27px; }
 
-/* Polish */
+/* Finish: the family palette and type for the panels, tab and section captions, tiles and cards */
 body, .app { background: var(--bg); color: var(--text); }
 .top, .ribbon, .status, .side { background: var(--panel); }
 .ribbon .grp .cap { font: 500 9.5px var(--mono); letter-spacing: .12em; text-transform: uppercase; }
