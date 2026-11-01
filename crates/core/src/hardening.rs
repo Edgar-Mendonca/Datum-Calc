@@ -162,15 +162,15 @@ fn evaluation_speed_gate() {
 fn random_expr(r: &mut Rng, depth: u32) -> String {
     const UNITS: [&str; 14] = ["m", "mm", "kg", "s", "N", "kN*m", "m^3/h", "MPa", "°C", "°F", "K", "rpm", "W/(m^2*K)", "%"];
     const NUMS: [&str; 10] = ["0", "1", "2.5", "-3", "1e-9", "1e9", "1e300", "1e-300", "0.0001", "42"];
-    const FUNCS: [&str; 21] = ["sqrt", "sin", "cos", "ln", "log", "exp", "abs", "min", "max", "round", "sum", "mean", "len", "if", "hypot", "f", "re", "im", "arg", "conj", "polar"];
+    const FUNCS: [&str; 24] = ["sqrt", "sin", "cos", "ln", "log", "exp", "abs", "min", "max", "round", "sum", "mean", "len", "if", "hypot", "f", "re", "im", "arg", "conj", "polar", "par", "db", "cosh"];
     // Complex values and units after brackets (0.1.8).
-    const CX: [&str; 9] = ["4j", "-2.5j V", "(1 + 2j) Ω", "j", "1e300j", "(a) m", "0j", "2i kN*m", "(b - 1j) mA"];
+    const CX: [&str; 13] = ["4j", "-2.5j V", "(1 + 2j) Ω", "j", "1e300j", "(a) m", "0j", "2i kN*m", "(b - 1j) mA", "10 Ω∠30°", "5/_-45 deg", "2*pi*50 Hz", "a∠a"];
     if depth == 0 || r.below(4) == 0 {
-        return match r.below(5) { 4 => CX[r.below(9)].into(), 0 => NUMS[r.below(10)].into(), 1 => format!("{} {}", NUMS[r.below(10)], UNITS[r.below(14)]), 2 => ["a", "b", "v", "g", "pi", "zz"][r.below(6)].into(), _ => format!("({})", random_expr(r, depth.saturating_sub(1))) };
+        return match r.below(5) { 4 => CX[r.below(13)].into(), 0 => NUMS[r.below(10)].into(), 1 => format!("{} {}", NUMS[r.below(10)], UNITS[r.below(14)]), 2 => ["a", "b", "v", "g", "pi", "zz"][r.below(6)].into(), _ => format!("({})", random_expr(r, depth.saturating_sub(1))) };
     }
     match r.below(4) {
         0 | 1 => format!("{} {} {}", random_expr(r, depth - 1), ["+", "-", "*", "/", "^", "<=", ">"][r.below(7)], random_expr(r, depth - 1)),
-        2 => { let f = FUNCS[r.below(21)]; let n = if f == "if" { 3 } else if matches!(f, "min" | "max" | "round" | "hypot" | "polar") { 2 } else { 1 }; format!("{f}({})", (0..n).map(|_| random_expr(r, depth - 1)).collect::<Vec<_>>().join(", ")) }
+        2 => { let f = FUNCS[r.below(24)]; let n = if f == "if" { 3 } else if matches!(f, "min" | "max" | "round" | "hypot" | "polar" | "par") { 2 } else { 1 }; format!("{f}({})", (0..n).map(|_| random_expr(r, depth - 1)).collect::<Vec<_>>().join(", ")) }
         _ => format!("-{}", random_expr(r, depth - 1)),
     }
 }
@@ -195,7 +195,7 @@ fn random_expressions_never_panic() {
             let text = match r.below(6) {
                 0 => format!("check {e} <= {}", random_expr(&mut r, 2)),
                 1 => format!("solve {e} = {} for x in {} .. {}", random_expr(&mut r, 2), random_expr(&mut r, 1), random_expr(&mut r, 1)),
-                2 => format!("plot {e} for x in 0 .. {}", random_expr(&mut r, 1)),
+                2 => format!("plot {e} for x in {} .. {}{}", ["0", "1 Hz", "a"][r.below(3)], random_expr(&mut r, 1), [" log", ""][r.below(2)]),
                 3 => format!("w{} = {e}  # note", r.below(5)),
                 4 => format!("v{} = {} .. {}", r.below(3), random_expr(&mut r, 1), random_expr(&mut r, 1)),
                 _ => format!("{e} ="),

@@ -107,6 +107,7 @@ export const Ribbon = () => (
     </Show>
     <Show when={tab() === "math"}>
       <G l="Operators" h="symbols"><div class="keys2"><K t="+" ins=" + " /><K t="−" ins=" - " /><K t="×" ins="*" /><K t="÷" ins="/" /><K t="xⁿ" ins="^" /><K t="√" ins="sqrt()" back={1} /><K t="( )" ins="()" back={1} /><K t="=" ins=" = " /><K t="≤" ins=" <= " /><K t="≥" ins=" >= " /><K t="x₁" ins="_" title="Subscript: type an underscore, then the subscript" /><K t=".." ins=" .. " title="A range: x = 0, 0.1 .. 10" /></div></G>
+      <G l="Complex" h="functions"><div class="keys2"><K t="j" ins="j" title="The imaginary unit: 4j, R + j*omega*L" /><K t="∠" ins="∠" title="Magnitude and angle: 230 V∠-30° (or type /_)" /><K t="|z|" ins="abs()" back={1} title="Magnitude" /><K t="arg" ins="arg()" back={1} title="Angle" /><K t="z̄" ins="conj()" back={1} title="Conjugate" /><K t="∥" ins="par(, )" back={3} title="In parallel: par(Z1, Z2)" /><K t="dB" ins="db()" back={1} title="Decibels of a ratio: 20·log₁₀|x|" /></div></G>
       <G l="Greek" h="symbols"><div class="keys2"><For each={GREEK}>{([g, n]) => <K t={g} ins={n} title={`${n} (type “${n}”)`} />}</For></div></G>
       <G l="Functions" h="functions"><div class="keys2 wide"><For each={FUNCS}>{([n, ins]) => <K t={n} ins={ins} back={ins.length - ins.indexOf("(") - 1} />}</For></div><B big i="list" l="All Functions" run={() => D.unitsList("functions")} /></G>
     </Show>

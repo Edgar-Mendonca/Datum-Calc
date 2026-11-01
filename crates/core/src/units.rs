@@ -232,16 +232,23 @@ fn ladder(dim: &Dim, us: bool) -> Option<&'static [&'static str]> {
         _ if k(d(-1, 0, 0, 0, 0, 0, 0, 0)) => &["1/m"],
         _ if k(d(0, 1, -2, 0, 0, 0, 0, 0)) => if us { &["lbf/ft"] } else { &["N/m", "kN/m"] },
         _ if k(d(1, 1, -2, 0, 0, 0, 0, 0)) => &["N"],
+        // Kinds that have a usual unit of their own: heat flux, mass flux, moment of inertia.
+        _ if k(d(0, 1, -3, 0, 0, 0, 0, 0)) => if us { &["BTU/(h*ft^2)"] } else { &["W/m^2", "kW/m^2"] },
+        _ if k(d(-2, 1, -1, 0, 0, 0, 0, 0)) => if us { &["lb/(h*ft^2)"] } else { &["kg/(m^2*s)"] },
+        _ if k(d(2, 1, 0, 0, 0, 0, 0, 0)) => if us { &["lb*ft^2"] } else { &["kg*m^2"] },
         _ => return None,
     })
 }
 
 /// The unit to show a value in: the user's choice if it fits, else the ladder for the unit system,
-/// else SI base units. Returns (factor, offset, label).
+/// else named SI units (W/m, K·m/W, J·s), else SI base units. Returns (factor, offset, label).
 pub fn display(si: f64, dim: &Dim, abs: bool, want: &str, us: bool) -> (f64, f64, String) {
     if !want.trim().is_empty() {
         if let Ok(u) = parse(want) {
             if same(&u.dim, dim) {
+                // A frequency counts cycles (Hz) and an angular speed radians (rad/s, rpm): 50 Hz is 3000 rpm
+                // and 314.2 rad/s is 50 Hz, one cycle being 2π rad.
+                if same(dim, &FREQ) && u.dim[7] != dim[7] { return (u.factor * (2.0 * PI).powi((dim[7] - u.dim[7]) as i32), 0.0, pretty(&u.text)); }
                 // An absolute temperature shown in °C/°F uses the offset; a difference uses Δ.
                 if u.offset != 0.0 && !abs { return (u.factor, 0.0, if u.factor == 1.0 { "Δ°C" } else { "Δ°F" }.into()); }
                 return (u.factor, if abs { u.offset } else { 0.0 }, pretty(&u.text));
@@ -259,7 +266,47 @@ pub fn display(si: f64, dim: &Dim, abs: bool, want: &str, us: bool) -> (f64, f64
         for s in l { if let Ok(u) = parse(s) { if si.abs() / u.factor >= 1.0 { pick = s; } } }
         if let Ok(u) = parse(pick) { return (u.factor, 0.0, pretty(pick)); }
     }
-    (1.0, 0.0, base_label(dim))
+    (1.0, 0.0, label(dim))
+}
+
+/// A dimension in named SI units where a short form exists (W/m, K·m/W, J·s, kg/(m²·s)), else base units.
+pub fn label(dim: &Dim) -> String { named(dim).unwrap_or_else(|| base_label(dim)) }
+
+/// The shortest product of one named unit (W, J, N, Pa, …) and up to three base units with this dimension;
+/// with as few parts, small powers win (J·s, not W·s²), then base units alone, then the earlier named unit (W/m
+/// before N/s). Kinds with a usual unit of their own (W/m², kg·m²) are in the ladder above.
+fn named(dim: &Dim) -> Option<String> {
+    const DERIVED: [(&str, Dim); 12] = [("W", POWER), ("J", ENERGY), ("N", FORCE), ("Pa", PRESS), ("V", VOLT), ("Ω", OHM), ("C", CHARGE), ("F", FARAD), ("H", HENRY), ("S", SIEMENS), ("Wb", WEBER), ("T", TESLA)];
+    const BASE: [(&str, usize); 6] = [("kg", 1), ("m", 0), ("s", 2), ("K", 3), ("A", 4), ("mol", 5)];
+    let target: [i8; 7] = std::array::from_fn(|i| dim[i]);
+    if target == [0; 7] { return None; }
+    // (parts, sum of all powers, a named unit at all, its rank, its power) → label: J·s before W·s² and kg·m²/s.
+    let mut best: Option<((usize, u8, bool, usize, i8), String)> = None;
+    for (rank, (sym, dd)) in std::iter::once(("", NONE)).chain(DERIVED).enumerate() {
+        for p in if sym.is_empty() { vec![0i8] } else { vec![1, -1] } {
+            let rest: [i8; 7] = std::array::from_fn(|i| target[i] - dd[i] * p);
+            let base: Vec<(usize, i8)> = BASE.iter().map(|b| (b.1, rest[b.1])).filter(|x| x.1 != 0).collect();
+            if rest[6] != 0 || base.len() > 3 || base.iter().any(|x| x.1.abs() > 4) { continue; }
+            let parts = base.len() + usize::from(p != 0);
+            if parts > 3 || parts == 0 { continue; }
+            let key = (parts, base.iter().map(|x| x.1.unsigned_abs()).sum::<u8>() + p.unsigned_abs(), p != 0, rank, -p);
+            if best.as_ref().is_some_and(|b| b.0 <= key) { continue; }
+            let mut num: Vec<String> = vec![];
+            let mut den: Vec<String> = vec![];
+            let mut put = |s: &str, e: i8| { let t = if e.abs() == 1 { s.to_string() } else { format!("{s}{}", sup(e.unsigned_abs() as i32)) }; if e > 0 { num.push(t) } else { den.push(t) } };
+            if p != 0 { put(sym, p); }
+            for (i, e) in &base { put(BASE.iter().find(|b| b.1 == *i).map(|b| b.0).unwrap_or("?"), *e); }
+            let text = match (num.is_empty(), den.len()) {
+                (true, 1) => format!("1/{}", den[0]),
+                (true, _) => format!("1/({})", den.join("·")),
+                (false, 0) => num.join("·"),
+                (false, 1) => format!("{}/{}", num.join("·"), den[0]),
+                (false, _) => format!("{}/({})", num.join("·"), den.join("·")),
+            };
+            best = Some((key, text));
+        }
+    }
+    best.map(|b| b.1)
 }
 
 /// SI base units for a dimension with no named unit, such as kg·m²/s³.

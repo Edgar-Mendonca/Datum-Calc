@@ -46,7 +46,7 @@ crates/core/src/parse.rs       lexer and Pratt parser: assignments, user functio
 crates/core/src/eval.rs        values (SI + dimension + abs temperature + vector + imaginary parts + the N·m reading), operators and complex arithmetic with dimension rules, built-in functions and constants, the sheet top to bottom (RegionOut: LaTeX, result, unit choices, check, plot, error), Variables, number formatting
 crates/core/src/latex.rs       expression tree → LaTeX (fractions, roots, subscripts, Greek, units in roman)
 crates/core/src/solve.rs       Brent's method after a 200-step scan for a sign change
-crates/core/src/packs.rs       the nineteen calc packs (include_str! of crates/core/packs/*.dcalc), cards for File › New
+crates/core/src/packs.rs       the twenty calc packs (include_str! of crates/core/packs/*.dcalc), cards for File › New
 crates/core/packs/getting-started.dcalc  the Getting Started sheet (packs::GETTING_STARTED, opened from File › Home and Help)
 crates/core/examples/dump.rs   also `-- <pack id> [us] [numbers]` dumps a pack as the window's state (used to render every pack in the built window for a check by eye)
 crates/core/examples/packs.rs  prints every pack worked out in SI and US units, for checking by eye
@@ -152,6 +152,10 @@ tests_ui/run.cjs               Playwright UI tests against ui/dist with a mocked
 | 0.1.10 | Updates need SHA256SUMS.txt; the shell writes a recovery copy, then exits (unless the user chose Don't save) | Installing exits at once; unsaved edits since the last autosave were lost |
 | 0.1.10 | A unit after brackets only on a plain or complex value; `nm` set for typed units with `*` (N*m), cleared by an angle factor | Review found (F/A) MPa multiplying instead of erroring, and M2*2 shown in J |
 | 0.1.10 | An independent review (a fresh agent, read-only, given the diff, not my conclusions) before a release that changes the engine or the shell | It found two recovery data-loss paths and two misleading units that my own checks missed |
+| 0.1.11 | ω = 2πf is marked `Val.w` (from `Val.pi`, a plain number made with π), shown in rad/s, without changing its dimension | A first try put the angle tag on ω: then ωτ, ωL/R and 1/(1 + jωτ) showed in degrees (×180/π) |
+| 0.1.11 | A frequency shown in a unit with the other angle tag converts cycles ↔ radians (×2π): 50 Hz = 3000 rpm, 314.2 rad/s = 50 Hz | Hz counts cycles, rad/s and rpm (as defined, 2π/60 rad/s) radians; SI makes both 1/s, which read 50 Hz as 477.5 rpm |
+| 0.1.11 | `units::label`: a kind with no ladder is written with one named unit and up to three base units, fewest parts and smallest powers first; usual units (W/m², kg/(m²·s), kg·m²) are ladder entries | User report: torque offered m²·kg/s; base units read badly for any compound kind |
+| 0.1.11 | Unit menu › Other unit… takes any unit of the kind; `∠` and `/_` for phasors; `log` after a plot range; `par`, `db`, complex trig; complex tables | The two user reports asked for a full solution, not the two cases |
 
 ## 3. Roadmap
 
@@ -174,7 +178,8 @@ tests_ui/run.cjs               Playwright UI tests against ui/dist with a mocked
 | 0.1.8 | Visitors' requests: complex numbers for AC circuits (View › Polar, re/im/arg/conj/polar), torque in N·m, AC circuit pack (17) | ✅ |
 | 0.1.9 | Recovery per window (two sheets open at once), Discard that deletes, packs 18–19 (insulated pipe, fillet weld), upright j, no utilisation for absolute temperatures | ✅ |
 | 0.1.10 | Save changes? before New/Open/pack/update; safer updates; review fixes (named recovery copy, lock age, typed torque, unit after brackets); Getting Started with torque and complex numbers | ✅ |
-| 0.1.11 | Fixes from trying every pack on a clean Windows PC and from the convention | 🔜 |
+| 0.1.11 | Complete frequency-domain work (∠ phasors, par, db, complex trig and tables, Bode plots on log axes, RC filter pack 20); ω in rad/s, Hz ↔ rpm right; named units for every kind; Other unit… | ✅ |
+| 0.1.12 | Fixes from trying every pack on a clean Windows PC and from the convention | 🔜 |
 | 0.2 | Materials from Datum Atlas, more packs, unit menus on results, symbolic simplify | ⬜ |
 | 0.3 | Matrices and linear systems, ODE solve, tables from CSV | ⬜ |
 | 0.4 | Programs inside a region, templates, a company title block | ⬜ |
@@ -261,11 +266,18 @@ tests_ui/run.cjs               Playwright UI tests against ui/dist with a mocked
 - Checks: clippy clean, 54 engine tests + 1 shell test, 86 UI tests, cargo deny; every sheet rendered in SI with Numbers and in US; 12,000 more random sheets.
 - Released 0.1.10. Still not tested: a clean Windows PC, the real Save as PDF dialog, an update from one release to the next on Windows.
 
+### 2026-11-01: Session 1, continued (0.1.11)
+- The user passed on the two visitor reports again (complex numbers for frequency-domain circuits; torque as N·m, not J or m²·kg/s) and asked for a full, generic solution in the next update. Both basic cases had shipped in 0.1.8; this release completes them.
+- Frequency domain: ∠ phasors, par, db, complex trigonometry, complex tables, log-axis plots with decade labels, RC filter pack (hand values first). Units: ω in rad/s via `Val.w`, cycles ↔ radians conversion, named units for any kind, Other unit…
+- Caught on the way: putting an angle tag on ω made every ratio built from it show in degrees; replaced by a display-only mark. Heat flux came out as kg/s³ from the naming rule; usual units moved into the ladder.
+- Checks: clippy clean, 57 engine tests + 1 shell test, 89 UI tests, cargo deny; every earlier pack prints exactly as in 0.1.10; all sheets rendered in SI with Numbers and in US; the RC filter's Bode plots looked at by eye; 18,000 more random sheets with the new syntax; an independent review of the diff.
+- Released 0.1.11. Still not tested: a clean Windows PC, the real Save as PDF dialog, an update from one release to the next on Windows.
+
 ## 5. Known limits and next steps
 
 - Energy and torque share a dimension: a force times a length (and a power over a speed) shows in N·m, a power times a time in J; m·g·h shows in N·m too (choose J in the unit menu).
-- Complex values work in arithmetic and in sqrt, exp, ln, abs, re, im, arg, conj, polar, sum and mean; trigonometric functions, checks, solve, plots, ranges and tables take real values only. Results show j, also when i was typed.
-- Hz, rad/s and rpm are all 1/s (the SI convention), so f = 50 Hz shown in rpm reads 477.5, not 3000; write ω = 2*pi*f or n = 3000 rpm explicitly.
+- Complex values work in arithmetic, tables and sqrt, exp, ln, sin, cos, tan, sinh, cosh, tanh, abs, re, im, arg, conj, polar, par, db, sum and mean; checks, solve, plots and ranges take real values (plot db(H) and arg(H)). Results show j, also when i was typed.
+- A frequency typed as 1/s, or worked out without π (P/T for a torque T typed in J), is read as cycles (Hz); write ω = 2*pi*f, or a speed in rpm or rad/s, where radians are meant.
 - Two windows that crash together leave two copies; the newest is offered first, the other at the next start.
 - Vectors are shown as their first values and the last; there are no matrices yet (0.3).
 - Tables hold values and formula columns, not free spreadsheet formulas per cell.

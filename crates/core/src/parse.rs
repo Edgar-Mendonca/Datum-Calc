@@ -49,14 +49,14 @@ pub fn lex(s: &str) -> Result<Vec<(Tok, Span)>, Error> {
         }
         let two: String = c[i..(i + 2).min(c.len())].iter().collect();
         let op: &'static str = match two.as_str() {
-            "<=" => "<=", ">=" => ">=", "==" => "==", "!=" => "!=", ".." => "..", "**" => "^",
+            "<=" => "<=", ">=" => ">=", "==" => "==", "!=" => "!=", ".." => "..", "**" => "^", "/_" => "∠",
             _ => match ch {
                 '+' => "+", '-' | '−' => "-", '*' | '·' | '×' | '⋅' => "*", '/' | '÷' => "/", '^' => "^", '(' => "(", ')' => ")", ',' => ",", '=' => "=",
-                '<' => "<", '>' => ">", '≤' => "<=", '≥' => ">=", '≠' => "!=", '²' => "²", '³' => "³", '%' => "%", ';' => ",", '…' => "..",
+                '<' => "<", '>' => ">", '≤' => "<=", '≥' => ">=", '≠' => "!=", '²' => "²", '³' => "³", '%' => "%", ';' => ",", '…' => "..", '∠' => "∠",
                 _ => return err(format!("“{ch}” cannot be used here."), (i, i + 1)),
             },
         };
-        i += if op.len() == 2 && two == op || two == "**" { 2 } else { 1 };
+        i += if op.len() == 2 && two == op || two == "**" || two == "/_" { 2 } else { 1 };
         if op == "%" { out.push((Tok::Id("%".into()), (start, i))); } else { out.push((Tok::Op(op), (start, i))); }
     }
     Ok(out)
@@ -89,7 +89,8 @@ pub enum Stmt {
     Range { name: String, at: Span, start: Node, next: Option<Node>, end: Node },
     Check { e: Node },
     Solve { lhs: Node, rhs: Node, var: String, lo: Node, hi: Node },
-    Plot { ys: Vec<Node>, var: String, lo: Node, hi: Node },
+    /// `log` after the range: a logarithmic x axis (a frequency sweep for a Bode plot).
+    Plot { ys: Vec<Node>, var: String, lo: Node, hi: Node, log: bool },
     Show { e: Node },
     Empty,
 }
@@ -178,7 +179,8 @@ impl P<'_> {
         loop {
             let Some(Tok::Op(op)) = self.peek().cloned() else {
                 if let Some(t) = self.peek() {
-                    if matches!(t, Tok::Num(_)) || matches!(t, Tok::Id(w) if w != "for" && w != "in") {
+                    let log_scale = matches!(t, Tok::Id(w) if w == "log") && !matches!(self.t.get(self.i + 1), Some((Tok::Op("("), _)));
+                    if !log_scale && (matches!(t, Tok::Num(_)) || matches!(t, Tok::Id(w) if w != "for" && w != "in")) {
                         let a = self.at();
                         let what = match t { Tok::Id(s) if lhs_is_num(&lhs) => format!("“{s}” is not a unit. Put * before it to multiply."), Tok::Id(s) => format!("Put an operator (such as *) before “{s}”."), _ => "Put an operator (such as *) before this number.".into() };
                         return err(what, a);
@@ -186,7 +188,7 @@ impl P<'_> {
                 }
                 break;
             };
-            let (bp, right) = match op { "<" | "<=" | ">" | ">=" | "==" | "!=" => (1, 2), "+" | "-" => (3, 4), "*" | "/" => (5, 6), "^" => (8, 7), "²" | "³" => (9, 0), _ => break };
+            let (bp, right) = match op { "<" | "<=" | ">" | ">=" | "==" | "!=" => (1, 2), "+" | "-" => (3, 4), "*" | "/" => (5, 6), "∠" => (7, 8), "^" => (8, 7), "²" | "³" => (9, 0), _ => break };
             if bp < min { break; }
             self.i += 1;
             if op == "²" || op == "³" {
@@ -342,7 +344,9 @@ pub fn statement(s: &str, known: &[String]) -> Result<Stmt, Error> {
             let mut ys = vec![p.expr(1)?];
             while p.is(",") { p.i += 1; ys.push(p.expr(1)?); }
             let (var, lo, hi) = p.for_in()?;
-            Stmt::Plot { ys, var, lo, hi }
+            let log = p.word("log");
+            if log { p.i += 1; }
+            Stmt::Plot { ys, var, lo, hi, log }
         }
         (Tok::Id(name), Some(Tok::Op("("))) if p.t.iter().any(|x| x.0 == Tok::Op("=")) && is_def(&p.t) => {
             let name = name.clone();

@@ -35,7 +35,7 @@ const check = (name, ok, info = "") => { console.log(`${ok ? "ok  " : "FAIL"} ${
   check("File page offers a blank sheet", (await p.textContent(".tiles")).includes("Blank Sheet"));
   // 1b. File › New lists the ten calc packs by field; a click opens one (0.1.3).
   await p.click(".bs aside button:has-text('New')"); await p.waitForTimeout(200);
-  check("New lists the nineteen calc packs", (await p.$$(".tiles.packs .tile")).length === 19 && (await p.$$eval("h3.packf", h => h.map(x => x.textContent))).join() === "Rotating equipment,Process,Mechanical,Electrical");
+  check("New lists the twenty calc packs", (await p.$$(".tiles.packs .tile")).length === 20 && (await p.$$eval("h3.packf", h => h.map(x => x.textContent))).join() === "Rotating equipment,Process,Mechanical,Electrical");
   await p.click(".tiles.packs .tile:has-text('Pump power')"); await p.waitForTimeout(200);
   check("a pack tile opens that pack", JSON.stringify(await p.evaluate(() => window.__calls.filter(c => c[0] === "new_from_pack").pop())).includes("pump-power"));
   await p.click(".tabs .file").catch(() => {}); await p.waitForTimeout(100);
@@ -88,6 +88,11 @@ const check = (name, ok, info = "") => { console.log(`${ok ? "ok  " : "FAIL"} ${
   check("the unit menu offers hp", (await p.$$eval(".menu button", bs => bs.map(b => b.textContent))).some(t => t.includes("hp")));
   await p.click(".menu button:has-text('hp')"); await p.waitForTimeout(120);
   check("choosing a unit sets the region's unit", (await lastApply()).includes('"field":"unit"') && (await lastApply()).includes('"hp"'), await lastApply());
+  // Any unit can be typed: Other unit… (0.1.11).
+  await (await R(5)).$eval(".unitbtn", b => b.click()); await p.waitForTimeout(120);
+  await p.click(".menu button:has-text('Other unit')"); await p.waitForTimeout(120);
+  await p.fill(".dlg input.find", "kN*m/s"); await p.click(".dlg footer .btn.pri"); await p.waitForTimeout(120);
+  check("Other unit… sets a typed unit", (await lastApply()).includes('"value":"kN*m/s"'), await lastApply());
   const vars = await p.$$eval(".vars .vlist tr", rs => rs.map(r => r.textContent));
   check("the Variables panel lists every name with its value", vars.length === 9 && vars.some(v => v.includes("19.61") && v.includes("kW")), JSON.stringify(vars));
   check("the panel counts the checks and errors", (await p.textContent(".vars")).includes("1 of 1 pass") && (await p.textContent(".vars")).includes("1 line with errors"));
@@ -248,6 +253,17 @@ const check = (name, ok, info = "") => { console.log(`${ok ? "ok  " : "FAIL"} ${
   const acApply = await p3.evaluate(() => JSON.stringify(window.__calls.filter(c => c[0] === "apply").pop() ?? null));
   check("View › Polar turns polar form off", acApply.includes('"field":"polar"') && acApply.includes('"value":false'), acApply);
   await p3.close();
+
+  // 13b. The RC filter: Bode plots with a log frequency axis draw; the Complex keys type j and ∠ (0.1.11).
+  const p6 = await b.newPage({ viewport: { width: 1440, height: 1400 } });
+  p6.on("pageerror", e => errors.push(String(e)));
+  await p6.addInitScript(st => { window.__calls = []; window.__TAURI__ = { core: { invoke: async (c, a) => { window.__calls.push([c, a]); return c === "state" || c === "apply" ? st : c === "options" ? { theme: "light", autosave: 0, units: "SI", digits: 4, paper: "A4", number: "auto" } : c === "recent" || c === "packs" ? [] : null; } }, event: { listen: async () => () => {} } }; }, fix.rc);
+  await p6.goto(url); await p6.waitForTimeout(500); await p6.click(".bs aside .back"); await p6.waitForTimeout(600);
+  const bode = [(await p6.$$(".cpage canvas")).length, (await p6.$$(".cpage .katex-error")).length, /log[\s\u00a0]scale/.test(await p6.textContent(".cpage")), (await p6.$$(".cpage .rerr")).length];
+  check("Bode plots draw on a log frequency axis", bode[0] === 2 && bode[1] === 0 && bode[2] && bode[3] === 0, JSON.stringify(bode));
+  await p6.click(".tabs > button:text-is('Math')"); await p6.waitForTimeout(100);
+  check("the Math tab has the complex keys", (await p6.$$eval(".ribbon .rb.key", bs => bs.map(b => b.textContent))).filter(t => ["j", "∠", "dB"].includes(t)).length === 3);
+  await p6.close();
 
   // 14. Recovery: Discard removes the kept copy; × only closes, so the copy is offered again next time (0.1.9).
   for (const [how, sel, want] of [["Discard", ".dlg footer .btn:not(.pri)", true], ["×", ".dlg header .x", false]]) {

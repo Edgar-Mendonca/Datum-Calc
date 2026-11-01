@@ -178,7 +178,7 @@ fn display_picks_a_good_unit() {
     assert_eq!(result(&["k = 0.5 W/(m*K)"]), "0.5 W/(m·K)");
     assert_eq!(result(&["U = 450 W/(m^2*K)"]), "450 W/(m²·K)");
     assert_eq!(result(&["w = 2 kg*m^2/s"]), "2 kg·m²/s");
-    assert_eq!(result(&["w = 2 kg*m^2/s*1"]), "2 m²·kg/s");
+    assert_eq!(result(&["w = 2 kg*m^2/s*1"]), "2 J·s", "a kind with no unit of its own reads in named units");
     assert_eq!(result(&["r = 3 m / (2 m)"]), "1.5");
     assert_eq!(result(&["θ = 30 deg"]), "30 deg");
     assert_eq!(result(&["θ = 30 deg*1"]), "30°");
@@ -491,7 +491,7 @@ mod packs {
     #[test]
     fn all_packs_open_and_list() {
         let cards = crate::packs::cards();
-        assert_eq!(cards.len(), 19);
+        assert_eq!(cards.len(), 20);
         for c in &cards { assert!(!c.name.is_empty() && !c.desc.is_empty() && !c.field.is_empty() && c.checks > 0, "{}", c.id); }
     }
 
@@ -632,6 +632,26 @@ mod packs {
         assert!(o.regions.iter().any(|r| r.result == "1509 N/mm") && o.regions.iter().any(|r| r.result == "PASS (150 mm ≥ 36 mm)"));
         let c = checks(&o);
         assert!(c.iter().all(|c| c.0) && close(c[0].1, 0.552_312_1, 1e-6));
+    }
+
+    #[test]
+    fn rc_filter() {
+        // τ = 1.6 kΩ × 100 nF = 160 µs; f_c = 1/(2π τ) = 994.72 Hz; H(5 kHz) = 1/(1 + j 2π 5000 τ) = 0.038072 − 0.19137j;
+        // |H| = 0.19512 → −14.194 dB; ∠ −78.748°; attenuation 14.194 dB ≥ 12 dB.
+        let (o, e) = run("rc-filter");
+        assert!(close(v(&e, "f_c"), 994.718_394, 1e-8));
+        let h = e.vars.get("H_s").unwrap();
+        assert!(close(h.v[0], 0.038_071_761, 1e-7) && close(h.im[0], -0.191_369_543, 1e-7));
+        assert!(close(v(&e, "G_s"), -14.193_970_4, 1e-8));
+        assert!(close(v(&e, "phi_s").to_degrees(), -78.748_274_3, 1e-8));
+        assert!(o.regions.iter().any(|r| r.result == "994.7 Hz") && o.regions.iter().any(|r| r.result == "0.03807 − 0.1914j"), "a ratio, not an angle");
+        assert!(checks(&o)[0].0);
+        let plots: Vec<_> = o.regions.iter().filter_map(|r| r.plot.as_ref()).collect();
+        assert!(plots.len() == 2 && plots.iter().all(|p| p.logx && p.xunit == "Hz"));
+        let p = plots[0];
+        assert!(close(p.xs[0], 10.0, 1e-12) && close(*p.xs.last().unwrap(), 100_000.0, 1e-9) && close(p.xs[30], 100.0, 1e-9), "evenly spaced in decades");
+        assert!(close(p.series[0].ys[60], 20.0 * (1.0 / (1.0f64 + (1000.0 / 994.718_394f64).powi(2)).sqrt()).log10(), 1e-6), "−3 dB near the cut-off");
+        assert_eq!(plots[1].yunit, "°");
     }
 
     #[test]
@@ -827,7 +847,7 @@ fn complex_numbers() {
     for (lines, msg) in [
         (&["z = 3 + 4j", "check z <= 5"][..], "A check needs a real value"),
         (&["z = 3 + 4j", "z < 5"][..], "Complex values cannot be compared"),
-        (&["z = 3 + 4j", "sin(z)"][..], "sin needs real values"),
+        (&["z = 3 + 4j", "min(z, 1)"][..], "min needs real values"),
         (&["x = 0 .. 1j"][..], "A range needs a real value"),
         (&["3 + 4j Ω"][..], "Cannot add a pure number and"),
         (&["z = 1j", "z/(0j)"][..], "Division by zero"),
@@ -853,4 +873,55 @@ fn complex_numbers() {
     let tex: Vec<&str> = o.regions.iter().map(|r| r.latex.as_str()).collect();
     assert_eq!(tex[1..], ["Z = 3 + \\mathrm{j} \\cdot w", "f\\left(j\\right) = {j}^{2}", "i \\cdot w \\quad \\text{for } i \\in \\left[0, 1\\right]", "j = 5", "k = j \\cdot 2"]);
     assert!(!crate::sheet::Sheet::from_json(&serde_json::to_string(&s).unwrap()).unwrap().polar);
+}
+
+#[test]
+fn angular_frequency_and_named_units() {
+    // ω = 2π × 50 Hz = 314.16 rad/s = 3000 rpm; 50 Hz = 3000 rpm (one revolution a cycle); 1480 rpm = 24.667 Hz.
+    assert_eq!(result(&["f = 50 Hz", "w = 2*pi*f"]), "314.2 rad/s");
+    assert_eq!(result(&["w = 2*pi/(20 ms)"]), "314.2 rad/s");
+    assert_eq!(result(&["f = 50 Hz", "w = 2*pi*f", "w/(2*pi)"]), "50 Hz");
+    let shown = |lines: &[&str], unit: &str| { let mut s = sheet(lines); s.regions.last_mut().unwrap().unit = unit.into(); eval::run(&s).regions.last().unwrap().result.clone() };
+    assert_eq!(shown(&["f = 50 Hz"], "rpm"), "3000 rpm");
+    assert_eq!(shown(&["f = 50 Hz", "w = 2*pi*f"], "rpm"), "3000 rpm");
+    assert_eq!(shown(&["f = 50 Hz", "w = 2*pi*f"], "Hz"), "50 Hz");
+    assert_eq!(shown(&["f = 50 Hz"], "rad/s"), "314.2 rad/s");
+    assert_eq!(shown(&["n = 1480 rpm"], "Hz"), "24.67 Hz");
+    // Nothing worked out from ω is an angle: Q = ωL/R and 1/(1 + jωτ) are plain numbers.
+    assert_eq!(result(&["f = 50 Hz", "w = 2*pi*f", "Q = w*30 mH/(10 Ω)"]), "0.9425");
+    assert_eq!(result(&["f = 50 Hz", "w = 2*pi*f", "X = w*30 mH"]), "9.425 Ω");
+    assert!(run(&["f = 50 Hz"]).regions[0].units.contains(&"rad/s".to_string()));
+    // Kinds with no unit of their own read in named SI units, not base units.
+    for (line, want) in [("q = 81 W/m", "81 W/m"), ("R = 1.86 K*m/W*1", "1.86 m·K/W"), ("G = 3 kg/(m^2*s)*1", "3 kg/(m²·s)"), ("k = 5 W/K*1", "5 W/K"),
+        ("p = 4 N*s*1", "4 N·s"), ("E = 2 V/m*1", "2 V/m"), ("I = 2 kg*m^2*1", "2 kg·m²"), ("x = 2 W/m^2*1", "2 W/m²")] {
+        assert_eq!(result(&[line]), want, "{line}");
+        assert!(units::parse(&result(&[line]).split_once(' ').unwrap().1.replace('·', "*")).is_ok(), "{line}: the label is a unit that can be typed");
+    }
+}
+
+#[test]
+fn complex_numbers_for_ac_analysis() {
+    // 10 Ω∠30° = 8.660 + 5j Ω; par(10, −20j) = −200j/(10 − 20j) = 8 − 4j; cosh(1 + j) = 0.83373 + 0.98890j; sin(2j) = 3.6269j;
+    // db(1/(1 + j)) = 20 log₁₀(0.70711) = −3.0103.
+    assert_eq!(result(&["Z = 10 Ω∠30°"]), "(8.66 + 5j) Ω");
+    assert_eq!(result(&["V = 230 V/_-30 deg"]), "(199.2 − 115j) V", "/_ is the typed form of ∠");
+    assert_eq!(result(&["2*10∠90°"]), "20j", "∠ binds before ×");
+    assert_eq!(result(&["par(10 Ω, -20j Ω)"]), "(8 − 4j) Ω");
+    assert_eq!(result(&["par(2 Ω, 2 Ω, 1 Ω)"]), "500 mΩ");
+    assert_eq!(result(&["cosh(1 + 1j)"]), "0.8337 + 0.9889j");
+    assert_eq!(result(&["sin(2j)"]), "3.627j");
+    assert_eq!(result(&["db(1/(1 + 1j))"]), "-3.01");
+    assert_eq!(error(&["par(1 Ω, 0 Ω)"]), "par of a zero value (a short circuit).");
+    assert!(error(&["db(2 V)"]).starts_with("db needs a plain number"));
+    assert!(error(&["plot x for x in 0 Hz .. 1 kHz log"]).starts_with("A log scale needs a range above zero"));
+    assert_eq!(run(&["Z = 10 Ω∠30°"]).regions[0].latex, "Z = 10\\,\\mathrm{\\Omega }\\angle 30\\,\\mathrm{{^\\circ}}");
+    // A table of impedances over frequency: a complex formula column, and complex cells typed with the column's unit.
+    let mut s = sheet(&["L = 30 mH"]);
+    s.regions.push(Region { id: 9, kind: Kind::Table, data: serde_json::json!({ "cols": [{ "name": "f_t", "unit": "Hz" }, { "name": "Z_t", "formula": "10 Ω + j*2*pi*f_t*L" }, { "name": "Z_m", "unit": "Ω" }], "rows": [["50", "", "3 + 4j"], ["100", "", "1j"]] }), ..Default::default() });
+    let o = eval::run(&s);
+    let t = o.regions[1].table.as_ref().unwrap();
+    assert!(o.regions[1].error.is_none(), "{:?}", o.regions[1].error);
+    assert_eq!(t.cols[1].cells, ["10 + 9.425j", "10 + 18.85j"]);
+    assert_eq!(t.cols[1].unit, "Ω");
+    assert_eq!(t.cols[2].cells, ["3 + 4j", "1j"]);
 }

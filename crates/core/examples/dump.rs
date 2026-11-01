@@ -43,5 +43,8 @@ fn main() {
     let mut ac = datum_core::packs::sheet("ac-circuit").expect("the AC pack opens");
     (ac.polar, ac.subst) = (true, true);
     let ac = serde_json::json!({ "sheet": ac, "calc": eval::run(&ac), "path": null, "dirty": false, "undo": false, "redo": false, "rev": 1 });
-    println!("{}", serde_json::json!({ "state": state, "packs": datum_core::packs::cards(), "ac": ac }));
+    // The RC filter pack: Bode plots on a log frequency axis (0.1.11).
+    let rc = datum_core::packs::sheet("rc-filter").expect("the RC pack opens");
+    let rc = serde_json::json!({ "sheet": rc, "calc": eval::run(&rc), "path": null, "dirty": false, "undo": false, "redo": false, "rev": 1 });
+    println!("{}", serde_json::json!({ "state": state, "packs": datum_core::packs::cards(), "ac": ac, "rc": rc }));
 }

@@ -53,7 +53,7 @@ pub fn unit(label: &str) -> String {
 
 fn unit_of(u: &crate::units::UnitExpr) -> String { unit(&crate::units::pretty(&u.text)) }
 
-const FUNCS: [&str; 26] = ["sin", "cos", "tan", "sinh", "cosh", "tanh", "ln", "log", "exp", "min", "max", "asin", "acos", "atan", "atan2", "abs", "round", "floor", "ceil", "sum", "mean", "len", "re", "im", "arg", "conj"];
+const FUNCS: [&str; 28] = ["db", "par", "sin", "cos", "tan", "sinh", "cosh", "tanh", "ln", "log", "exp", "min", "max", "asin", "acos", "atan", "atan2", "abs", "round", "floor", "ceil", "sum", "mean", "len", "re", "im", "arg", "conj"];
 
 fn prec(n: &Node) -> u8 {
     match &n.e { E::Bin(op, ..) => match *op { "<" | "<=" | ">" | ">=" | "==" | "!=" => 1, "+" | "-" => 3, "*" => 5, "/" => 9, _ => 7 }, E::Neg(_) => 4, _ => 9 }
@@ -99,11 +99,13 @@ fn nd(n: &Node, s: &Sub) -> String {
                 }
                 "+" => format!("{} + {}", wrap(a, 3), wrap(b, 3)),
                 "-" => format!("{} - {}", wrap(a, 3), if prec(b) <= 3 && !matches!(b.e, E::Group(_)) { format!("\\left({}\\right)", nd(b, s)) } else { nd(b, s) }),
+                "∠" => format!("{}\\angle {}", wrap(a, 7), if matches!(&b.e, E::Neg(x) if matches!(x.e, E::Num(..))) { nd(b, s) } else { wrap(b, 7) }),
                 o => format!("{} {} {}", nd(a, s), match o { "<" => "<", "<=" => "\\le", ">" => ">", ">=" => "\\ge", "==" => "=", _ => "\\ne" }, nd(b, s)),
             }
         }
         E::Call(f, args) => {
-            let a: Vec<String> = args.iter().map(|x| strip(x, s)).collect();
+            // A substituted complex value is bracketed already; inside a function's own brackets once is enough.
+            let a: Vec<String> = args.iter().map(|x| { let t = strip(x, s); match (&x.e, t.strip_prefix("\\left(").and_then(|r| r.strip_suffix("\\right)"))) { (E::Var(_), Some(inner)) if !inner.contains("\\right)") => inner.to_string(), _ => t } }).collect();
             match f.as_str() {
                 "sqrt" if a.len() == 1 => format!("\\sqrt{{{}}}", a[0]),
                 "cbrt" if a.len() == 1 => format!("\\sqrt[3]{{{}}}", a[0]),
@@ -113,7 +115,7 @@ fn nd(n: &Node, s: &Sub) -> String {
                 "exp" if a.len() == 1 => format!("e^{{{}}}", a[0]),
                 "if" if a.len() == 3 => format!("\\begin{{cases}} {} & \\text{{if }} {} \\\\ {} & \\text{{otherwise}} \\end{{cases}}", a[1], a[0], a[2]),
                 "log" if a.len() == 1 => format!("\\log_{{10}}\\left({}\\right)", a[0]),
-                f if FUNCS.contains(&f) => format!("\\{}\\left({}\\right)", if matches!(f, "atan2" | "round" | "floor" | "ceil" | "sum" | "mean" | "len" | "asin" | "acos" | "atan" | "abs" | "re" | "im" | "arg" | "conj") { format!("operatorname{{{f}}}") } else { f.to_string() }, a.join(", ")),
+                f if FUNCS.contains(&f) => format!("\\{}\\left({}\\right)", if matches!(f, "atan2" | "round" | "floor" | "ceil" | "sum" | "mean" | "len" | "asin" | "acos" | "atan" | "abs" | "re" | "im" | "arg" | "conj" | "db" | "par") { format!("operatorname{{{f}}}") } else { f.to_string() }, a.join(", ")),
                 f => format!("{}\\left({}\\right)", name(f), a.join(", ")),
             }
         }
@@ -135,7 +137,7 @@ pub fn stmt_with(s: &Stmt, sub: &Sub) -> String {
         Stmt::Range { name: n, start, next, end, .. } => format!("{} = {}{} \\ldots {}", name(n), node(start), next.as_ref().map(|x| format!(", {}", node(x))).unwrap_or_default(), node(end)),
         Stmt::Check { e } => node(e),
         Stmt::Solve { lhs, rhs, var, lo, hi } => format!("{} = {} \\quad \\text{{for }} {} \\in \\left[{}, {}\\right]", node(lhs), node(rhs), name(var), node(lo), node(hi)),
-        Stmt::Plot { ys, var, lo, hi } => format!("{} \\quad \\text{{for }} {} \\in \\left[{}, {}\\right]", ys.iter().map(&node).collect::<Vec<_>>().join(",\\; "), name(var), node(lo), node(hi)),
+        Stmt::Plot { ys, var, lo, hi, log } => format!("{} \\quad \\text{{for }} {} \\in \\left[{}, {}\\right]{}", ys.iter().map(&node).collect::<Vec<_>>().join(",\\; "), name(var), node(lo), node(hi), if *log { "\\;\\text{(log scale)}" } else { "" }),
         Stmt::Show { e } => node(e),
         Stmt::Empty => String::new(),
     }
@@ -150,7 +152,7 @@ pub fn plain(n: &Node) -> String {
         E::Var(v) => canon(v),
         E::Group(e) => format!("({})", plain(e)),
         E::Neg(e) => format!("−{}", plain(e)),
-        E::Bin(op, a, b) => format!("{}{}{}", plain(a), match *op { "*" => "·", "-" => " − ", "+" => " + ", "/" => "/", "^" => "^", o => o }, plain(b)),
+        E::Bin(op, a, b) => format!("{}{}{}", plain(a), match *op { "*" => "·", "-" => " − ", "+" => " + ", "/" => "/", "^" => "^", "∠" => "∠", o => o }, plain(b)),
         E::Call(f, args) => format!("{}({})", canon(f), args.iter().map(plain).collect::<Vec<_>>().join(", ")),
     }
 }

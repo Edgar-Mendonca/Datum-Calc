@@ -1,14 +1,15 @@
 // What the engine worked out, shown: maths (KaTeX), results with their units, PASS/FAIL badges,
 // errors on their line, plots, and the Variables panel. Used on screen and on paper.
-import { For, Show, createMemo, onCleanup, onMount } from "solid-js";
+import { For, Show, createMemo, createSignal, onCleanup, onMount } from "solid-js";
 import katex from "katex";
 import "katex/dist/katex.min.css";
-import { Chart, LineController, LineElement, PointElement, LinearScale, Tooltip, Legend } from "chart.js";
+import { Chart, LineController, LineElement, PointElement, LinearScale, LogarithmicScale, Tooltip, Legend } from "chart.js";
 import { PlotOut, Region, RegionOut, TableOut } from "./api";
-import { out, act, call, openMenu, setSelId, toast } from "./store";
+import { out, act, call, openMenu, openDialog, setSelId, toast } from "./store";
+import { Dialog } from "./ui";
 import { Help } from "./help";
 
-Chart.register(LineController, LineElement, PointElement, LinearScale, Tooltip, Legend);
+Chart.register(LineController, LineElement, PointElement, LinearScale, LogarithmicScale, Tooltip, Legend);
 
 const cache = new Map<string, string>();
 /** LaTeX to HTML, cached (the same maths is drawn again on every change). */
@@ -28,8 +29,20 @@ export const outs = createMemo(() => new Map((out()?.calc.regions ?? []).map(r =
 
 const unitMenu = (e: MouseEvent, r: Region, o: RegionOut) => openMenu(e, [
   { label: "Automatic", on: !r.unit, run: () => act({ Set: { id: r.id, field: "unit", value: "" } }) }, "-",
-  ...o.units.map(u => ({ label: u, on: r.unit === u, run: () => act({ Set: { id: r.id, field: "unit", value: u } }) })),
+  ...o.units.map(u => ({ label: u, on: r.unit === u, run: () => act({ Set: { id: r.id, field: "unit", value: u } }) })), "-",
+  { label: "Other unit…", on: !!r.unit && !o.units.includes(r.unit), run: () => otherUnit(r, o) },
 ]);
+
+/** Any unit of the same kind, typed: kN·mm, lbf·in, J/rad, W/(m²·K). The engine says if it does not fit. */
+const otherUnit = (r: Region, o: RegionOut) => openDialog(() => {
+  const [u, setU] = createSignal(r.unit || o.unit);
+  return (
+    <Dialog title="Show this result in" ok={() => { act({ Set: { id: r.id, field: "unit", value: u().trim() } }); }} help="units">
+      <p class="muted">Type any unit of the same kind, such as N*m, kN*mm, lbf*in, W/(m^2*K) or rad/s.</p>
+      <input class="find" value={u()} onInput={e => setU(e.currentTarget.value)} />
+    </Dialog>
+  );
+});
 
 /** The text the user typed, with the part in error underlined. */
 const Marked = (p: { text: string; from: number; to: number }) => {
@@ -82,7 +95,9 @@ export const PlotView = (p: { p: PlotOut; id: number; paper?: boolean }) => {
         plugins: { legend: { display: p.p.series.length > 1, position: "top", labels: { boxWidth: 14, font: { family: "IBM Plex Sans", size: 11 }, color: "#1B2733" } },
           tooltip: { enabled: !p.paper, callbacks: { title: it => `${p.p.xlabel} = ${(it[0]?.parsed.x ?? 0).toPrecision(4)} ${p.p.xunit}`, label: it => `${it.dataset.label}: ${(it.parsed.y ?? 0).toPrecision(4)} ${p.p.yunit}` } } },
         scales: {
-          x: { type: "linear", min: p.p.xs[0], max: p.p.xs[p.p.xs.length - 1], title: { display: true, text: `${p.p.xlabel}${p.p.xunit ? ` (${p.p.xunit})` : ""}`, color: "#1B2733", font: { family: "IBM Plex Sans", size: 11 } }, grid: { color: "#EEF0F2" }, border: { color: "#5B6878" }, ticks: { color: "#3B4859", font: { size: 10 } } },
+          // A log axis labels its decades only (10, 100, 1000 …); the grid still shows the steps between.
+          x: { type: p.p.logx ? "logarithmic" : "linear", min: p.p.xs[0], max: p.p.xs[p.p.xs.length - 1], title: { display: true, text: `${p.p.xlabel}${p.p.xunit ? ` (${p.p.xunit})` : ""}`, color: "#1B2733", font: { family: "IBM Plex Sans", size: 11 } }, grid: { color: "#EEF0F2" }, border: { color: "#5B6878" },
+            ticks: { color: "#3B4859", font: { size: 10 }, ...(p.p.logx ? { autoSkip: false, maxRotation: 0, callback: (v: string | number) => Math.abs(Math.log10(+v) - Math.round(Math.log10(+v))) < 1e-9 ? (+v).toLocaleString("en-US").replace(/,/g, "\u2009") : "" } : {}) } },
           y: { title: { display: !!p.p.yunit, text: p.p.yunit, color: "#1B2733", font: { family: "IBM Plex Sans", size: 11 } }, grid: { color: "#EEF0F2" }, border: { color: "#5B6878" }, ticks: { color: "#3B4859", font: { size: 10 } } },
         },
       },

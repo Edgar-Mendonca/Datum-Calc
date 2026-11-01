@@ -9,9 +9,11 @@ use std::collections::HashMap;
 
 /// A value: one number or a vector, in SI base units, with its dimension. `abs` marks an absolute
 /// temperature (given in °C or °F); `logic` marks the result of a comparison. `im` holds the imaginary
-/// parts of a complex value (empty when it is real); `nm` marks a force times a length, shown in N·m.
+/// parts of a complex value (empty when it is real); `nm` marks a force times a length, shown in N·m;
+/// `pi` marks a plain number made with π (2π); `w` marks a frequency made with it (ω = 2πf), shown in rad/s.
+/// Neither changes the dimension, so nothing worked out from ω (ωτ, ωL/R) is taken for an angle.
 #[derive(Debug, Clone, PartialEq, Default)]
-pub struct Val { pub v: Vec<f64>, pub dim: Dim, pub abs: bool, pub vec: bool, pub logic: bool, pub im: Vec<f64>, pub nm: bool }
+pub struct Val { pub v: Vec<f64>, pub dim: Dim, pub abs: bool, pub vec: bool, pub logic: bool, pub im: Vec<f64>, pub nm: bool, pub pi: bool, pub w: bool }
 
 impl Val {
     pub fn num(x: f64, dim: Dim) -> Self { Self { v: vec![x], dim, ..Default::default() } }
@@ -51,7 +53,7 @@ pub fn canon(name: &str) -> String {
 /// Built-in constants (a name defined on the sheet takes their place).
 fn constant(name: &str) -> Option<Val> {
     Some(match name {
-        "π" => Val::plain(std::f64::consts::PI),
+        "π" => Val { pi: true, ..Val::plain(std::f64::consts::PI) },
         "e" => Val::plain(std::f64::consts::E),
         "g" => Val::num(9.806_65, [1, 0, -2, 0, 0, 0, 0, 0]),
         "R" => Val::num(8.314_462_618, [2, 1, -2, -1, 0, -1, 0, 0]),
@@ -68,7 +70,7 @@ pub const CONSTANTS: [(&str, &str); 9] = [("π", "pi, 3.14159…"), ("j", "the i
     ("σ_SB", "Stefan–Boltzmann constant, 5.670374419×10⁻⁸ W/(m²·K⁴)"), ("N_A", "Avogadro constant, 6.02214076×10²³ /mol"), ("k_B", "Boltzmann constant, 1.380649×10⁻²³ J/K"), ("c_0", "speed of light, 299792458 m/s")];
 
 /// Built-in functions: name, arguments, what it does (for help and the window's menus).
-pub const FUNCTIONS: [(&str, &str); 32] = [
+pub const FUNCTIONS: [(&str, &str); 34] = [
     ("sqrt(x)", "square root"), ("cbrt(x)", "cube root"), ("abs(x)", "absolute value"), ("exp(x)", "e to the power x"), ("ln(x)", "natural logarithm"), ("log(x)", "logarithm base 10"),
     ("sin(x)", "sine (x in rad, or with deg)"), ("cos(x)", "cosine"), ("tan(x)", "tangent"), ("asin(x)", "inverse sine (an angle)"), ("acos(x)", "inverse cosine"), ("atan(x)", "inverse tangent"),
     ("atan2(y, x)", "angle of the point (x, y)"), ("sinh(x)", "hyperbolic sine"), ("cosh(x)", "hyperbolic cosine"), ("tanh(x)", "hyperbolic tangent"),
@@ -76,7 +78,8 @@ pub const FUNCTIONS: [(&str, &str); 32] = [
     ("if(test, a, b)", "a when the test holds, otherwise b"), ("sum(v)", "sum of a vector"), ("mean(v)", "mean of a vector"), ("len(v)", "number of values"),
     ("interp(x, xs, ys)", "straight-line interpolation in a table"), ("hypot(a, b)", "√(a² + b²)"),
     ("re(z)", "real part of a complex value"), ("im(z)", "imaginary part"), ("arg(z)", "angle of a complex value"), ("conj(z)", "complex conjugate"),
-    ("polar(r, θ)", "the complex value r∠θ"),
+    ("polar(r, θ)", "the complex value r∠θ; also written r∠θ (or r/_θ)"), ("par(a, b, …)", "values in parallel: 1/(1/a + 1/b + …), for impedances"),
+    ("db(x)", "decibels of a ratio: 20·log₁₀|x|"),
 ];
 
 pub struct Env {
@@ -177,7 +180,7 @@ pub fn dim_name(d: &Dim) -> String {
         ("a temperature", TEMP), ("an area", [2, 0, 0, 0, 0, 0, 0, 0]), ("a volume", [3, 0, 0, 0, 0, 0, 0, 0]), ("a force", [1, 1, -2, 0, 0, 0, 0, 0]),
         ("a pressure", [-1, 1, -2, 0, 0, 0, 0, 0]), ("an energy", [2, 1, -2, 0, 0, 0, 0, 0]), ("a power", [2, 1, -3, 0, 0, 0, 0, 0]), ("a speed", [1, 0, -1, 0, 0, 0, 0, 0]),
         ("a flow", [3, 0, -1, 0, 0, 0, 0, 0]), ("a current", [0, 0, 0, 0, 1, 0, 0, 0])];
-    named.iter().find(|x| units::same(&x.1, d)).map(|x| x.0.to_string()).unwrap_or_else(|| format!("a value in {}", units::base_label(d)))
+    named.iter().find(|x| units::same(&x.1, d)).map(|x| x.0.to_string()).unwrap_or_else(|| format!("a value in {}", units::label(d)))
 }
 
 fn zip(a: &Val, b: &Val, at: Span, f: impl Fn(f64, f64) -> f64) -> R<Vec<f64>> {
@@ -231,6 +234,10 @@ fn cmul(a: (f64, f64), b: (f64, f64)) -> (f64, f64) { (a.0 * b.0 - a.1 * b.1, a.
 fn cdiv(a: (f64, f64), b: (f64, f64)) -> (f64, f64) { let d = b.0 * b.0 + b.1 * b.1; ((a.0 * b.0 + a.1 * b.1) / d, (a.1 * b.0 - a.0 * b.1) / d) }
 fn cexp(a: (f64, f64)) -> (f64, f64) { let r = a.0.exp(); (r * a.1.cos(), r * a.1.sin()) }
 fn cln(a: (f64, f64)) -> (f64, f64) { (a.0.hypot(a.1).ln(), a.1.atan2(a.0)) }
+fn csin(a: (f64, f64)) -> (f64, f64) { (a.0.sin() * a.1.cosh(), a.0.cos() * a.1.sinh()) }
+fn ccos(a: (f64, f64)) -> (f64, f64) { (a.0.cos() * a.1.cosh(), -a.0.sin() * a.1.sinh()) }
+fn csinh(a: (f64, f64)) -> (f64, f64) { (a.0.sinh() * a.1.cos(), a.0.cosh() * a.1.sin()) }
+fn ccosh(a: (f64, f64)) -> (f64, f64) { (a.0.cosh() * a.1.cos(), a.0.sinh() * a.1.sin()) }
 fn csqrt(a: (f64, f64)) -> (f64, f64) { let r = a.0.hypot(a.1); (((r + a.0) / 2.0).sqrt(), ((r - a.0) / 2.0).sqrt().copysign(a.1)) }
 
 /// The number of values an operation on a and b gives (vectors must match).
@@ -276,7 +283,33 @@ fn bin_complex(op: &str, a: Val, b: Val, at: Span, rat: Span) -> R<Val> {
     Ok(Val { v: re, im, dim, vec: a.vec || b.vec, nm: moment(op, &a, &b, &dim), ..Default::default() })
 }
 
+/// 2π times a frequency in cycles (Hz), or 2π over a period, is an angular frequency, shown in rad/s; ω/(2π) is
+/// back in Hz. A plain number made with π keeps its mark through plain factors (2*pi, pi/30), and ω keeps
+/// its mark through plain factors and sums of angular frequencies.
+fn angular(op: &str, a: &Val, b: &Val, mut r: Val) -> Val {
+    let plain = |v: &Val| units::is_none(&v.dim) && v.dim[7] == 0;
+    let freq = |v: &Val| units::same(&v.dim, &[0, 0, -1, 0, 0, 0, 0, 0]) && v.dim[7] == 0;
+    match op {
+        "*" | "/" if plain(a) && plain(b) => r.pi = a.pi || b.pi,
+        "*" if (a.pi && plain(a) && freq(b) && !b.w) || (b.pi && plain(b) && freq(a) && !a.w) => r.w = true,
+        "/" if a.pi && plain(a) && units::same(&b.dim, &[0, 0, 1, 0, 0, 0, 0, 0]) && b.dim[7] == 0 => r.w = true,
+        "/" if b.pi && plain(b) && freq(a) && a.w => r.w = false,
+        "*" | "/" => r.w = freq(&r) && ((a.w && plain(b)) || (op == "*" && b.w && plain(a))),
+        "+" | "-" => r.w = freq(&r) && (a.w || b.w),
+        _ => {}
+    }
+    r
+}
+
 fn bin_raw(op: &str, a: Val, b: Val, at: Span, rat: Span) -> R<Val> {
+    let r = bin_raw2(op, &a, &b, at, rat)?;
+    Ok(angular(op, &a, &b, r))
+}
+
+fn bin_raw2(op: &str, a: &Val, b: &Val, at: Span, rat: Span) -> R<Val> {
+    let (a, b) = (a.clone(), b.clone());
+    // 230 V∠-30° is polar(230 V, -30°).
+    if op == "∠" { return builtin("polar", vec![a, b], at); }
     if a.cx() || b.cx() { return bin_complex(op, a, b, at, rat); }
     let vec = a.vec || b.vec;
     let mk = |v: Vec<f64>, dim: Dim, abs: bool| Val { v, dim, abs, vec, nm: moment(op, &a, &b, &dim), ..Default::default() };
@@ -322,7 +355,7 @@ fn builtin(f: &str, a: Vec<Val>, at: Span) -> R<Val> {
     let cmap = |v: &Val, dim: Dim, g: &dyn Fn((f64, f64)) -> (f64, f64)| { let (re, im) = (0..v.v.len()).map(|k| g(v.at(k))).unzip(); Val { v: re, im, dim, vec: v.vec, ..Default::default() } };
     let plain = |v: &Val| -> R<()> { if units::is_none(&v.dim) { Ok(()) } else { Err(Error { msg: format!("{f} needs a plain number, not {}.", dim_name(&v.dim)), at }) } };
     let fail = |m: String| -> R<Val> { Err(Error { msg: m, at }) };
-    if a.iter().any(|v| v.cx()) && !matches!(f, "abs" | "sqrt" | "exp" | "ln" | "re" | "im" | "arg" | "conj" | "sum" | "mean" | "len") {
+    if a.iter().any(|v| v.cx()) && !matches!(f, "abs" | "sqrt" | "exp" | "ln" | "re" | "im" | "arg" | "conj" | "sum" | "mean" | "len" | "sin" | "cos" | "tan" | "sinh" | "cosh" | "tanh" | "db" | "par") {
         return fail(format!("{f} needs real values: use abs, re, im or arg of a complex value."));
     }
     let r = match f {
@@ -347,6 +380,27 @@ fn builtin(f: &str, a: Vec<Val>, at: Span) -> R<Val> {
                 _ => Val { im: z.im.iter().map(|y| -y).collect(), ..z.clone() },
             }
         }
+        "db" => {
+            want(1)?;
+            plain(&a[0])?;
+            let v: Vec<f64> = (0..a[0].v.len()).map(|k| { let (x, y) = a[0].at(k); 20.0 * x.hypot(y).log10() }).collect();
+            if v.iter().any(|x| !x.is_finite()) { return fail("db of zero.".into()); }
+            Val { v, vec: a[0].vec, ..Default::default() }
+        }
+        "par" => {
+            if n < 2 { return fail("par needs two or more values: par(Z1, Z2).".into()); }
+            for x in &a[1..] { same_or(&a[0], x, "combine", at)?; }
+            let n2 = a.iter().try_fold(1usize, |m, x| if x.vec && m > 1 && x.v.len() != m { Err(()) } else { Ok(if x.vec { x.v.len() } else { m }) }).map_err(|_| Error { msg: "These vectors have different lengths.".into(), at })?;
+            let mut out = (vec![], vec![]);
+            for k in 0..n2 {
+                let mut y = (0.0, 0.0);
+                for x in &a { let z = x.at(k); if z == (0.0, 0.0) { return fail("par of a zero value (a short circuit).".into()); } let r = cdiv((1.0, 0.0), z); y = (y.0 + r.0, y.1 + r.1); }
+                let z = cdiv((1.0, 0.0), y);
+                out.0.push(z.0);
+                out.1.push(z.1);
+            }
+            Val { v: out.0, im: if a.iter().any(|x| x.cx()) { out.1 } else { vec![] }, dim: a[0].dim, vec: a.iter().any(|x| x.vec), ..Default::default() }
+        }
         "arg" => { want(1)?; Val { v: (0..a[0].v.len()).map(|k| { let (x, y) = a[0].at(k); y.atan2(x) }).collect(), dim: units::ANGLE, vec: a[0].vec, ..Default::default() } }
         "polar" => {
             want(2)?;
@@ -360,7 +414,8 @@ fn builtin(f: &str, a: Vec<Val>, at: Span) -> R<Val> {
             plain(&a[0])?;
             if a[0].cx() {
                 if f == "ln" && (0..a[0].v.len()).any(|k| a[0].at(k) == (0.0, 0.0)) { return fail("ln of zero.".into()); }
-                cmap(&a[0], NONE, &|z| if f == "exp" { cexp(z) } else { cln(z) })
+                if f.starts_with("log") { return fail(format!("{f} needs real values: use ln, or db for a ratio in decibels.")); }
+                cmap(&a[0], NONE, &|z| match f { "exp" => cexp(z), "ln" => cln(z), "sinh" => csinh(z), "cosh" => ccosh(z), _ => cdiv(csinh(z), ccosh(z)) })
             } else {
             if (f == "ln" || f.starts_with("log")) && a[0].v.iter().any(|x| *x <= 0.0) { return fail(format!("{f} of zero or a negative number.")); }
             map(&a[0], NONE, &|x| match f { "exp" => x.exp(), "ln" => x.ln(), "sinh" => x.sinh(), "cosh" => x.cosh(), "tanh" => x.tanh(), _ => x.log10() })
@@ -369,7 +424,8 @@ fn builtin(f: &str, a: Vec<Val>, at: Span) -> R<Val> {
         "sin" | "cos" | "tan" => {
             want(1)?;
             if !units::is_none(&a[0].dim) { return fail(format!("{f} needs an angle or a plain number, not {}.", dim_name(&a[0].dim))); }
-            map(&a[0], NONE, &|x| match f { "sin" => x.sin(), "cos" => x.cos(), _ => x.tan() })
+            if a[0].cx() { cmap(&a[0], NONE, &|z| match f { "sin" => csin(z), "cos" => ccos(z), _ => cdiv(csin(z), ccos(z)) }) }
+            else { map(&a[0], NONE, &|x| match f { "sin" => x.sin(), "cos" => x.cos(), _ => x.tan() }) }
         }
         "asin" | "acos" | "atan" => {
             want(1)?;
@@ -431,7 +487,7 @@ pub struct CheckOut { pub pass: bool, pub ratio: Option<f64>, pub lhs: String, p
 pub struct Series { pub label: String, pub ys: Vec<f64> }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Default)]
-pub struct PlotOut { pub xs: Vec<f64>, pub xlabel: String, pub xunit: String, pub series: Vec<Series>, pub yunit: String }
+pub struct PlotOut { pub xs: Vec<f64>, pub xlabel: String, pub xunit: String, pub series: Vec<Series>, pub yunit: String, pub logx: bool }
 
 /// A table region worked out: each column's heading (LaTeX), unit and cells as shown.
 #[derive(Debug, Clone, Serialize, PartialEq, Default)]
@@ -541,7 +597,8 @@ pub fn show_val(v: &Val, want: &str, f: &Fmt) -> (String, String, String, String
     }
     let big = (0..v.v.len()).map(|k| { let (x, y) = v.at(k); x.hypot(y) }).filter(|x| x.is_finite()).fold(0.0f64, f64::max);
     // A force times a length reads as a torque (N·m), as a power over a speed does (J/rad).
-    let dim = if v.nm && v.dim[7] == 0 && want.trim().is_empty() { let mut d = v.dim; d[7] = -1; d } else { v.dim };
+    // An angular frequency (ω = 2πf) reads in rad/s, and as cycles in Hz or rpm when one is chosen.
+    let dim = if v.nm && v.dim[7] == 0 && want.trim().is_empty() { let mut d = v.dim; d[7] = -1; d } else { shown_dim(v) };
     let (k, off, label) = units::display(big, &dim, v.abs, want, f.us);
     let one = |(x, y): (f64, f64)| if v.cx() { fmt_cx((x - off) / k, y / k, f) } else { fmt_num((x - off) / k, f.digits, f.eng) };
     let (text, tex) = if v.vec {
@@ -563,6 +620,9 @@ pub fn show_val(v: &Val, want: &str, f: &Fmt) -> (String, String, String, String
     (full_t, full_x, text, label)
 }
 
+/// The dimension a value is shown with: an angular frequency (ω = 2πf) as rad/s.
+fn shown_dim(v: &Val) -> Dim { let mut d = v.dim; if v.w && d[7] == 0 { d[7] = 1; } d }
+
 /// A complex number as text and LaTeX: 3 + 4j, or 5∠53.13° in polar form.
 fn fmt_cx(x: f64, y: f64, f: &Fmt) -> (String, String) {
     if f.polar {
@@ -583,6 +643,7 @@ fn unit_choices(dim: &Dim, abs: bool, nm: bool) -> Vec<String> {
     let mut v: Vec<String> = vec![];
     if abs && units::same(dim, &TEMP) { v.push("°C".into()); v.push("°F".into()); }
     v.extend(units::UNITS.iter().filter(|u| units::same(&u.dim, dim) && !ALIAS.contains(&u.sym)).map(|u| u.sym.to_string()));
+    if units::same(dim, &[0, 0, -1, 0, 0, 0, 0, 0]) && !v.iter().any(|u| u == "rad/s") { v.push("rad/s".into()); }
     // Torque and moments share the units of energy.
     if units::same(dim, &ENERGY) {
         let t = ["N·m", "kN·m", "N·mm", "MN·m", "lbf·ft", "lbf·in", "kip·ft"].map(String::from);
@@ -802,7 +863,7 @@ fn region(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>, subst: bo
                 env.vars.insert(k, v);
                 known.push(var.clone());
             }
-            Stmt::Plot { ys, var, lo, hi } => {
+            Stmt::Plot { ys, var, lo, hi, log } => {
                 let (a, b) = (env.eval(lo)?, env.eval(hi)?);
                 real(&a, "A plot range", lo.at)?;
                 real(&b, "A plot range", hi.at)?;
@@ -811,8 +872,10 @@ fn region(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>, subst: bo
                 let k = canon(var);
                 let saved = env.vars.get(&k).cloned();
                 let n = 121;
-                let xs: Vec<f64> = (0..n).map(|i| a.x() + (b.x() - a.x()) * i as f64 / (n - 1) as f64).collect();
-                let mut p = PlotOut::default();
+                if *log && (a.x() <= 0.0 || b.x() <= 0.0) { return fail("A log scale needs a range above zero, such as 10 Hz .. 100 kHz.", (lo.at.0, hi.at.1)); }
+                // A log scale spaces the points evenly in decades: as many per decade over 10 Hz .. 100 kHz as 0 .. 10 gets on a line.
+                let xs: Vec<f64> = (0..n).map(|i| { let t = i as f64 / (n - 1) as f64; if *log { a.x() * (b.x() / a.x()).powf(t) } else { a.x() + (b.x() - a.x()) * t } }).collect();
+                let mut p = PlotOut { logx: *log, ..Default::default() };
                 let (_, _, _, xu) = show_val(&a, "", f);
                 let (xk, xo, _) = units::display(a.x(), &a.dim, a.abs, &xu, f.us);
                 p.xs = xs.iter().map(|x| (x - xo) / xk).collect();
@@ -825,9 +888,9 @@ fn region(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>, subst: bo
                     for x in &xs {
                         env.vars.insert(k.clone(), Val { v: vec![*x], ..a.clone() });
                         match env.eval(y) {
-                            Ok(v) if v.cx() => { res = fail("A plot shows real values: plot abs(z), re(z), im(z) or arg(z).", y.at); break; }
+                            Ok(v) if v.cx() => { res = fail("A plot shows real values: plot abs(z), db(z) or arg(z) (a Bode plot: add log after the range).", y.at); break; }
                             Ok(v) => {
-                                if let Some((d, _)) = &ydim { if !units::same(d, &v.dim) { res = fail("Every curve on a plot must have the same units.", y.at); break; } } else { ydim = Some((v.dim, v.abs)); }
+                                if let Some((d, _)) = &ydim { if !units::same(d, &v.dim) { res = fail("Every curve on a plot must have the same units.", y.at); break; } } else { ydim = Some((shown_dim(&v), v.abs)); }
                                 vals.push(if v.vec { f64::NAN } else { v.x() });
                             }
                             Err(_) => vals.push(f64::NAN),
@@ -890,39 +953,42 @@ fn table(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>, o: &mut Re
         let val: Result<Val, String> = if !c.formula.trim().is_empty() {
             let src = c.formula.trim().trim_start_matches('=');
             parse::statement(src, known).map_err(|e| e.msg).and_then(|st| match st { Stmt::Show { e } => env.eval(&e).map_err(|e| e.msg), _ => Err("A formula column holds an expression, such as rho*g*Q*H.".into()) })
-                .and_then(|v| if v.cx() { Err("A table column holds real values: use abs, re, im or arg of a complex value.".into()) } else { Ok(v) })
-                .map(|v| if v.vec || n == 0 { v } else { Val { v: vec![v.x(); n], vec: true, ..v } })
+                .map(|v| if v.vec || n == 0 { v } else { let (x, y) = v.at(0); Val { v: vec![x; n], im: if v.cx() { vec![y; n] } else { vec![] }, vec: true, ..v } })
         } else {
-            let mut vals = Vec::with_capacity(n);
+            let (mut vals, mut ims) = (Vec::with_capacity(n), Vec::with_capacity(n));
             let mut dim: Option<units::Dim> = None;
             let mut res = Ok(());
             let mut abs = false;
             for (i, row) in d.rows.iter().take(n).enumerate() {
                 let cell = row.get(j).map(|x| x.trim()).unwrap_or("");
-                if cell.is_empty() { vals.push(f64::NAN); continue; }
+                if cell.is_empty() { vals.push(f64::NAN); ims.push(0.0); continue; }
                 let v = match parse::statement(cell, known) { Ok(Stmt::Show { e }) => env.eval(&e).map_err(|e| e.msg), Ok(_) => Err("a cell holds a value".into()), Err(e) => Err(e.msg) };
                 let v = match (v, &unit) {
-                    (Ok(v), Some(u)) if units::is_none(&v.dim) && !units::is_none(&u.dim) => Ok(Val { v: vec![v.x() * u.factor + u.offset], dim: u.dim, abs: u.offset != 0.0, ..Default::default() }),
+                    (Ok(v), Some(u)) if v.cx() && u.offset != 0.0 => Err(format!("{} cannot be complex.", dim_name(&u.dim))),
+                    (Ok(v), Some(u)) if units::is_none(&v.dim) && !units::is_none(&u.dim) => { let (x, y) = v.at(0); Ok(Val { v: vec![x * u.factor + u.offset], im: if v.cx() { vec![y * u.factor] } else { vec![] }, dim: u.dim, abs: u.offset != 0.0, ..Default::default() }) }
                     (v, _) => v,
                 };
                 match v {
-                    Ok(v) if v.vec || v.cx() => { res = Err(format!("Row {}: a cell holds one real value.", i + 1)); break; }
+                    Ok(v) if v.vec => { res = Err(format!("Row {}: a cell holds one value.", i + 1)); break; }
                     Ok(v) => {
                         if let Some(d0) = &dim { if !units::same(d0, &v.dim) { res = Err(format!("Row {}: {} does not match the rest of the column.", i + 1, dim_name(&v.dim))); break; } } else { dim = Some(v.dim); abs = v.abs; }
                         vals.push(v.x());
+                        ims.push(v.at(0).1);
                     }
                     Err(m) => { res = Err(format!("Row {}: {m}", i + 1)); break; }
                 }
             }
-            res.map(|_| Val { v: vals, dim: dim.or(unit.as_ref().map(|u| u.dim)).unwrap_or(units::NONE), abs, vec: true, ..Default::default() })
+            // A column with a complex cell is complex (an impedance per frequency); otherwise real.
+            let im = if ims.iter().any(|y| *y != 0.0) { ims } else { vec![] };
+            res.map(|_| Val { v: vals, im, dim: dim.or(unit.as_ref().map(|u| u.dim)).unwrap_or(units::NONE), abs, vec: true, ..Default::default() })
         };
         match val {
             Ok(v) => {
                 if v.v.len() != n && n > 0 { co.error = format!("{} values for {} rows.", v.v.len(), n); }
-                let big = v.v.iter().copied().filter(|x| x.is_finite()).fold(0.0f64, |m, x| m.max(x.abs()));
-                let (k, off, label) = units::display(big, &v.dim, v.abs, &c.unit, f.us);
+                let big = (0..v.v.len()).map(|i| { let (x, y) = v.at(i); x.hypot(y) }).filter(|x| x.is_finite()).fold(0.0f64, f64::max);
+                let (k, off, label) = units::display(big, &shown_dim(&v), v.abs, &c.unit, f.us);
                 co.unit = label;
-                co.cells = (0..n).map(|i| v.v.get(i).filter(|x| x.is_finite()).map(|x| fmt_num((x - off) / k, f.digits, f.eng).0).unwrap_or_default()).collect();
+                co.cells = (0..n).map(|i| v.v.get(i).filter(|x| x.is_finite()).map(|x| if v.cx() { fmt_cx((x - off) / k, v.at(i).1 / k, f).0 } else { fmt_num((x - off) / k, f.digits, f.eng).0 }).unwrap_or_default()).collect();
                 if !name.is_empty() && co.error.is_empty() {
                     let (_, _, value, unit) = show_val(&v, &c.unit, f);
                     o.defs.push(VarOut { name: canon(name), tex: latex::name(name), value, unit, id: r.id });

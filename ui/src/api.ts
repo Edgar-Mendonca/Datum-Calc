@@ -18,7 +18,7 @@ export interface Out { sheet: Sheet; calc: SheetOut; path: string | null; dirty:
 export interface Options { autosave: number; beta: boolean; theme: string; openLast: boolean; units: string; digits: number; paper: string; company: string; by: string; logo: string; number: string }
 
 export interface CheckOut { pass: boolean; ratio: number | null; lhs: string; rhs: string; op: string }
-export interface PlotOut { xs: number[]; xlabel: string; xunit: string; series: { label: string; ys: number[] }[]; yunit: string }
+export interface PlotOut { xs: number[]; xlabel: string; xunit: string; series: { label: string; ys: number[] }[]; yunit: string; logx?: boolean }
 export interface RegionOut {
   id: number; latex: string; result_tex: string; result: string; value: string; unit: string; name: string; input: boolean;
   error: { msg: string; from: number; to: number } | null; warn: string; check: CheckOut | null; plot: PlotOut | null; units: string[]; note: string; subst_tex: string;

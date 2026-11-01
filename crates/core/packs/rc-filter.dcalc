@@ -1,0 +1,197 @@
+{
+ "format": 1,
+ "name": "RC low-pass filter: frequency response",
+ "title": {
+  "project": "",
+  "number": "PACK-20",
+  "title": "RC low-pass filter: frequency response",
+  "by": "",
+  "checked": "",
+  "date": "",
+  "rev": "A",
+  "company": "",
+  "client": "",
+  "logo": ""
+ },
+ "page": {
+  "paper": "A4",
+  "margins": [
+   15.0,
+   15.0,
+   15.0,
+   20.0
+  ]
+ },
+ "units": "SI",
+ "digits": 4,
+ "regions": [
+  {
+   "id": 1,
+   "kind": "text",
+   "text": "RC low-pass filter: frequency response",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 2,
+   "kind": "text",
+   "text": "A resistor in series and a capacitor across the output. The transfer function H = 1/(1 + jωτ), with τ = RC, is complex: its magnitude in decibels and its angle give the Bode plots. A plot with log after its range has a logarithmic frequency axis.",
+   "unit": "",
+   "style": "note",
+   "data": null
+  },
+  {
+   "id": 3,
+   "kind": "text",
+   "text": "Inputs",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 4,
+   "kind": "math",
+   "text": "R = 1.6 kΩ  # series resistor",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 5,
+   "kind": "math",
+   "text": "C = 100 nF  # capacitor",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 6,
+   "kind": "math",
+   "text": "f_s = 5 kHz  # interference to suppress",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 7,
+   "kind": "math",
+   "text": "A_req = 12  # attenuation needed at f_s, in dB",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 8,
+   "kind": "text",
+   "text": "Results",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 9,
+   "kind": "math",
+   "text": "tau = R*C  # time constant",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 10,
+   "kind": "math",
+   "text": "f_c = 1/(2*pi*tau)  # cut-off frequency (−3 dB)",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 11,
+   "kind": "math",
+   "text": "H(f) = 1/(1 + j*2*pi*f*tau)  # transfer function, output over input",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 12,
+   "kind": "math",
+   "text": "H_s = H(f_s)  # at the frequency to suppress",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 13,
+   "kind": "math",
+   "text": "G_s = db(H_s)  # gain, in dB",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 14,
+   "kind": "math",
+   "text": "phi_s = arg(H_s)  # phase",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 15,
+   "kind": "math",
+   "text": "A_s = -G_s  # attenuation, in dB",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 16,
+   "kind": "check",
+   "text": "check A_s >= A_req",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 17,
+   "kind": "text",
+   "text": "Bode plots",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 18,
+   "kind": "plot",
+   "text": "plot db(H(f)) for f in 10 Hz .. 100 kHz log",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 19,
+   "kind": "plot",
+   "text": "plot arg(H(f)) for f in 10 Hz .. 100 kHz log",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 20,
+   "kind": "text",
+   "text": "Ref: J. W. Nilsson, S. A. Riedel, Electric Circuits, 11th ed., ch. 14: the RC low-pass filter, cut-off frequency ω_c = 1/(RC); Appendix E: Bode diagrams.",
+   "unit": "",
+   "style": "ref",
+   "data": null
+  }
+ ],
+ "next_id": 21,
+ "ui": {
+  "pack": {
+   "id": "rc-filter",
+   "field": "Electrical",
+   "desc": "Cut-off frequency, gain and phase of an RC low-pass filter at a frequency to suppress, with Bode plots of gain and phase over a log frequency axis."
+  }
+ }
+}
