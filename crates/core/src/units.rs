@@ -180,9 +180,12 @@ pub struct UnitExpr { pub factor: f64, pub dim: Dim, pub offset: f64, pub text: 
 /// Parses a unit expression on its own, such as `kN*m`, `m^3/h`, `W/(m^2*K)`, `m/s²` or `N·m`.
 pub fn parse(s: &str) -> Result<UnitExpr, String> {
     let toks = crate::parse::lex(s).map_err(|e| e.msg)?;
-    let mut p = crate::parse::UnitParser { toks: &toks, i: 0, known: &[] };
+    // 1/s, 1/(m·K): a reciprocal, as labels are written.
+    let inv = matches!(toks.first(), Some((crate::parse::Tok::Num(n), _)) if *n == 1.0) && matches!(toks.get(1), Some((crate::parse::Tok::Op("/"), _)));
+    let mut p = crate::parse::UnitParser { toks: &toks, i: if inv { 2 } else { 0 }, known: &[] };
     let u = p.expr().ok_or_else(|| format!("“{s}” is not a unit."))?;
     if p.i < toks.len() { return Err(format!("“{s}” is not a unit.")); }
+    if inv { if u.offset != 0.0 { return Err(format!("“{s}” is not a unit.")); } return Ok(UnitExpr { factor: 1.0 / u.factor, dim: div(&NONE, &u.dim), offset: 0.0, text: format!("1/{}", u.text) }); }
     Ok(u)
 }
 

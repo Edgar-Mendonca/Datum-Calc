@@ -155,6 +155,7 @@ tests_ui/run.cjs               Playwright UI tests against ui/dist with a mocked
 | 0.1.11 | ω = 2πf is marked `Val.w` (from `Val.pi`, a plain number made with π), shown in rad/s, without changing its dimension | A first try put the angle tag on ω: then ωτ, ωL/R and 1/(1 + jωτ) showed in degrees (×180/π) |
 | 0.1.11 | A frequency shown in a unit with the other angle tag converts cycles ↔ radians (×2π): 50 Hz = 3000 rpm, 314.2 rad/s = 50 Hz | Hz counts cycles, rad/s and rpm (as defined, 2π/60 rad/s) radians; SI makes both 1/s, which read 50 Hz as 477.5 rpm |
 | 0.1.11 | `units::label`: a kind with no ladder is written with one named unit and up to three base units, fewest parts and smallest powers first; usual units (W/m², kg/(m²·s), kg·m²) are ladder entries | User report: torque offered m²·kg/s; base units read badly for any compound kind |
+| 0.1.11 | `Val.pi` is the power of π (2π: +1, 1/(2π): −1); only a positive power marks ω, a negative one undoes it; a bare number after ∠ is degrees; ∠ binds (6, 7) | Review: 1/(2π)·√(k/m) showed in rad/s; 230∠-30 read −30 rad; 10^2∠30 bound inside the power |
 | 0.1.11 | Unit menu › Other unit… takes any unit of the kind; `∠` and `/_` for phasors; `log` after a plot range; `par`, `db`, complex trig; complex tables | The two user reports asked for a full solution, not the two cases |
 
 ## 3. Roadmap
@@ -269,6 +270,7 @@ tests_ui/run.cjs               Playwright UI tests against ui/dist with a mocked
 ### 2026-11-01: Session 1, continued (0.1.11)
 - The user passed on the two visitor reports again (complex numbers for frequency-domain circuits; torque as N·m, not J or m²·kg/s) and asked for a full, generic solution in the next update. Both basic cases had shipped in 0.1.8; this release completes them.
 - Frequency domain: ∠ phasors, par, db, complex trigonometry, complex tables, log-axis plots with decade labels, RC filter pack (hand values first). Units: ω in rad/s via `Val.w`, cycles ↔ radians conversion, named units for any kind, Other unit…
+- The independent review found seven issues (1/(2π) taken as 2π, ω plot axis ×2π, ω and f on one plot, bare degrees after ∠, ∠ inside a power, log axis over °C, labels like 1/(m·s) that could not be typed back); all fixed with tests, including a round-trip of every automatic label over 624 kinds.
 - Caught on the way: putting an angle tag on ω made every ratio built from it show in degrees; replaced by a display-only mark. Heat flux came out as kg/s³ from the naming rule; usual units moved into the ladder.
 - Checks: clippy clean, 57 engine tests + 1 shell test, 89 UI tests, cargo deny; every earlier pack prints exactly as in 0.1.10; all sheets rendered in SI with Numbers and in US; the RC filter's Bode plots looked at by eye; 18,000 more random sheets with the new syntax; an independent review of the diff.
 - Released 0.1.11. Still not tested: a clean Windows PC, the real Save as PDF dialog, an update from one release to the next on Windows.

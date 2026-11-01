@@ -891,6 +891,23 @@ fn angular_frequency_and_named_units() {
     assert_eq!(result(&["f = 50 Hz", "w = 2*pi*f", "Q = w*30 mH/(10 Ω)"]), "0.9425");
     assert_eq!(result(&["f = 50 Hz", "w = 2*pi*f", "X = w*30 mH"]), "9.425 Ω");
     assert!(run(&["f = 50 Hz"]).regions[0].units.contains(&"rad/s".to_string()));
+    // Review of 0.1.11: 1/(2π) undoes the radians (the textbook natural frequency), ω on a plot's x axis, ω and f on one plot.
+    assert_eq!(result(&["k = 1000 N/m", "m = 0.1 kg", "f_n = 1/(2*pi)*sqrt(k/m)"]), "15.92 Hz");
+    assert_eq!(shown(&["tau = 1 ms", "f_c = 1/(2*pi)/tau"], "Hz"), "159.2 Hz");
+    assert_eq!(result(&["f = 50 Hz", "w = 2*pi*f", "w*(1/(2*pi))"]), "50 Hz");
+    let o = run(&["f = 50 Hz", "w = 2*pi*f", "plot x*1 s for x in w .. 2*w", "plot w, f for x in 0 .. 1"]);
+    let (p, q) = (o.regions[2].plot.as_ref().unwrap(), o.regions[3].plot.as_ref().unwrap());
+    assert!(close(p.xs[0], 314.159_265, 1e-8) && p.xunit == "rad/s", "{:?}", &p.xs[..2]);
+    assert!(q.yunit == "rad/s" && close(q.series[1].ys[0], 314.159_265, 1e-8), "f drawn as 2π f on a rad/s axis");
+    // Every automatic label is a unit that can be typed back, with the same dimension.
+    for e in 0..625 {
+        let p = |k: u32| (e / 5u32.pow(k) % 5) as i8 - 2;
+        let dim = [p(0), p(1), p(2), p(3), 0, 0, 0, 0];
+        if dim == [0; 8] { continue; }
+        let l = units::label(&dim);
+        let u = units::parse(&l).unwrap_or_else(|e| panic!("{dim:?} → {l}: {e}"));
+        assert!(units::same(&u.dim, &dim), "{dim:?} → {l}");
+    }
     // Kinds with no unit of their own read in named SI units, not base units.
     for (line, want) in [("q = 81 W/m", "81 W/m"), ("R = 1.86 K*m/W*1", "1.86 m·K/W"), ("G = 3 kg/(m^2*s)*1", "3 kg/(m²·s)"), ("k = 5 W/K*1", "5 W/K"),
         ("p = 4 N*s*1", "4 N·s"), ("E = 2 V/m*1", "2 V/m"), ("I = 2 kg*m^2*1", "2 kg·m²"), ("x = 2 W/m^2*1", "2 W/m²")] {
@@ -906,6 +923,9 @@ fn complex_numbers_for_ac_analysis() {
     assert_eq!(result(&["Z = 10 Ω∠30°"]), "(8.66 + 5j) Ω");
     assert_eq!(result(&["V = 230 V/_-30 deg"]), "(199.2 − 115j) V", "/_ is the typed form of ∠");
     assert_eq!(result(&["2*10∠90°"]), "20j", "∠ binds before ×");
+    assert_eq!(result(&["V = 230∠-30"]), "199.2 − 115j", "a bare number after ∠ is in degrees");
+    assert_eq!(result(&["10^2∠30°"]), "86.6 + 50j", "∠ does not bind inside a power");
+    assert!(error(&["plot x for x in -10 °C .. 50 °C log"]).starts_with("A log scale needs a range above zero"));
     assert_eq!(result(&["par(10 Ω, -20j Ω)"]), "(8 − 4j) Ω");
     assert_eq!(result(&["par(2 Ω, 2 Ω, 1 Ω)"]), "500 mΩ");
     assert_eq!(result(&["cosh(1 + 1j)"]), "0.8337 + 0.9889j");

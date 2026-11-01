@@ -5,7 +5,7 @@
 Complex numbers and units, completed: AC circuits in the frequency domain, Bode plots, and any result in any unit of its kind.
 
 **Frequency-domain analysis**
-- Phasors as magnitude and angle: V = 230 V∠-30° (∠ is on Math › Complex; or type /_). ∠ binds before ×, so 2*10∠90° is 20j.
+- Phasors as magnitude and angle: V = 230 V∠-30° (∠ is on Math › Complex; or type /_). A bare number after ∠ is in degrees (230∠-30). ∠ binds before × but not inside a power: 2*10∠90° is 20j, 10^2∠30° is 100∠30°.
 - par(Z1, Z2, …) puts impedances in parallel; db(H) is a ratio in decibels, 20·log₁₀|H|.
 - sin, cos, tan, sinh, cosh and tanh work on complex values (transmission lines, cosh(γl)), as exp, ln and sqrt already did.
 - Tables hold complex values: a formula column such as R + j*2*pi*f_t*L gives an impedance per frequency, and a cell can be typed as 3 + 4j with the column's unit.
@@ -13,13 +13,13 @@ Complex numbers and units, completed: AC circuits in the frequency domain, Bode 
 - New calc pack (20 in all): RC low-pass filter, with its cut-off frequency, gain and phase at a frequency to suppress, and both Bode plots; checked against a hand calculation.
 
 **Units: one kind, several meanings**
-- ω = 2*pi*f (and 2*pi/T) shows in rad/s, and ω/(2*pi) in Hz again. Nothing worked out from ω, such as ωL/R or 1/(1 + jωτ), is mistaken for an angle.
+- ω = 2*pi*f (and 2*pi/T) shows in rad/s, and ω/(2*pi) in Hz again; 1/(2*pi)*sqrt(k/m) is a natural frequency in Hz. Nothing worked out from ω, such as ωL/R or 1/(1 + jωτ), is mistaken for an angle. A plot over ω, or of ω and f together, reads in the axis' own unit.
 - Hz counts cycles and rpm revolutions: 50 Hz shown in rpm is now 3000 rpm (it read 477.5), and 314.2 rad/s shown in Hz is 50 Hz. rad/s is in the unit menu of every frequency.
-- A kind with no usual unit of its own is written in named units instead of base units: W/m, m·K/W, J·s, N·s, V/m, W/K (it was kg·m/s³ or m²·kg/s). Heat flux shows in W/m² (BTU/(h·ft²) in US units), mass flux in kg/(m²·s), a moment of inertia in kg·m².
+- A kind with no usual unit of its own is written in named units instead of base units: W/m, m·K/W, J·s, N·s, V/m, W/K (it was kg·m/s³ or m²·kg/s). Every such label can be typed back as a unit, including 1/(m·s) and powers written as m⁴. Heat flux shows in W/m² (BTU/(h·ft²) in US units), mass flux in kg/(m²·s), a moment of inertia in kg·m².
 - Any result can be shown in any unit of its kind: its unit menu › Other unit…, then type it (kN*mm, lbf*in, W/(m^2*K)). A unit that does not fit says so on the line.
 
 **Checks**
-- 57 engine tests (new: angular frequency and named units, complex AC analysis with ∠, par, db, complex trigonometry and complex tables, the RC filter with its log plots), 89 UI tests (Other unit…, Bode plots on a log axis, the Complex keys). Every earlier pack prints exactly as in 0.1.10. 18,000 more random sheets with the new syntax.
+- 57 engine tests (new: angular frequency and named units, complex AC analysis with ∠, par, db, complex trigonometry and complex tables, the RC filter with its log plots; every automatic label for 624 kinds typed back), 89 UI tests (Other unit…, Bode plots on a log axis, the Complex keys). Every earlier pack prints exactly as in 0.1.10. 18,000 more random sheets with the new syntax. An independent review of the changes found seven issues before release (among them 1/(2π)·√(k/m) shown in rad/s, and a plot over ω scaled by 2π); all fixed, with tests.
 
 ## 0.1.10 — 2026-10-30
 

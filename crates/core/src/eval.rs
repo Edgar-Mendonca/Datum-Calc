@@ -10,10 +10,10 @@ use std::collections::HashMap;
 /// A value: one number or a vector, in SI base units, with its dimension. `abs` marks an absolute
 /// temperature (given in °C or °F); `logic` marks the result of a comparison. `im` holds the imaginary
 /// parts of a complex value (empty when it is real); `nm` marks a force times a length, shown in N·m;
-/// `pi` marks a plain number made with π (2π); `w` marks a frequency made with it (ω = 2πf), shown in rad/s.
+/// `pi` is the power of π in a plain number (2π: 1, 1/(2π): −1); `w` marks a frequency made with it (ω = 2πf), shown in rad/s.
 /// Neither changes the dimension, so nothing worked out from ω (ωτ, ωL/R) is taken for an angle.
 #[derive(Debug, Clone, PartialEq, Default)]
-pub struct Val { pub v: Vec<f64>, pub dim: Dim, pub abs: bool, pub vec: bool, pub logic: bool, pub im: Vec<f64>, pub nm: bool, pub pi: bool, pub w: bool }
+pub struct Val { pub v: Vec<f64>, pub dim: Dim, pub abs: bool, pub vec: bool, pub logic: bool, pub im: Vec<f64>, pub nm: bool, pub pi: i8, pub w: bool }
 
 impl Val {
     pub fn num(x: f64, dim: Dim) -> Self { Self { v: vec![x], dim, ..Default::default() } }
@@ -53,7 +53,7 @@ pub fn canon(name: &str) -> String {
 /// Built-in constants (a name defined on the sheet takes their place).
 fn constant(name: &str) -> Option<Val> {
     Some(match name {
-        "π" => Val { pi: true, ..Val::plain(std::f64::consts::PI) },
+        "π" => Val { pi: 1, ..Val::plain(std::f64::consts::PI) },
         "e" => Val::plain(std::f64::consts::E),
         "g" => Val::num(9.806_65, [1, 0, -2, 0, 0, 0, 0, 0]),
         "R" => Val::num(8.314_462_618, [2, 1, -2, -1, 0, -1, 0, 0]),
@@ -289,11 +289,16 @@ fn bin_complex(op: &str, a: Val, b: Val, at: Span, rat: Span) -> R<Val> {
 fn angular(op: &str, a: &Val, b: &Val, mut r: Val) -> Val {
     let plain = |v: &Val| units::is_none(&v.dim) && v.dim[7] == 0;
     let freq = |v: &Val| units::same(&v.dim, &[0, 0, -1, 0, 0, 0, 0, 0]) && v.dim[7] == 0;
+    // A factor 2π (π to the power +1) turns cycles into radians; 1/(2π) (power −1) turns them back.
+    let up = |p: &Val| plain(p) && p.pi > 0;
+    let down = |p: &Val| plain(p) && p.pi < 0;
     match op {
-        "*" | "/" if plain(a) && plain(b) => r.pi = a.pi || b.pi,
-        "*" if (a.pi && plain(a) && freq(b) && !b.w) || (b.pi && plain(b) && freq(a) && !a.w) => r.w = true,
-        "/" if a.pi && plain(a) && units::same(&b.dim, &[0, 0, 1, 0, 0, 0, 0, 0]) && b.dim[7] == 0 => r.w = true,
-        "/" if b.pi && plain(b) && freq(a) && a.w => r.w = false,
+        "*" | "/" if plain(a) && plain(b) => r.pi = if op == "*" { a.pi.saturating_add(b.pi) } else { a.pi.saturating_sub(b.pi) },
+        "*" if (up(a) && freq(b) && !b.w) || (up(b) && freq(a) && !a.w) => r.w = true,
+        "*" if (down(a) && freq(b) && b.w) || (down(b) && freq(a) && a.w) => r.w = false,
+        "/" if up(a) && units::same(&b.dim, &[0, 0, 1, 0, 0, 0, 0, 0]) && b.dim[7] == 0 => r.w = true,
+        "/" if up(b) && freq(a) && a.w => r.w = false,
+        "/" if down(b) && freq(a) && !a.w => r.w = true,
         "*" | "/" => r.w = freq(&r) && ((a.w && plain(b)) || (op == "*" && b.w && plain(a))),
         "+" | "-" => r.w = freq(&r) && (a.w || b.w),
         _ => {}
@@ -309,7 +314,11 @@ fn bin_raw(op: &str, a: Val, b: Val, at: Span, rat: Span) -> R<Val> {
 fn bin_raw2(op: &str, a: &Val, b: &Val, at: Span, rat: Span) -> R<Val> {
     let (a, b) = (a.clone(), b.clone());
     // 230 V∠-30° is polar(230 V, -30°).
-    if op == "∠" { return builtin("polar", vec![a, b], at); }
+    // A bare number after ∠ is in degrees, as phasors are written (230∠-30); an angle keeps its own unit.
+    if op == "∠" {
+        let b = if units::is_none(&b.dim) && b.dim[7] == 0 && !b.cx() { Val { v: b.v.iter().map(|x| x.to_radians()).collect(), dim: units::ANGLE, ..b } } else { b };
+        return builtin("polar", vec![a, b], at);
+    }
     if a.cx() || b.cx() { return bin_complex(op, a, b, at, rat); }
     let vec = a.vec || b.vec;
     let mk = |v: Vec<f64>, dim: Dim, abs: bool| Val { v, dim, abs, vec, nm: moment(op, &a, &b, &dim), ..Default::default() };
@@ -872,25 +881,29 @@ fn region(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>, subst: bo
                 let k = canon(var);
                 let saved = env.vars.get(&k).cloned();
                 let n = 121;
-                if *log && (a.x() <= 0.0 || b.x() <= 0.0) { return fail("A log scale needs a range above zero, such as 10 Hz .. 100 kHz.", (lo.at.0, hi.at.1)); }
+                if *log && (a.x() <= 0.0 || b.x() <= 0.0 || a.abs) { return fail("A log scale needs a range above zero, such as 10 Hz .. 100 kHz.", (lo.at.0, hi.at.1)); }
                 // A log scale spaces the points evenly in decades: as many per decade over 10 Hz .. 100 kHz as 0 .. 10 gets on a line.
                 let xs: Vec<f64> = (0..n).map(|i| { let t = i as f64 / (n - 1) as f64; if *log { a.x() * (b.x() / a.x()).powf(t) } else { a.x() + (b.x() - a.x()) * t } }).collect();
                 let mut p = PlotOut { logx: *log, ..Default::default() };
                 let (_, _, _, xu) = show_val(&a, "", f);
-                let (xk, xo, _) = units::display(a.x(), &a.dim, a.abs, &xu, f.us);
+                let (xk, xo, _) = units::display(a.x(), &shown_dim(&a), a.abs, &xu, f.us);
                 p.xs = xs.iter().map(|x| (x - xo) / xk).collect();
                 p.xlabel = show(var);
                 p.xunit = xu;
                 let mut ydim: Option<(Dim, bool)> = None;
                 let mut res = Ok(());
+                // Each curve's angle tag as shown, so f (cycles) and ω (radians) on one plot share the axis' reading.
+                let mut tags: Vec<i8> = vec![];
                 for y in ys {
                     let mut vals = vec![];
+                    let mut tag = 0;
                     for x in &xs {
                         env.vars.insert(k.clone(), Val { v: vec![*x], ..a.clone() });
                         match env.eval(y) {
                             Ok(v) if v.cx() => { res = fail("A plot shows real values: plot abs(z), db(z) or arg(z) (a Bode plot: add log after the range).", y.at); break; }
                             Ok(v) => {
                                 if let Some((d, _)) = &ydim { if !units::same(d, &v.dim) { res = fail("Every curve on a plot must have the same units.", y.at); break; } } else { ydim = Some((shown_dim(&v), v.abs)); }
+                                tag = shown_dim(&v)[7];
                                 vals.push(if v.vec { f64::NAN } else { v.x() });
                             }
                             Err(_) => vals.push(f64::NAN),
@@ -898,11 +911,15 @@ fn region(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>, subst: bo
                     }
                     if vals.iter().all(|v| v.is_nan()) { res = env.eval(y).map(|_| ()); if res.is_ok() { res = fail("This curve has no values in the range.", y.at); } }
                     p.series.push(Series { label: latex::plain(y), ys: vals });
+                    tags.push(tag);
                     if res.is_err() { break; }
                 }
                 match saved { Some(v) => { env.vars.insert(k, v); } None => { env.vars.remove(&k); } }
                 res?;
                 if let Some((d, abs)) = ydim {
+                    if units::same(&d, &[0, 0, -1, 0, 0, 0, 0, 0]) {
+                        for (s, t) in p.series.iter_mut().zip(&tags) { if *t != d[7] { let c = (2.0 * std::f64::consts::PI).powi((d[7] - t) as i32); s.ys.iter_mut().for_each(|v| *v *= c); } }
+                    }
                     let big = p.series.iter().flat_map(|s| s.ys.iter()).copied().filter(|v| v.is_finite()).fold(0.0f64, |m, v| m.max(v.abs()));
                     let (yk, yo, yl) = units::display(big, &d, abs, &r.unit, f.us);
                     for s in &mut p.series { for v in &mut s.ys { *v = (*v - yo) / yk; } }
