@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.1.12 — 2026-11-11
+
+Every release is now installed and used on a clean Windows machine before it is published.
+
+**Windows install check**
+- A new check runs on GitHub's Windows machines for every change and before every release. It installs the previous release, then the new one over it (as the in-app updater does), and checks the version, the publisher (Datum) and that .dcalc files open with Datum Calc.
+- It then uses the installed app as a person would: it opens a sheet double-clicked in Explorer, checks its maths and results, makes an edit, sees Save changes? before New, opens the print preview and keeps a recovery copy. Then it ends the app as a crash would, and checks that the unsaved work is offered back, that Discard removes it and that a calc pack opens and works out. Last, it uninstalls and checks nothing is left.
+- A release is not published unless all of this passes.
+
+**Other**
+- The README's family table shows its app icons again.
+- Comments describe features only; README and NOTICE end with a note on trademarks.
+- The window is now made by the app from its settings, so the install check can reach it; nothing changes for users.
+
 ## 0.1.11 — 2026-11-01
 
 Complex numbers and units, completed: AC circuits in the frequency domain, Bode plots, and any result in any unit of its kind.

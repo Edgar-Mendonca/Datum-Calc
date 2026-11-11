@@ -157,6 +157,8 @@ tests_ui/run.cjs               Playwright UI tests against ui/dist with a mocked
 | 0.1.11 | `units::label`: a kind with no ladder is written with one named unit and up to three base units, fewest parts and smallest powers first; usual units (W/m², kg/(m²·s), kg·m²) are ladder entries | User report: torque offered m²·kg/s; base units read badly for any compound kind |
 | 0.1.11 | `Val.pi` is the power of π (2π: +1, 1/(2π): −1); only a positive power marks ω, a negative one undoes it; a bare number after ∠ is degrees; ∠ binds (6, 7) | Review: 1/(2π)·√(k/m) showed in rad/s; 230∠-30 read −30 rad; 10^2∠30 bound inside the power |
 | 0.1.11 | Unit menu › Other unit… takes any unit of the kind; `∠` and `/_` for phasors; `log` after a plot range; `par`, `db`, complex trig; complex tables | The two user reports asked for a full solution, not the two cases |
+| 0.1.12 | The window is made in `setup` from tauri.conf.json (`"create": false`) and opens WebView2's debugging port only when `DATUM_CALC_TEST_PORT` is set | Tauri always passes its own WebView2 arguments, so WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS is ignored; the test must drive the exact published installer |
+| 0.1.12 | The release workflow runs tests_win/smoke.ps1 on the built installer before publishing | The user cannot test on Windows; nothing ships that a clean machine cannot install, update, use, recover and uninstall |
 
 ## 3. Roadmap
 
@@ -180,8 +182,10 @@ tests_ui/run.cjs               Playwright UI tests against ui/dist with a mocked
 | 0.1.9 | Recovery per window (two sheets open at once), Discard that deletes, packs 18–19 (insulated pipe, fillet weld), upright j, no utilisation for absolute temperatures | ✅ |
 | 0.1.10 | Save changes? before New/Open/pack/update; safer updates; review fixes (named recovery copy, lock age, typed torque, unit after brackets); Getting Started with torque and complex numbers | ✅ |
 | 0.1.11 | Complete frequency-domain work (∠ phasors, par, db, complex trig and tables, Bode plots on log axes, RC filter pack 20); ω in rad/s, Hz ↔ rpm right; named units for every kind; Other unit… | ✅ |
-| 0.1.12 | Fixes from trying every pack on a clean Windows PC and from the convention | 🔜 |
-| 0.2 | Materials from Datum Atlas, more packs, unit menus on results, symbolic simplify | ⬜ |
+| 0.1.12 | Windows install check in CI and before every release (tests_win): install over the previous release, publisher, .dcalc association, the real window through WebView2's debugging port, recovery after a crash, uninstall | ✅ |
+| 0.2.0 | Exact fractions; simplify, expand, factor | 🔜 |
+| 0.2.1 | Materials from Datum Atlas (`material("S355")`, if Atlas's data format allows) | ⬜ |
+| 0.2.2 | More packs: flange bolts, tank heat loss, three-phase power, a spring, a belt drive | ⬜ |
 | 0.3 | Matrices and linear systems, ODE solve, tables from CSV | ⬜ |
 | 0.4 | Programs inside a region, templates, a company title block | ⬜ |
 | 1.0 | Validation report, user guide, signed installer | ⬜ |
@@ -277,6 +281,12 @@ tests_ui/run.cjs               Playwright UI tests against ui/dist with a mocked
 
 ### 2026-11-01: Session 1, continued (wording cleanup, no release)
 - Family-wide cleanup of comments naming commercial products: none in Calc (the comments copied from Plan were already neutral); the bare "Polish" comment in styles.css now says what the block does. README and NOTICE end with: "Product and file-format names are trademarks of their owners and are used only to describe file compatibility." No functional change, so no version bump.
+
+### 2026-11-11: Session 1, continued (0.1.12)
+- After a break, the user cannot test on Windows and asked for a roadmap; agreed: 0.1.12 a Windows check in CI, then 0.2 (exact maths, materials, packs), 0.3 (matrices, ODEs, CSV), 0.4 (programs, templates), 1.0 (validation report, guide, signed installer). The school-maths, Chinese and browser ideas are parked in the hub (the user files them there; this session has the hub read-only).
+- tests_win/smoke.ps1 and ui.cjs, run on windows-latest in CI and in release.yml. The first runs found: WebView2's environment variable ignored (fixed by making the window in setup); the test comparing KaTeX text with spaces (compare without). Everything else passed on real Windows the first time: install over 0.1.11, publisher, association, a double-clicked sheet, the guard, print preview, recovery after a crash, Discard, a pack, uninstall.
+- Also merged the user's README family table (3 Nov) and pointed its icons at the hub.
+- Released 0.1.12. Still not tested by a person: the real Save as PDF dialog and the in-app download of an update (the install step of an update is tested).
 
 ## 5. Known limits and next steps
 

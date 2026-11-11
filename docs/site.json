@@ -31,8 +31,7 @@
     "docs/images/units.png"
   ],
   "roadmap": [
-    { "v": "0.1.12", "title": "Fixes from the convention", "when": "Next", "items": ["Fixes from trying every pack on a clean Windows PC", "What visitors ask for at the convention"] },
-    { "v": "0.2", "title": "Materials and more packs", "when": "Soon", "items": ["Material properties from Datum Atlas", "More calc packs", "Symbolic simplify"] },
+    { "v": "0.2", "title": "Exact maths, materials and more packs", "when": "Next", "items": ["Exact fractions and simplify, expand and factor", "Material properties from Datum Atlas", "More calc packs: flange bolts, tank heat loss, three-phase power, a spring, a belt drive"] },
     { "v": "0.3", "title": "Matrices and ODEs", "when": "Later", "items": ["Matrices and linear systems", "Solve ordinary differential equations", "Tables from CSV"] },
     { "v": "0.4", "title": "Programs and templates", "when": "Later", "items": ["Loops and conditions inside a region", "Sheet templates", "A company title block"] },
     { "v": "1.0", "title": "Validation", "when": "Goal", "items": ["A validation report: every pack against its reference", "A user guide", "A signed installer"] }
