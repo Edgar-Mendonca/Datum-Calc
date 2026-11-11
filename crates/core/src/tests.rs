@@ -660,8 +660,8 @@ mod packs {
         // A_m = max(716.0, 2016.5) mm² = 2016.5 mm²; A_b = 12 × 225.2 = 2702.4 mm²; utilisation 0.74618.
         let (o, e) = run("flange-bolts");
         assert!(close(v(&e, "W_m1"), 123_150.432, 1e-8) && close(v(&e, "W_m2"), 346_831.829, 1e-8));
-        assert!(close(v(&e, "A_m"), 2016.464_122e-6, 1e-8) && close(v(&e, "A_b"), 2702.4e-6, 1e-12));
-        assert!(checks(&o)[0].0 && close(checks(&o)[0].1, 2016.464_122 / 2702.4, 1e-8));
+        assert!(close(v(&e, "A_m"), 2016.464122e-6, 1e-8) && close(v(&e, "A_b"), 2702.4e-6, 1e-12));
+        assert!(checks(&o)[0].0 && close(checks(&o)[0].1, 2016.464122 / 2702.4, 1e-8));
     }
 
     #[test]
@@ -690,8 +690,8 @@ mod packs {
         // C = 8; K_B = 34/29 = 1.17241; k = 81e9 × 0.003⁴/(8 × 0.024³ × 8) = 7415.77 N/m; y = 20.227 mm; τ = K_B 8 150 0.024/(π 0.003³) = 398.07 MPa;
         // S_ut = 2211/3^0.145 = 1885.41 MPa; τ_allow = 848.44 MPa (Shigley Table 10-6, 45 %).
         let (o, e) = run("spring");
-        assert!(close(v(&e, "k"), 7415.771_484, 1e-9) && close(v(&e, "tau"), 398.070_294e6, 1e-8));
-        assert!(close(v(&e, "S_ut"), 1885.411_539e6, 1e-8) && close(v(&e, "y"), 20.227_160e-3, 1e-7));
+        assert!(close(v(&e, "k"), 7415.771484, 1e-9) && close(v(&e, "tau"), 398.070294e6, 1e-8));
+        assert!(close(v(&e, "S_ut"), 1885.411539e6, 1e-8) && close(v(&e, "y"), 20.22716e-3, 1e-7));
         assert!(o.regions.iter().any(|r| r.result == "7.416 N/mm") && checks(&o)[0].0 && close(checks(&o)[0].1, 0.469_182, 1e-5));
     }
 
@@ -701,7 +701,7 @@ mod packs {
         // T_2 = 459.161 N; T_1 = 1076.572 N; n_2 = 580 rpm; L = 2.497646 m.
         let (o, e) = run("belt-drive");
         assert!(close(v(&e, "theta"), 2.840_456_108, 1e-9) && close(v(&e, "v"), 12.147_491_59, 1e-9));
-        assert!(close(v(&e, "T_1"), 1076.572_291, 1e-8) && close(v(&e, "T_2"), 459.160_873, 1e-8));
+        assert!(close(v(&e, "T_1"), 1076.572291, 1e-8) && close(v(&e, "T_2"), 459.160873, 1e-8));
         assert!(close(v(&e, "L"), 2.497_645_943, 1e-9));
         assert!(o.regions.iter().any(|r| r.result == "580 rpm") && o.regions.iter().any(|r| r.result == "162.7°"));
         // With its numbers put in, the angle in the exponent reads in radians.
