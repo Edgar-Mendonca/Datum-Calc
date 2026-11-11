@@ -72,10 +72,16 @@ pub struct Poly(pub BTreeMap<Mono, Q>);
 
 const MAX_TERMS: usize = 2000;
 
-fn mono_mul(a: &Mono, b: &Mono) -> Mono {
+/// The highest power of a symbol exact maths keeps: x^1000 is fine, (x^64)^64 is refused before it fills memory.
+pub const MAX_DEGREE: u32 = 1000;
+
+fn mono_mul(a: &Mono, b: &Mono) -> R<Mono> {
     let mut m: BTreeMap<String, u32> = a.iter().cloned().collect();
-    for (v, e) in b { *m.entry(v.clone()).or_insert(0) += e; }
-    m.into_iter().collect()
+    for (v, e) in b {
+        let x = m.entry(v.clone()).or_insert(0);
+        *x = x.checked_add(*e).filter(|s| *s <= MAX_DEGREE).ok_or_else(|| format!("Powers above {MAX_DEGREE} are too large for exact maths."))?;
+    }
+    Ok(m.into_iter().collect())
 }
 
 impl Poly {
@@ -95,7 +101,7 @@ impl Poly {
     pub fn sub(&self, o: &Poly) -> R<Poly> { self.add(&o.neg()) }
     pub fn mul(&self, o: &Poly) -> R<Poly> {
         let mut r = Poly::default();
-        for (m1, c1) in &self.0 { for (m2, c2) in &o.0 { r.add_term(mono_mul(m1, m2), c1.mul(*c2)?)?; } }
+        for (m1, c1) in &self.0 { for (m2, c2) in &o.0 { r.add_term(mono_mul(m1, m2)?, c1.mul(*c2)?)?; } }
         Ok(r)
     }
     pub fn scale(&self, q: Q) -> R<Poly> { if q.is_zero() { return Ok(Poly::default()); } Ok(Poly(self.0.iter().map(|(m, c)| Ok((m.clone(), c.mul(q)?))).collect::<R<_>>()?)) }
@@ -189,7 +195,7 @@ impl RatF {
         RatF { num: self.num.mul(&o.den)?, den: self.den.mul(&o.num)? }.reduce()
     }
     pub fn pow(&self, n: i64) -> R<RatF> {
-        if n.unsigned_abs() > 64 { return Err("A power above 64 is too large for exact maths.".into()); }
+        if n.unsigned_abs() > MAX_DEGREE as u64 { return Err(format!("Powers above {MAX_DEGREE} are too large for exact maths.")); }
         let r = RatF { num: self.num.pow(n.unsigned_abs() as u32)?, den: self.den.pow(n.unsigned_abs() as u32)? };
         if n < 0 { if r.num.is_zero() { return Err("Division by zero.".into()); } RatF { num: r.den, den: r.num }.reduce() } else { Ok(r) }
     }
@@ -258,6 +264,7 @@ pub const OPS: [&str; 3] = ["simplify", "expand", "factor"];
 pub fn from_node(n: &Node, look: &dyn Fn(&str) -> Look) -> R<RatF> {
     let not = |what: &str| Err(format!("Exact maths works on numbers, names, + − × ÷ and whole powers, not {what}."));
     match &n.e {
+        E::Num(x, None) if x.abs() > 1e15 => Err("Numbers above 10¹⁵ are too large for exact maths.".into()),
         E::Num(x, None) => fraction(*x, 1_000_000).map(|q| RatF::poly(Poly::constant(q))).ok_or_else(|| format!("{x} is not a fraction exact maths can keep.")),
         E::Num(_, Some(_)) | E::Unit(..) => not("units"),
         E::Im(..) => not("complex numbers"),
@@ -274,7 +281,7 @@ pub fn from_node(n: &Node, look: &dyn Fn(&str) -> Look) -> R<RatF> {
             if *op == "^" {
                 let p = from_node(b, look)?;
                 let k = p.num.as_const().filter(|_| p.den.as_const() == Some(Q::ONE)).filter(|q| q.d == 1).ok_or("Exact maths needs a whole-number power.")?;
-                return x.pow(k.n.clamp(-1000, 1000) as i64);
+                return x.pow(k.n.clamp(-100_000, 100_000) as i64);
             }
             let y = from_node(b, look)?;
             match *op { "+" => x.add(&y), "-" => x.sub(&y), "*" => x.mul(&y), "/" => x.div(&y), o => not(&format!("“{o}”")) }
@@ -307,7 +314,7 @@ pub fn factor(p: &Poly) -> R<Factored> {
     if p.is_zero() { return Ok(Factored { c: Q::ZERO, mono: vec![], parts: vec![] }); }
     // Content: the rational that makes the coefficients coprime integers, with the leading sign.
     let den_lcm = p.0.values().try_fold(1i128, |l, q| l.checked_mul(q.d / gcd(l, q.d)).ok_or(BIG))?;
-    let ints: Vec<i128> = p.0.values().map(|q| q.n * (den_lcm / q.d)).collect();
+    let ints: Vec<i128> = p.0.values().map(|q| q.n.checked_mul(den_lcm / q.d).ok_or_else(|| BIG.to_string())).collect::<R<_>>()?;
     let g = ints.iter().fold(0i128, |g, n| gcd(g, *n)).max(1);
     let sign = if p.lead().is_some_and(|l| l.1.n < 0) { -1 } else { 1 };
     let c = Q::new(sign * g, den_lcm)?;
@@ -399,11 +406,31 @@ pub fn poly_text(p: &Poly, name: &dyn Fn(&str) -> String) -> (String, String) {
 
 /// A fraction of polynomials: (x + 1)/(x − 1) as text, \frac{x + 1}{x - 1} as LaTeX.
 pub fn ratf_text(r: &RatF, name: &dyn Fn(&str) -> String) -> (String, String) {
+    if r.den.as_const() == Some(Q::ONE) { return poly_text(&r.num, name); }
+    // Fractions inside are cleared for reading: 1/(2x), not (1/2)/x.
+    let l = r.num.0.values().chain(r.den.0.values()).try_fold(1i128, |l, q| l.checked_mul(q.d / gcd(l, q.d))).unwrap_or(1);
+    let (num, den) = (r.num.scale(Q::int(l)).unwrap_or_else(|_| r.num.clone()), r.den.scale(Q::int(l)).unwrap_or_else(|_| r.den.clone()));
+    let r = &RatF { num, den };
     let (nt, nx) = poly_text(&r.num, name);
-    if r.den.as_const() == Some(Q::ONE) { return (nt, nx); }
     let (dt, dx) = poly_text(&r.den, name);
-    let wrap = |s: String, p: &Poly| if p.0.len() > 1 { format!("({s})") } else { s };
-    (format!("{}/{}", wrap(nt, &r.num), wrap(dt, &r.den)), format!("\\frac{{{nx}}}{{{dx}}}"))
+    (format!("{}/{}", bracket(nt, r.num.0.len() == 1), bracket(dt, atom(&r.den))), format!("\\frac{{{nx}}}{{{dx}}}"))
+}
+
+/// One symbol or a whole number, which needs no brackets on either side of a /: x, x², 3.
+fn atom(p: &Poly) -> bool {
+    p.0.len() == 1 && p.0.iter().all(|(m, c)| (m.is_empty() && c.d == 1 && c.n >= 0) || (m.len() == 1 && *c == Q::ONE))
+}
+
+/// Text that reads as one piece before or after a /: brackets unless it is one symbol or a whole number,
+/// so (x + 1)/(xy) and 1/(2x) read as meant.
+pub fn bracket(t: String, one_piece: bool) -> String { if one_piece { t } else { format!("({t})") } }
+
+/// Whether a factored polynomial reads as one piece before a /: no brackets of its own, no fraction (3xy).
+pub fn factored_term(f: &Factored) -> bool { f.parts.is_empty() && f.c.d == 1 }
+
+/// Whether a factored polynomial reads as one piece after a /: one symbol or a whole number.
+pub fn factored_atom(f: &Factored) -> bool {
+    (f.parts.is_empty() && f.mono.is_empty() && f.c.d == 1 && f.c.n >= 0) || (f.parts.is_empty() && f.c == Q::ONE && f.mono.len() == 1 && f.mono[0].1 == 1)
 }
 
 /// A factored polynomial: 3xy(2x + 3), (x − 1)(2x + 1), 2(x + 1)².
@@ -411,7 +438,12 @@ pub fn factored_text(f: &Factored, name: &dyn Fn(&str) -> String) -> (String, St
     if f.c.is_zero() { return ("0".into(), "0".into()); }
     let (mut t, mut x) = (String::new(), String::new());
     let lone = f.mono.is_empty() && f.parts.is_empty();
-    if f.c == Q::int(-1) && !lone { t.push('-'); x.push('-'); } else if f.c != Q::ONE || lone { let (a, b) = q_text(f.c); t.push_str(&a); x.push_str(&b); }
+    if f.c == Q::int(-1) && !lone { t.push('-'); x.push('-'); } else if f.c != Q::ONE || lone {
+        // A fractional constant in front is bracketed in text: (1/2)x, not 1/2x.
+        let (a, b) = q_text(f.c);
+        t.push_str(&if f.c.d != 1 && !lone { format!("({a})") } else { a });
+        x.push_str(&b);
+    }
     let (mt, mx) = mono_text(&f.mono, name);
     t.push_str(&mt);
     if !mx.is_empty() { if !x.is_empty() && !x.ends_with('-') { x.push(' '); } x.push_str(&mx); }

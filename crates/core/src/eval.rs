@@ -104,6 +104,15 @@ impl Env {
         use crate::sym::Look;
         let k = canon(v);
         if let Some(r) = self.exprs.get(&k) { return Look::Expr(r.clone()); }
+        // A name the sheet would refuse on a numeric line is refused here too, rather than taken for a symbol.
+        if !self.vars.contains_key(&k) {
+            if self.funcs.contains_key(&k) || FUNCTIONS.iter().any(|f| f.0.split('(').next() == Some(k.as_str())) { return Look::Refuse(format!("{k} is a function; exact maths works on names and numbers.")); }
+            match self.later.get(&k) {
+                Some(true) => return Look::Refuse(format!("{k} has an error on its own line.")),
+                Some(false) => return Look::Refuse(format!("{k} is defined further down: move its line above this one.")),
+                None => {}
+            }
+        }
         let val = self.vars.get(&k).cloned().or_else(|| if matches!(k.as_str(), "π" | "e") { None } else { constant(&k) });
         match val {
             None => Look::Symbol,
@@ -659,6 +668,8 @@ pub fn show_val(v: &Val, want: &str, f: &Fmt) -> (String, String, String, String
     // (3 + 4j) Ω: a complex value in rectangular form is bracketed before its unit.
     let rect = v.cx() && !v.vec && !f.polar && !label.is_empty() && text.contains(' ');
     let (bt, bx) = if rect { (format!("({text})"), format!("\\left({tex}\\right)")) } else { (text.clone(), tex) };
+    // A fraction before a unit is bracketed in text: (2/3) m.
+    let bt = if !rect && !v.vec && !label.is_empty() && label != "°" && text.contains('/') { format!("({bt})") } else { bt };
     let full_t = if label.is_empty() { text.clone() } else if label == "°" { format!("{bt}°") } else { format!("{bt} {label}") };
     let full_x = if label.is_empty() { bx } else if label == "°" { format!("{bx}{unit_tex}") } else { format!("{bx}\\,{unit_tex}") };
     (full_t, full_x, text, label)
@@ -827,9 +838,11 @@ fn region(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>, subst: bo
         let nm = |v: &str| latex::name(v);
         let res = crate::sym::from_node(&arg, &|v| env.look(v)).and_then(|r| {
             let (t, x) = if op == "factor" {
-                let (n, d) = (crate::sym::factor(&r.num)?, crate::sym::factor(&r.den)?);
+                let (mut n, mut d) = (crate::sym::factor(&r.num)?, crate::sym::factor(&r.den)?);
+                // One whole-number constant on each side: 3/(2(x + 1)(x − 1)), not (3/2)/((x + 1)(x − 1)).
+                if r.den.as_const() != Some(crate::sym::Q::ONE) { let q = crate::sym::Q::new(n.c.n * d.c.d, n.c.d * d.c.n).map_err(|e| e.to_string())?; (n.c, d.c) = (crate::sym::Q::int(q.n), crate::sym::Q::int(q.d)); }
                 let (nt, nx) = crate::sym::factored_text(&n, &nm);
-                if r.den.as_const() == Some(crate::sym::Q::ONE) { (nt, nx) } else { let (dt, dx) = crate::sym::factored_text(&d, &nm); (format!("{nt}/{dt}"), format!("\\frac{{{nx}}}{{{dx}}}")) }
+                if r.den.as_const() == Some(crate::sym::Q::ONE) { (nt, nx) } else { let (dt, dx) = crate::sym::factored_text(&d, &nm); (format!("{}/{}", crate::sym::bracket(nt, crate::sym::factored_term(&n)), crate::sym::bracket(dt, crate::sym::factored_atom(&d))), format!("\\frac{{{nx}}}{{{dx}}}")) }
             } else { crate::sym::ratf_text(&r, &nm) };
             Ok((r, t, x))
         });
@@ -863,11 +876,12 @@ fn region(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>, subst: bo
                     Some(t) => set_result(&mut o, &v, &Region { unit: t, ..r.clone() }, f),
                     None => set_result(&mut o, &v, r, f),
                 }
-                env.vars.insert(canon(name), v);
+                env.exprs.remove(&canon(name)); env.vars.insert(canon(name), v);
                 known.push(name.clone());
             }
             Stmt::Func { name, params, e } => {
                 o.name = canon(name);
+                env.exprs.remove(&canon(name));
                 env.funcs.insert(canon(name), (params.clone(), e.clone()));
                 known.push(name.clone());
             }
@@ -887,7 +901,7 @@ fn region(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>, subst: bo
                 let n = count as usize;
                 let v = Val { abs: a.abs, ..Val::vector((0..n).map(|i| a.x() + st.x() * i as f64).collect(), a.dim) };
                 set_result(&mut o, &v, r, f);
-                env.vars.insert(canon(name), v);
+                env.exprs.remove(&canon(name)); env.vars.insert(canon(name), v);
                 known.push(name.clone());
             }
             Stmt::Check { e } => {
@@ -935,6 +949,7 @@ fn region(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>, subst: bo
                 let v = Val { v: vec![x], ..a.clone() };
                 set_result(&mut o, &v, r, f);
                 o.result_tex = format!("\\Rightarrow\\; {} = {}", latex::name(var), o.result_tex);
+                env.exprs.remove(&k);
                 env.vars.insert(k, v);
                 known.push(var.clone());
             }
@@ -1075,7 +1090,7 @@ fn table(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>, o: &mut Re
                 if !name.is_empty() && co.error.is_empty() {
                     let (_, _, value, unit) = show_val(&v, &c.unit, f);
                     o.defs.push(VarOut { name: canon(name), tex: latex::name(name), value, unit, id: r.id });
-                    env.vars.insert(canon(name), v);
+                    env.exprs.remove(&canon(name)); env.vars.insert(canon(name), v);
                     known.push(name.into());
                 }
             }

@@ -15,7 +15,8 @@ Exact maths: fractions that stay fractions, and algebra on expressions.
 - View › Fractions shows results that are fractions as fractions (1/3, not 0.3333; 0.1 + 0.2 is 3/10) and whole numbers in full. It is saved with the sheet and off by default, so engineering sheets keep their decimals. π, √2 and other numbers that are not fractions stay decimals.
 
 **Checks**
-- 61 engine tests (new: algebra worked by hand, a thousand random polynomials whose factors multiply back and whose fractions cancel, fractions shown exactly, the slowest inputs in under a second), 93 UI tests. Every pack prints as before. 18,000 more random sheets with the new functions. The Windows install check passes.
+- 62 engine tests (new: algebra worked by hand, a thousand random polynomials whose factors multiply back and whose fractions cancel, fractions shown exactly, the slowest inputs in under a second), 93 UI tests. Every pack prints as before. 36,000 more random sheets with the new functions. The Windows install check passes.
+- An independent review before release found that a short line of nested powers could fill memory and close the app, that a very large power could wrap round to x⁰, and that some answers read ambiguously as text (x + 1/x − 1); powers above 1000 are now refused at once, and text is bracketed where it needs to be: (x + 1)/(x − 1), 1/(2x), (2/3) m. A name given a value after an expression drops the expression, and names that are defined further down, have an error, or are functions are refused instead of taken for symbols.
 
 ## 0.1.12 — 2026-11-11
 

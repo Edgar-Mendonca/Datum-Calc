@@ -971,7 +971,7 @@ fn exact_algebra() {
         (&["L = 2 m", "expand(L*x)"][..], "L has units"),
         (&["expand(x^0.5)"][..], "Exact maths needs a whole-number power."),
         (&["simplify(1/(x - x))"][..], "Division by zero."),
-        (&["expand((x+1)^200)"][..], "A power above 64"),
+        (&["expand((x+1)^200)"][..], "The numbers grow too large for exact maths."),
     ] { assert!(error(lines).starts_with(msg), "{lines:?}: {}", error(lines)); }
 }
 
@@ -1009,7 +1009,7 @@ fn fractions_shown_exactly() {
     assert_eq!(shown(&["0.1 + 0.2"]), "3/10", "the decimal round-off of 3/10 is still 3/10");
     let mut s = sheet(&["x = 7/12*1 m"]);
     (s.exact, s.regions[0].unit) = (true, "m".into());
-    assert_eq!(eval::run(&s).regions[0].result, "7/12 m", "in the unit chosen");
+    assert_eq!(eval::run(&s).regions[0].result, "(7/12) m", "in the unit chosen, bracketed before it");
     assert_eq!(shown(&["z = 274863"]), "274\u{2009}863", "whole numbers in full, grouped with a thin space");
     assert_eq!(shown(&["sqrt(2)"]), "1.414", "not a fraction: decimals as before");
     assert_eq!(shown(&["pi"]), "3.142");
@@ -1028,4 +1028,32 @@ fn exact_algebra_stays_quick() {
     let limit = if cfg!(debug_assertions) { 10.0 } else { 1.0 };
     assert!(t.elapsed().as_secs_f64() < limit, "took {:?}", t.elapsed());
     assert!(result(&["factor(x^24 - 1)"]).matches("(").count() >= 2);
+}
+
+#[test]
+fn exact_algebra_review_of_0_2_0() {
+    // Inputs that filled memory or wrapped the exponent: refused at once (the limit is a power of 1000).
+    let t = std::time::Instant::now();
+    for line in ["simplify((((((x^64)^64)^64)^64)^64)/(x+1))", "expand(((((((x^64)^64)^64)^64)^64)^64))", "expand(((((((x^64)^64)^64)^64)^64)^64)*x)", "expand((x+1)^1000)", "factor(10^30*x + 1/10^9)"] {
+        let e = error(&[line]);
+        assert!(e.contains("too large"), "{line}: {e}");
+    }
+    assert!(t.elapsed().as_secs_f64() < if cfg!(debug_assertions) { 10.0 } else { 1.0 }, "took {:?}", t.elapsed());
+    assert_eq!(result(&["expand(x^1000)"]), "x¹⁰⁰⁰");
+    assert_eq!(error(&["expand(1e20*x)"]), "Numbers above 10¹⁵ are too large for exact maths.");
+    // Text that reads as meant: brackets around a sum or a product on either side of /, whole-number constants.
+    for (line, want) in [("factor((x+1)/(x-1))", "(x + 1)/(x − 1)"), ("factor(x*y/(x+y))", "xy/(x + y)"), ("factor(6/(4*x^2-4))", "3/(2(x + 1)(x − 1))"),
+        ("factor(x/2)", "(1/2)x"), ("factor((x+1)/(2*x-2))", "(x + 1)/(2(x − 1))"), ("simplify((x+1)/(x*y))", "(x + 1)/(xy)"), ("simplify(1/(2*x))", "1/(2x)")] {
+        assert_eq!(result(&[line]), want, "{line}");
+    }
+    // A name redefined as a value drops its expression; names the sheet would refuse are refused, not symbols.
+    assert_eq!(result(&["y = expand((x+1)^2)", "y = 3", "expand(y)"]), "3");
+    assert!(error(&["expand((a+1)^2)", "a = 2"][..1]).is_empty() && run(&["expand((a+1)^2)", "a = 2"]).regions[0].error.as_ref().unwrap().msg.contains("defined further down"));
+    assert!(error(&["b = 1/0", "expand((b+1)^2)"]).contains("has an error on its own line"));
+    assert!(error(&["f(t) = t^2", "expand(f + 1)"]).contains("f is a function"));
+    assert!(error(&["expand(sin)"]).contains("sin is a function"));
+    // A fraction before a unit is bracketed in text.
+    let mut s = sheet(&["q = 2/3*1 m"]);
+    (s.exact, s.regions[0].unit) = (true, "m".into());
+    assert_eq!(eval::run(&s).regions[0].result, "(2/3) m");
 }

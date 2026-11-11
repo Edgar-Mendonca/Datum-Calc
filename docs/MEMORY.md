@@ -162,7 +162,8 @@ tests_ui/run.cjs               Playwright UI tests against ui/dist with a mocked
 | 0.1.12 | The release workflow runs tests_win/smoke.ps1 on the built installer before publishing | The user cannot test on Windows; nothing ships that a clean machine cannot install, update, use, recover and uninstall |
 | 0.2.0 | Fractions are recognised when shown (continued fractions, denominator ≤ 10 000, within 4 ulp), not carried through the engine | Exact arithmetic everywhere would mean rewriting every operation with units; the recognition is reliable for the arithmetic of small fractions and leaves π, √2 as decimals |
 | 0.2.0 | Exact algebra is its own module on polynomials with rational coefficients; only + − × ÷ and whole powers; undefined names are symbols | A small, testable core that never gives an inexact "exact" answer; anything else is refused with a plain message |
-| 0.2.0 | `y = expand(…)` keeps the expression in `Env.exprs`; using y as a value says it is an expression | Expressions are reused by later algebra lines without a general symbolic engine |
+| 0.2.0 | `y = expand(…)` keeps the expression in `Env.exprs`; using y as a value says it is an expression; any later definition of y as a value drops it | Expressions are reused by later algebra lines without a general symbolic engine |
+| 0.2.0 | Powers above 1000 are refused (MAX_DEGREE); text brackets a sum or product after /, a fraction before a symbol or a unit | Review: nested powers aborted the app (memory); x + 1/x − 1 read as something else |
 
 ## 3. Roadmap
 
@@ -294,6 +295,7 @@ tests_ui/run.cjs               Playwright UI tests against ui/dist with a mocked
 
 ### 2026-11-11: Session 1, continued (0.2.0)
 - Exact maths: sym.rs (rationals, polynomials, RatF with reduce, factor by rational roots), simplify/expand/factor lines and kept expressions, View › Fractions (`Sheet.exact`), Math › Algebra keys, help and glossary.
+- The independent review found an out-of-memory abort from nested powers (degree now capped at 1000 in mono_mul and pow), u32 exponent wraparound, an unchecked i128 multiply in factor, ambiguous text for fractions, stale kept expressions after a redefinition, and names the sheet would refuse taken for symbols; all fixed with a regression test.
 - Self-check: hand-worked cases, a property test (1,000 random polynomials: factors multiply back, (p·q)/q = p), a speed test of adversarial inputs (a constant with thousands of divisors capped the root search), the algebra sheet looked at in the window, every pack unchanged, 18,000 random sheets with the new functions, an independent review.
 
 ## 5. Known limits and next steps
