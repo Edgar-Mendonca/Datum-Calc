@@ -291,6 +291,11 @@ const check = (name, ok, info = "") => { console.log(`${ok ? "ok  " : "FAIL"} ${
   check("a material region draws its datasheet", (await p8.$$(".cpage .matview .ctable.mat tr")).length >= 10 && (await p8.textContent(".cpage .matview")).includes("Structural steel, EN S355") && (await p8.textContent(".cpage .matsrc")).includes("not design values") && (await p8.$$(".cpage .katex-error")).length === 0);
   check("its names work in the lines below", (await p8.$$(".cpage .badge.pass")).length === 1 && (await p8.textContent(".vars")).includes("360"));
   await p8.dblclick(".cpage .region.k-material"); await p8.waitForTimeout(400);
+  // Renaming a region that names only its material's id keeps the material (review of 0.2.1).
+  await p8.fill(".matedit input.matname", "s355 "); await p8.dispatchEvent(".matedit input.matname", "change"); await p8.waitForTimeout(150);
+  const renamed = await p8.evaluate(() => JSON.stringify(window.__calls.filter(c => c[0] === "apply").pop() ?? null));
+  check("renaming keeps the material", renamed.includes('"id":"steel-s355"') && renamed.includes('"mat":{') && renamed.includes('"name":"s355"'), renamed.slice(0, 200));
+  await p8.fill(".matedit input.matname", "steel"); await p8.dispatchEvent(".matedit input.matname", "change"); await p8.waitForTimeout(150);
   const all = (await p8.$$(".matlist button")).length;
   await p8.fill(".matedit input.find", "6061"); await p8.waitForTimeout(150);
   const found = await p8.$$eval(".matlist button", bs => bs.map(b => b.textContent));

@@ -88,14 +88,23 @@ const TableEditor = (p: { r: Region }) => {
   );
 };
 
-/** A short name from a material's name: the last plain word before any comma (Structural steel, EN S355 → steel). */
-const shortName = (m: Material) => (m.name.split(",")[0].split(/\s+/).reverse().find(w => /^[A-Za-z]+$/.test(w)) ?? "mat").toLowerCase().slice(0, 12);
+/** A short name from a material's name: the last plain word before any comma (Structural steel, EN S355 → steel),
+ *  numbered when another material region on the sheet has it already (steel2). */
+const shortName = (m: Material, self = 0) => {
+  const base = (m.name.split(",")[0].split(/\s+/).reverse().find(w => /^[A-Za-z]+$/.test(w)) ?? "mat").toLowerCase().slice(0, 16);
+  const taken = new Set(S().regions.filter(r => r.kind === "material" && r.id !== self).map(r => (r.data?.name ?? "") as string));
+  let n = base, k = 1;
+  while (taken.has(n)) n = `${base}${++k}`;
+  return n;
+};
 
 /** The material picker: search the library, pick one, name it, choose typical, low or high values. Each change
  *  is kept in the sheet with the material's values, so the sheet reads the same when the library changes. */
 const MaterialEditor = (p: { r: Region }) => {
   const [lib] = createResource(async () => JSON.parse((await call<string>("materials")) ?? "{}") as MatLibrary);
   const d = () => (p.r.data ?? {}) as { id?: string; name?: string; pick?: string; mat?: Material };
+  // The material in use: the one kept in the sheet, or the library's for a region that names only its id.
+  const cur = () => d().mat ?? lib()?.materials.find(x => x.id === d().id);
   const [q, setQ] = createSignal("");
   const [name, setName] = createSignal(d().name ?? "");
   const [pick, setPick] = createSignal(d().pick || "typical");
@@ -106,12 +115,12 @@ const MaterialEditor = (p: { r: Region }) => {
     act({ Set: { id: p.r.id, field: "data", value: { id: m?.id ?? "", name: n, pick: pk, mat: m ?? null, sources } } });
   };
   // A name still as suggested for the last material follows the new one (steel → aluminium); one typed is kept.
-  const choose = (m: Material) => { const old = d().mat ?? lib()?.materials.find(x => x.id === d().id); const n = !name() || (old && name() === shortName(old)) ? shortName(m) : name(); setName(n); save(m, n, pick()); };
+  const choose = (m: Material) => { const old = cur(); const n = !name().trim() || (old && name().trim() === shortName(old, p.r.id)) ? shortName(m, p.r.id) : name().trim(); setName(n); save(m, n, pick()); };
   return (
     <div class="matedit" onMouseDown={e => e.stopPropagation()}>
       <div class="matbar">
-        <label>Name <input class="matname" value={name()} placeholder="steel" onInput={e => setName(e.currentTarget.value)} onChange={() => save(d().mat, name().trim(), pick())} /></label>
-        <label>Values <select value={pick()} onChange={e => { setPick(e.currentTarget.value); save(d().mat, name().trim(), e.currentTarget.value); }}><option value="typical">typical (middle of the range)</option><option value="low">low end</option><option value="high">high end</option></select></label>
+        <label>Name <input class="matname" value={name()} placeholder="steel" onInput={e => setName(e.currentTarget.value)} onChange={() => save(cur(), name().trim(), pick())} /></label>
+        <label>Values <select value={pick()} onChange={e => { setPick(e.currentTarget.value); save(cur(), name().trim(), e.currentTarget.value); }}><option value="typical">typical (middle of the range)</option><option value="low">low end</option><option value="high">high end</option></select></label>
         <span class="grow" /><button class="btn sm pri" onClick={() => setEditId(0)}>Done</button>
       </div>
       <input class="find" placeholder="Search 250 materials: S355, 6061, nylon, oak, alumina…" value={q()} onInput={e => setQ(e.currentTarget.value)} />

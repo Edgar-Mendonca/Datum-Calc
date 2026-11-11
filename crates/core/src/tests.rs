@@ -1128,6 +1128,24 @@ mod materials {
     }
 
     #[test]
+    fn review_of_0_2_1() {
+        // A second material with the same short name warns: its values replace the first one's from here.
+        let mut s = with_material(serde_json::json!({ "id": "steel-s355", "name": "steel" }), &[]);
+        s.regions.push(Region { id: 7, kind: Kind::Material, data: serde_json::json!({ "id": "ss-304", "name": "steel" }), ..Default::default() });
+        let o = eval::run(&s);
+        assert!(o.regions[0].warn.is_empty() && o.regions[1].warn.starts_with("Names ending _steel are already defined above"), "{:?}", o.regions[1].warn);
+        // Elongation keeps its % on a US sheet; hardness shows HV.
+        let mut s = with_material(serde_json::json!({ "id": "steel-s355", "name": "steel" }), &[]);
+        s.units = "US".into();
+        let o = eval::run(&s);
+        let row = o.regions[0].material.as_ref().unwrap().rows.iter().find(|r| r.what == "elongation at fracture").unwrap().clone();
+        assert_eq!((row.value.as_str(), row.unit.as_str()), ("21", "%"));
+        let hv = crate::materials::library().materials.iter().find(|m| m.props.contains_key("hv")).unwrap();
+        let o = eval::run(&with_material(serde_json::json!({ "id": hv.id, "name": "h" }), &[]));
+        assert_eq!(o.regions[0].material.as_ref().unwrap().rows.iter().find(|r| r.what == "Vickers hardness").unwrap().unit, "HV");
+    }
+
+    #[test]
     fn every_material_works_out_in_si_and_us() {
         for m in &crate::materials::library().materials {
             for us in [false, true] {

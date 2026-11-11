@@ -14,7 +14,8 @@ Materials: the properties of about 250 materials, from Datum Atlas, as names wit
 - New units: µΩ and nΩ.
 
 **Checks**
-- 68 engine tests (new: every one of the 252 materials worked out in SI and US units; S355's values and units; low and high ends; a sheet keeps its values; what a material region says when it cannot; damaged material data), 98 UI tests (the datasheet, the picker on the real library, a search and a pick). Every pack prints as before. The Windows install check passes.
+- 69 engine tests (new: every one of the 252 materials worked out in SI and US units; S355's values and units; low and high ends; a sheet keeps its values; what a material region says when it cannot; damaged material data), 99 UI tests (the datasheet, the picker on the real library, a search, a pick and a rename). Every pack prints as before. The Windows install check passes.
+- An independent review before release found that renaming a material region that named only its material dropped the material, that two materials could get the same suggested name (S355 and 304 are both "steel") and the second replaced the first without a word, and that elongation lost its % on US sheets. The suggested name is now unique (steel, steel2), a reused name gets a warning, renaming keeps the material, and % stays.
 
 ## 0.2.0 — 2026-11-11
 

@@ -1131,6 +1131,10 @@ fn material(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>, o: &mut
         o.error = Some(ErrOut { msg: "Give the material a short name of letters and digits, such as steel: its properties become ρ_steel, E_steel …".into(), from: 0, to: 0 });
         return;
     }
+    // Names another material (or line) above already defined are replaced from here: say so, as a second
+    // material given the same short name would otherwise change the first one's values silently.
+    let reused = KEYS.iter().filter(|k| m.props.contains_key(k.0)).any(|k| env.vars.contains_key(&canon(&format!("{}_{}", k.1, d.name))));
+    if reused { o.warn = format!("Names ending _{} are already defined above; this material's values replace them from here. Give it another name to keep both.", d.name); }
     for (key, base, what, unit) in KEYS {
         let Some((lo, hi, src)) = m.props.get(key) else { continue };
         if !lo.is_finite() || !hi.is_finite() { continue; }
@@ -1138,13 +1142,14 @@ fn material(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>, o: &mut
         let val = |x: f64| match &u { Some(u) => Val { v: vec![x * u.factor + u.offset], dim: u.dim, abs: u.offset != 0.0, ..Default::default() }, None => Val::plain(x) };
         let v = val(mats::pick(*lo, *hi, &d.pick));
         // Shown in the unit the library keeps (US units on a US sheet).
-        let want = if f.us || unit.is_empty() { String::new() } else { units::pretty(unit) };
+        // % is the same in both systems: elongation reads 21 %, not 0.21.
+        let want = if unit.is_empty() || (f.us && unit != "%") { String::new() } else { units::pretty(unit) };
         let (_, _, value, shown) = show_val(&v, &want, f);
         let (_, _, a, _) = show_val(&val(*lo), &shown, f);
         let (_, _, b, _) = show_val(&val(*hi), &shown, f);
         let raw = format!("{base}_{}", d.name);
         let k = canon(&raw);
-        mo.rows.push(MatRow { tex: latex::name(&raw), what: what.to_string(), value: value.clone(), unit: shown.clone(), range: if a == b { String::new() } else { format!("{a} – {b}") }, source: d.sources.get(src).cloned().unwrap_or_else(|| mats::source_title(src)) });
+        mo.rows.push(MatRow { tex: latex::name(&raw), what: what.to_string(), value: value.clone(), unit: if key == "hv" { "HV".into() } else { shown.clone() }, range: if a == b { String::new() } else { format!("{a} – {b}") }, source: d.sources.get(src).cloned().unwrap_or_else(|| mats::source_title(src)) });
         o.defs.push(VarOut { name: k.clone(), tex: latex::name(&raw), value, unit: shown.clone(), id: r.id });
         env.shown.insert(k.clone(), shown);
         env.exprs.remove(&k);
