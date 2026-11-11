@@ -12,6 +12,7 @@
     "windows": [
       {
         "label": "main",
+        "create": false,
         "title": "Datum Calc",
         "width": 1440,
         "height": 900,

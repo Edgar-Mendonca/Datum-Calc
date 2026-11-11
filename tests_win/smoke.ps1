@@ -33,10 +33,10 @@ Check ".dcalc files open with Datum Calc" ($null -ne $assoc)
 # 3. The real window: a sheet "double-clicked" (passed on the command line), an edit, print preview, a recovery copy.
 $sheet = Join-Path $env:RUNNER_TEMP "AC circuit.dcalc"
 Copy-Item "crates/core/packs/ac-circuit.dcalc" $sheet
-$env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = "--remote-debugging-port=9222"
+$env:DATUM_CALC_TEST_PORT = "9222"
 function Start-App($arg) {
   $p = if ($arg) { Start-Process $exe.FullName -ArgumentList "`"$arg`"" -PassThru } else { Start-Process $exe.FullName -PassThru }
-  for ($i = 0; $i -lt 60; $i++) { try { Invoke-RestMethod "http://127.0.0.1:9222/json/version" | Out-Null; return $p } catch { Start-Sleep 1 } }
+  for ($i = 0; $i -lt 60; $i++) { try { Invoke-RestMethod "http://127.0.0.1:9222/json/version" -TimeoutSec 2 | Out-Null; return $p } catch { Start-Sleep 1 } }
   throw "The window did not open its debugging port within a minute."
 }
 $p = Start-App $sheet

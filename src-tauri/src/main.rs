@@ -456,6 +456,14 @@ fn main() {
             let mut a = App { doc: Doc::new(Sheet::new("Calc1")), opts, id, _lock: lock };
             a.doc = Doc::new(fresh(&a, Sheet::new("Calc1")));
             app.manage(St(Mutex::new(a)));
+            // The window is made here, from tauri.conf.json, so the Windows install test can open WebView2's
+            // debugging port (tests_win/smoke.ps1 sets DATUM_CALC_TEST_PORT); a user's start never sets it.
+            let cfg = app.config().app.windows.iter().find(|w| w.label == "main").cloned().ok_or("The window settings are missing.")?;
+            let mut w = tauri::WebviewWindowBuilder::from_config(app.handle(), &cfg)?;
+            if let Some(port) = std::env::var("DATUM_CALC_TEST_PORT").ok().and_then(|p| p.parse::<u16>().ok()) {
+                w = w.additional_browser_args(&format!("--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --remote-debugging-port={port}"));
+            }
+            w.build()?;
             Ok(())
         })
         .on_window_event(|w, e| {
