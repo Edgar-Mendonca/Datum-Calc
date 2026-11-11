@@ -265,6 +265,22 @@ const check = (name, ok, info = "") => { console.log(`${ok ? "ok  " : "FAIL"} ${
   check("the Math tab has the complex keys", (await p6.$$eval(".ribbon .rb.key", bs => bs.map(b => b.textContent))).filter(t => ["j", "∠", "dB"].includes(t)).length === 3);
   await p6.close();
 
+  // 13c. Exact maths: algebra results and fractions draw; View › Fractions and the Algebra keys (0.2.0).
+  const p7 = await b.newPage({ viewport: { width: 1440, height: 900 } });
+  p7.on("pageerror", e => errors.push(String(e)));
+  await p7.addInitScript(st => { window.__calls = []; window.__TAURI__ = { core: { invoke: async (c, a) => { window.__calls.push([c, a]); return c === "state" || c === "apply" ? st : c === "options" ? { theme: "light", autosave: 0, units: "SI", digits: 4, paper: "A4", number: "auto" } : c === "recent" || c === "packs" ? [] : null; } }, event: { listen: async () => () => {} } }; }, fix.alg);
+  await p7.goto(url); await p7.waitForTimeout(500); await p7.click(".bs aside .back"); await p7.waitForTimeout(500);
+  const algText = (await p7.textContent(".cpage")).replace(/[\s  ]/g, "");
+  check("algebra results draw as maths", algText.includes("x2+2x+1") && algText.includes("(2x+1)(x−1)") && algText.includes("(x+1)3") && (await p7.$$(".cpage .katex-error")).length === 0 && (await p7.$$(".cpage .rerr")).length === 0, algText.slice(0, 300));
+  check("a fraction draws as a fraction", (await p7.$$(".cpage .katex .mfrac")).length >= 2);
+  await p7.click(".tabs > button:text-is('Math')"); await p7.waitForTimeout(100);
+  check("the Math tab has the Algebra keys", (await p7.$$eval(".ribbon .rb.key", bs => bs.map(b => b.textContent))).filter(t => ["simplify", "expand", "factor"].includes(t)).length === 3);
+  await p7.click(".tabs > button:text-is('View')"); await p7.waitForTimeout(100);
+  await p7.click(".ribbon button:has-text('Fractions')"); await p7.waitForTimeout(120);
+  const fr = await p7.evaluate(() => JSON.stringify(window.__calls.filter(c => c[0] === "apply").pop() ?? null));
+  check("View › Fractions turns fractions off", fr.includes('"field":"exact"') && fr.includes('"value":false'), fr);
+  await p7.close();
+
   // 14. Recovery: Discard removes the kept copy; × only closes, so the copy is offered again next time (0.1.9).
   for (const [how, sel, want] of [["Discard", ".dlg footer .btn:not(.pri)", true], ["×", ".dlg header .x", false]]) {
     const p4 = await b.newPage({ viewport: { width: 1440, height: 900 } });

@@ -162,7 +162,7 @@ fn evaluation_speed_gate() {
 fn random_expr(r: &mut Rng, depth: u32) -> String {
     const UNITS: [&str; 14] = ["m", "mm", "kg", "s", "N", "kN*m", "m^3/h", "MPa", "°C", "°F", "K", "rpm", "W/(m^2*K)", "%"];
     const NUMS: [&str; 10] = ["0", "1", "2.5", "-3", "1e-9", "1e9", "1e300", "1e-300", "0.0001", "42"];
-    const FUNCS: [&str; 24] = ["sqrt", "sin", "cos", "ln", "log", "exp", "abs", "min", "max", "round", "sum", "mean", "len", "if", "hypot", "f", "re", "im", "arg", "conj", "polar", "par", "db", "cosh"];
+    const FUNCS: [&str; 27] = ["sqrt", "sin", "cos", "ln", "log", "exp", "abs", "min", "max", "round", "sum", "mean", "len", "if", "hypot", "f", "re", "im", "arg", "conj", "polar", "par", "db", "cosh", "simplify", "expand", "factor"];
     // Complex values and units after brackets (0.1.8).
     const CX: [&str; 13] = ["4j", "-2.5j V", "(1 + 2j) Ω", "j", "1e300j", "(a) m", "0j", "2i kN*m", "(b - 1j) mA", "10 Ω∠30°", "5/_-45 deg", "2*pi*50 Hz", "a∠a"];
     if depth == 0 || r.below(4) == 0 {
@@ -170,7 +170,7 @@ fn random_expr(r: &mut Rng, depth: u32) -> String {
     }
     match r.below(4) {
         0 | 1 => format!("{} {} {}", random_expr(r, depth - 1), ["+", "-", "*", "/", "^", "<=", ">"][r.below(7)], random_expr(r, depth - 1)),
-        2 => { let f = FUNCS[r.below(24)]; let n = if f == "if" { 3 } else if matches!(f, "min" | "max" | "round" | "hypot" | "polar" | "par") { 2 } else { 1 }; format!("{f}({})", (0..n).map(|_| random_expr(r, depth - 1)).collect::<Vec<_>>().join(", ")) }
+        2 => { let f = FUNCS[r.below(27)]; let n = if f == "if" { 3 } else if matches!(f, "min" | "max" | "round" | "hypot" | "polar" | "par") { 2 } else { 1 }; format!("{f}({})", (0..n).map(|_| random_expr(r, depth - 1)).collect::<Vec<_>>().join(", ")) }
         _ => format!("-{}", random_expr(r, depth - 1)),
     }
 }
@@ -196,6 +196,7 @@ fn random_expressions_never_panic() {
                 0 => format!("check {e} <= {}", random_expr(&mut r, 2)),
                 1 => format!("solve {e} = {} for x in {} .. {}", random_expr(&mut r, 2), random_expr(&mut r, 1), random_expr(&mut r, 1)),
                 2 => format!("plot {e} for x in {} .. {}{}", ["0", "1 Hz", "a"][r.below(3)], random_expr(&mut r, 1), [" log", ""][r.below(2)]),
+                3 if r.below(3) == 0 => format!("w{} = {}((x + {e})^{} / (x - 1))", r.below(5), ["simplify", "expand", "factor"][r.below(3)], r.below(5)),
                 3 => format!("w{} = {e}  # note", r.below(5)),
                 4 => format!("v{} = {} .. {}", r.below(3), random_expr(&mut r, 1), random_expr(&mut r, 1)),
                 _ => format!("{e} ="),
@@ -204,7 +205,7 @@ fn random_expressions_never_panic() {
             push(kind, text, json!(null));
         }
         for us in [false, true] {
-            let o = crate::eval::run_with(&s, &crate::eval::Fmt { digits: [2, 4, 10][round % 3], eng: round % 7 == 0, us, polar: round % 5 == 0 });
+            let o = crate::eval::run_with(&s, &crate::eval::Fmt { digits: [2, 4, 10][round % 3], eng: round % 7 == 0, us, polar: round % 5 == 0, exact: round % 3 == 0 });
             assert_eq!(o.regions.len(), s.regions.len());
             for g in &o.regions {
                 assert!(g.result.len() < 2000 && g.latex.len() < 20_000, "{}", g.latex);

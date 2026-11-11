@@ -46,5 +46,13 @@ fn main() {
     // The RC filter pack: Bode plots on a log frequency axis (0.1.11).
     let rc = datum_core::packs::sheet("rc-filter").expect("the RC pack opens");
     let rc = serde_json::json!({ "sheet": rc, "calc": eval::run(&rc), "path": null, "dirty": false, "undo": false, "redo": false, "rev": 1 });
-    println!("{}", serde_json::json!({ "state": state, "packs": datum_core::packs::cards(), "ac": ac, "rc": rc }));
+    // Exact maths with View › Fractions on (0.2.0).
+    let mut alg = Sheet::new("Algebra");
+    for (k, t) in ["expand((x+1)^2)", "factor(2*x^2 - x - 1)", "y = expand((x+1)^3)", "factor(y)", "a = 1/3", "simplify((x^2 - 1)/(x - 1))"].iter().enumerate() {
+        alg.regions.push(datum_core::Region { id: k as u32 + 1, kind: Kind::Math, text: t.to_string(), ..Default::default() });
+    }
+    alg.next_id = 7;
+    alg.exact = true;
+    let alg = serde_json::json!({ "sheet": alg, "calc": eval::run(&alg), "path": null, "dirty": false, "undo": false, "redo": false, "rev": 1 });
+    println!("{}", serde_json::json!({ "state": state, "packs": datum_core::packs::cards(), "ac": ac, "rc": rc, "alg": alg }));
 }

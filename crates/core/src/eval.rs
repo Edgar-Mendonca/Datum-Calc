@@ -70,7 +70,7 @@ pub const CONSTANTS: [(&str, &str); 9] = [("π", "pi, 3.14159…"), ("j", "the i
     ("σ_SB", "Stefan–Boltzmann constant, 5.670374419×10⁻⁸ W/(m²·K⁴)"), ("N_A", "Avogadro constant, 6.02214076×10²³ /mol"), ("k_B", "Boltzmann constant, 1.380649×10⁻²³ J/K"), ("c_0", "speed of light, 299792458 m/s")];
 
 /// Built-in functions: name, arguments, what it does (for help and the window's menus).
-pub const FUNCTIONS: [(&str, &str); 34] = [
+pub const FUNCTIONS: [(&str, &str); 37] = [
     ("sqrt(x)", "square root"), ("cbrt(x)", "cube root"), ("abs(x)", "absolute value"), ("exp(x)", "e to the power x"), ("ln(x)", "natural logarithm"), ("log(x)", "logarithm base 10"),
     ("sin(x)", "sine (x in rad, or with deg)"), ("cos(x)", "cosine"), ("tan(x)", "tangent"), ("asin(x)", "inverse sine (an angle)"), ("acos(x)", "inverse cosine"), ("atan(x)", "inverse tangent"),
     ("atan2(y, x)", "angle of the point (x, y)"), ("sinh(x)", "hyperbolic sine"), ("cosh(x)", "hyperbolic cosine"), ("tanh(x)", "hyperbolic tangent"),
@@ -80,6 +80,8 @@ pub const FUNCTIONS: [(&str, &str); 34] = [
     ("re(z)", "real part of a complex value"), ("im(z)", "imaginary part"), ("arg(z)", "angle of a complex value"), ("conj(z)", "complex conjugate"),
     ("polar(r, θ)", "the complex value r∠θ; also written r∠θ (or r/_θ)"), ("par(a, b, …)", "values in parallel: 1/(1/a + 1/b + …), for impedances"),
     ("db(x)", "decibels of a ratio: 20·log₁₀|x|"),
+    ("simplify(e)", "an expression in lowest terms: like terms collected, fractions cancelled"), ("expand(e)", "an expression multiplied out: (x + 1)² → x² + 2x + 1"),
+    ("factor(e)", "an expression as a product: x² − 1 → (x − 1)(x + 1)"),
 ];
 
 pub struct Env {
@@ -87,17 +89,35 @@ pub struct Env {
     pub funcs: HashMap<String, (Vec<String>, Node)>,
     /// The unit each name is shown in on its own line, so substituted values read the same.
     pub shown: HashMap<String, String>,
+    /// Names that hold an exact expression from simplify, expand or factor (y = expand((x+1)^2)).
+    pub exprs: HashMap<String, crate::sym::RatF>,
     /// Names that are defined further down the sheet, or whose own line has an error.
     later: HashMap<String, bool>,
     depth: u32,
 }
 
 impl Env {
-    pub fn new() -> Self { Self { vars: HashMap::new(), funcs: HashMap::new(), shown: HashMap::new(), later: HashMap::new(), depth: 0 } }
+    pub fn new() -> Self { Self { vars: HashMap::new(), funcs: HashMap::new(), shown: HashMap::new(), exprs: HashMap::new(), later: HashMap::new(), depth: 0 } }
+
+    /// What a name is for exact maths: a plain number (as a fraction), a kept expression, or a symbol.
+    fn look(&self, v: &str) -> crate::sym::Look {
+        use crate::sym::Look;
+        let k = canon(v);
+        if let Some(r) = self.exprs.get(&k) { return Look::Expr(r.clone()); }
+        let val = self.vars.get(&k).cloned().or_else(|| if matches!(k.as_str(), "π" | "e") { None } else { constant(&k) });
+        match val {
+            None => Look::Symbol,
+            Some(x) if x.cx() => Look::Refuse(format!("{k} is complex; exact maths works on real numbers.")),
+            Some(x) if x.vec => Look::Refuse(format!("{k} is a vector; exact maths works on single values.")),
+            Some(x) if !units::is_none(&x.dim) => Look::Refuse(format!("{k} has units; exact maths works on plain numbers and symbols.")),
+            Some(x) => crate::sym::fraction(x.x(), 1_000_000).map(Look::Value).unwrap_or_else(|| Look::Refuse(format!("{k} = {} is not a fraction exact maths can keep.", fmt_plain(x.x(), 6)))),
+        }
+    }
 
     fn var(&self, name: &str, at: Span) -> R<Val> {
         let k = canon(name);
         if let Some(v) = self.vars.get(&k) { return Ok(v.clone()); }
+        if self.exprs.contains_key(&k) { return fail(format!("{k} is an expression, not a value: use it inside simplify, expand or factor, such as factor({k})."), at); }
         if let Some(v) = constant(&k) { return Ok(v); }
         match self.later.get(&k) {
             Some(true) => fail(format!("{} has an error on its own line.", show(&k)), at),
@@ -145,6 +165,7 @@ impl Env {
         }
         let n = args.len();
         let want = |m: usize| -> R<()> { if n == m { Ok(()) } else { fail(format!("{f} takes {m} value{}.", if m == 1 { "" } else { "s" }), at) } };
+        if crate::sym::OPS.contains(&f) { return fail(format!("{f} gives an expression, not a value: write it on its own line, such as {f}((x + 1)^2) or y = {f}(…)."), at); }
         if f == "if" {
             want(3)?;
             let c = self.eval(&args[0])?;
@@ -481,6 +502,7 @@ fn builtin(f: &str, a: Vec<Val>, at: Span) -> R<Val> {
             };
             Val { v: x.v.iter().map(|q| one(*q)).collect(), dim: ys.dim, abs: ys.abs, vec: x.vec, ..Default::default() }
         }
+        _ if crate::sym::OPS.contains(&f) => return fail(format!("{f} gives an expression, not a value: write it on its own line, such as {f}((x + 1)^2) or y = {f}(…).")),
         _ => return fail(format!("{f} is not a function. Define it first, such as {f}(x) = 2*x.")),
     };
     if r.v.iter().chain(&r.im).any(|x| !x.is_finite()) { return fail(format!("{f} gave a value that is not a finite number.")); }
@@ -555,7 +577,7 @@ pub struct VarOut { pub name: String, pub tex: String, pub value: String, pub un
 pub struct SheetOut { pub regions: Vec<RegionOut>, pub vars: Vec<VarOut>, pub checks: usize, pub failed: usize, pub errors: usize }
 
 /// How results are written: significant figures, engineering notation, US units, complex values as r∠θ.
-pub struct Fmt { pub digits: u8, pub eng: bool, pub us: bool, pub polar: bool }
+pub struct Fmt { pub digits: u8, pub eng: bool, pub us: bool, pub polar: bool, pub exact: bool }
 
 /// A number with `digits` significant figures, as text and as LaTeX. Very large or small numbers
 /// (or every number with `eng`) use engineering notation: a power of ten in steps of three.
@@ -577,6 +599,19 @@ pub fn fmt_num(x: f64, digits: u8, eng: bool) -> (String, String) {
     let t = fmt_plain(x, digits);
     if t.replace('\u{2009}', "").parse::<f64>().is_ok_and(|r| r.abs() >= 1e6) { return fmt_num(x, digits, true); }
     (t.clone(), t.replace('\u{2009}', "\\,"))
+}
+
+/// A number as shown on a sheet: with View › Fractions, a fraction as one (1/3) and a whole number in full;
+/// otherwise `fmt_num`.
+pub fn fmt_val(x: f64, f: &Fmt) -> (String, String) {
+    if f.exact && x.abs() < 1e15 {
+        if let Some(q) = crate::sym::fraction(x, 10_000) {
+            if q.d != 1 { return crate::sym::q_text(q); }
+            let t = fmt_plain(q.n as f64, 16);
+            return (t.clone(), t.replace('\u{2009}', "\\,"));
+        }
+    }
+    fmt_num(x, f.digits, f.eng)
 }
 
 /// Significant figures without exponent, trailing zeros removed; whole parts of five digits or more
@@ -609,7 +644,7 @@ pub fn show_val(v: &Val, want: &str, f: &Fmt) -> (String, String, String, String
     // An angular frequency (ω = 2πf) reads in rad/s, and as cycles in Hz or rpm when one is chosen.
     let dim = if v.nm && v.dim[7] == 0 && want.trim().is_empty() { let mut d = v.dim; d[7] = -1; d } else { shown_dim(v) };
     let (k, off, label) = units::display(big, &dim, v.abs, want, f.us);
-    let one = |(x, y): (f64, f64)| if v.cx() { fmt_cx((x - off) / k, y / k, f) } else { fmt_num((x - off) / k, f.digits, f.eng) };
+    let one = |(x, y): (f64, f64)| if v.cx() { fmt_cx((x - off) / k, y / k, f) } else { fmt_val((x - off) / k, f) };
     let (text, tex) = if v.vec {
         let n = v.v.len();
         let pick: Vec<usize> = if n <= 6 { (0..n).collect() } else { vec![0, 1, 2, n - 1] };
@@ -638,7 +673,9 @@ fn fmt_cx(x: f64, y: f64, f: &Fmt) -> (String, String) {
         let (r, t) = (fmt_num(x.hypot(y), f.digits, f.eng), fmt_num(y.atan2(x).to_degrees(), f.digits, false));
         return (format!("{}∠{}°", r.0, t.0), format!("{}\\angle{{{}}}^{{\\circ}}", r.1, t.1));
     }
-    let (a, b) = (fmt_num(x, f.digits, f.eng), fmt_num(y.abs(), f.digits, f.eng));
+    let (a, b) = (fmt_val(x, f), fmt_val(y.abs(), f));
+    // A fraction before j is bracketed in text: (1/4)j, not 1/4j.
+    let b = if b.0.contains('/') { (format!("({})", b.0), b.1) } else { b };
     let sign = if y < 0.0 { "−" } else { "+" };
     if b.0 == "0" { return a; }
     if a.0 == "0" { return (format!("{}{}j", if y < 0.0 { "-" } else { "" }, b.0), format!("{}{}\\,\\mathrm{{j}}", if y < 0.0 { "-" } else { "" }, b.1)); }
@@ -671,7 +708,7 @@ pub fn show(name: &str) -> String { name.to_string() }
 
 /// Evaluates the whole sheet, top to bottom.
 pub fn run(s: &Sheet) -> SheetOut {
-    let f = Fmt { digits: s.digits, eng: false, us: s.units == "US", polar: s.polar };
+    let f = Fmt { digits: s.digits, eng: false, us: s.units == "US", polar: s.polar, exact: s.exact };
     run_with(s, &f)
 }
 
@@ -680,7 +717,7 @@ pub fn run_with(s: &Sheet, f: &Fmt) -> SheetOut { run_env(s, f).0 }
 /// The sheet worked out, with the final symbol table (the packs' tests read values from it). It runs on
 /// its own thread with a large stack: the window's thread has 1 MB on Windows, and user functions nest.
 pub fn run_env(s: &Sheet, f: &Fmt) -> (SheetOut, Env) {
-    let (s2, f2) = (s.clone(), Fmt { digits: f.digits, eng: f.eng, us: f.us, polar: f.polar });
+    let (s2, f2) = (s.clone(), Fmt { digits: f.digits, eng: f.eng, us: f.us, polar: f.polar, exact: f.exact });
     std::thread::Builder::new().stack_size(64 << 20).spawn(move || run_here(&s2, &f2)).ok()
         .and_then(|h| h.join().ok())
         .unwrap_or_else(|| (SheetOut { errors: 1, ..Default::default() }, Env::new()))
@@ -783,6 +820,35 @@ fn region(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>, subst: bo
     // j and i, when they are the imaginary unit rather than a name of the sheet, are drawn upright like a unit.
     let bound: Vec<&str> = match &st { Stmt::Func { params, .. } => params.iter().map(|p| p.as_str()).collect(), Stmt::Solve { var, .. } | Stmt::Plot { var, .. } => vec![var.as_str()], _ => vec![] };
     o.latex = latex::stmt_with(&st, &|v| imag_unit(env, v).filter(|_| !bound.contains(&v)));
+    // simplify, expand and factor give an exact expression, not a value.
+    let sym_call = |e: &Node| match &e.e { E::Call(fname, args) if crate::sym::OPS.contains(&fname.as_str()) && args.len() == 1 => Some((fname.clone(), args[0].clone())), _ => None };
+    let symbolic = match &st { Stmt::Show { e } => sym_call(e).map(|c| (None, c, e.at)), Stmt::Assign { name, e, .. } => sym_call(e).map(|c| (Some(name.clone()), c, e.at)), _ => None };
+    if let Some((name, (op, arg), at)) = symbolic {
+        let nm = |v: &str| latex::name(v);
+        let res = crate::sym::from_node(&arg, &|v| env.look(v)).and_then(|r| {
+            let (t, x) = if op == "factor" {
+                let (n, d) = (crate::sym::factor(&r.num)?, crate::sym::factor(&r.den)?);
+                let (nt, nx) = crate::sym::factored_text(&n, &nm);
+                if r.den.as_const() == Some(crate::sym::Q::ONE) { (nt, nx) } else { let (dt, dx) = crate::sym::factored_text(&d, &nm); (format!("{nt}/{dt}"), format!("\\frac{{{nx}}}{{{dx}}}")) }
+            } else { crate::sym::ratf_text(&r, &nm) };
+            Ok((r, t, x))
+        });
+        match res {
+            Ok((r, t, x)) => {
+                o.result = t.clone();
+                o.value = t;
+                o.result_tex = x;
+                if let Some(n) = name {
+                    o.name = canon(&n);
+                    env.vars.remove(&canon(&n));
+                    env.exprs.insert(canon(&n), r);
+                    known.push(n);
+                }
+            }
+            Err(m) => { o.error = Some(ErrOut { msg: m, from: at.0, to: at.1 }); if let Some(n) = name { o.name = canon(&n); } }
+        }
+        return o;
+    }
     let res: R<()> = (|| {
         match &st {
             Stmt::Empty => {}
@@ -1005,7 +1071,7 @@ fn table(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>, o: &mut Re
                 let big = (0..v.v.len()).map(|i| { let (x, y) = v.at(i); x.hypot(y) }).filter(|x| x.is_finite()).fold(0.0f64, f64::max);
                 let (k, off, label) = units::display(big, &shown_dim(&v), v.abs, &c.unit, f.us);
                 co.unit = label;
-                co.cells = (0..n).map(|i| v.v.get(i).filter(|x| x.is_finite()).map(|x| if v.cx() { fmt_cx((x - off) / k, v.at(i).1 / k, f).0 } else { fmt_num((x - off) / k, f.digits, f.eng).0 }).unwrap_or_default()).collect();
+                co.cells = (0..n).map(|i| v.v.get(i).filter(|x| x.is_finite()).map(|x| if v.cx() { fmt_cx((x - off) / k, v.at(i).1 / k, f).0 } else { fmt_val((x - off) / k, f).0 }).unwrap_or_default()).collect();
                 if !name.is_empty() && co.error.is_empty() {
                     let (_, _, value, unit) = show_val(&v, &c.unit, f);
                     o.defs.push(VarOut { name: canon(name), tex: latex::name(name), value, unit, id: r.id });

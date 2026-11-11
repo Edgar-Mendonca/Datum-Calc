@@ -5,6 +5,7 @@ pub mod packs;
 pub mod parse;
 pub mod sheet;
 pub mod solve;
+pub mod sym;
 pub mod units;
 
 pub use sheet::{Doc, Kind, Op, Region, Sheet};

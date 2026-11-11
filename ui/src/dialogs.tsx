@@ -51,6 +51,7 @@ const GLOSSARY: [string, [string, string][]][] = [
     ["Absolute and difference temperature", "20 °C is a temperature (293.15 K); a rise of 20 °C is a difference of 20 K. Datum Calc keeps them apart so conversions are right."],
     ["Torque and energy", "Both are a force times a length. A force times a length, or a power over a speed, shows in N·m (lbf·ft); a power times a time shows in J (BTU). Either can be chosen in the unit menu."],
     ["Complex number", "A value with a real and an imaginary part, used for AC circuits: (3 + 4j) Ω, or 5 Ω∠53.13°. Shown as 3 + 4j, or as magnitude and angle with View › Polar."],
+    ["Exact maths", "Fractions kept as fractions and algebra on symbols: simplify, expand and factor give expressions such as (x + 1)(x − 1); View › Fractions shows results that are fractions as 1/3."],
     ["Hz, rad/s and rpm", "A frequency in Hz counts cycles a second; an angular frequency in rad/s counts radians (ω = 2πf, so 50 Hz is 314.2 rad/s); rpm counts revolutions a minute (50 Hz is 3000 rpm)."],
     ["Bode plot", "Gain in decibels (db) and phase (arg) of a transfer function against frequency on a log axis: plot … for f in 10 Hz .. 100 kHz log."],
     ["SI and US", "The two unit systems results can be shown in: SI (m, kg, s, N, Pa, W) or US customary (ft, lb, psi, hp, °F)."]]],

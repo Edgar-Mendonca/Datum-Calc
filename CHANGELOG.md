@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.2.0 — 2026-11-11
+
+Exact maths: fractions that stay fractions, and algebra on expressions.
+
+**Algebra**
+- simplify, expand and factor work on expressions. Names that are not defined are symbols (x, y, π); plain numbers defined above are put in.
+- expand((x + 1)^2) gives x² + 2x + 1; simplify((x^2 - 1)/(x - 1)) gives x + 1; factor(2*x^2 - x - 1) gives (2x + 1)(x − 1); factor(6*x^2*y + 9*x*y) gives 3xy(2x + 3); factor(x^3 - 6*x^2 + 11*x - 6) gives (x − 1)(x − 2)(x − 3).
+- y = expand((x + 1)^3) keeps the expression in y, so factor(y) works on a later line.
+- The coefficients are exact fractions, never rounded. Exact maths works on numbers, names, + − × ÷ and whole powers; a line with units, functions such as sin, or a decimal that is not a fraction says so.
+- Math › Algebra has keys for the three; Help › What Is This Tool? › Algebra explains them.
+
+**Fractions**
+- View › Fractions shows results that are fractions as fractions (1/3, not 0.3333; 0.1 + 0.2 is 3/10) and whole numbers in full. It is saved with the sheet and off by default, so engineering sheets keep their decimals. π, √2 and other numbers that are not fractions stay decimals.
+
+**Checks**
+- 61 engine tests (new: algebra worked by hand, a thousand random polynomials whose factors multiply back and whose fractions cancel, fractions shown exactly, the slowest inputs in under a second), 93 UI tests. Every pack prints as before. 18,000 more random sheets with the new functions. The Windows install check passes.
+
 ## 0.1.12 — 2026-11-11
 
 Every release is now installed and used on a clean Windows machine before it is published.

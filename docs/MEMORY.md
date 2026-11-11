@@ -44,6 +44,7 @@ crates/core/src/sheet.rs       Sheet (title block, page, units, digits, regions)
 crates/core/src/units.rs       dimensions (7 SI exponents + an angle tag), ~200 units with NIST factors, absolute temperatures (°C, °F with offsets), unit expressions, the display ladders (SI and US), labels (m³/h, W/(m²·K))
 crates/core/src/parse.rs       lexer and Pratt parser: assignments, user functions, ranges, check, solve … for x in a .. b, plot … for x in a .. b; units after numbers and after brackets; 4j imaginary numbers; character spans for errors
 crates/core/src/eval.rs        values (SI + dimension + abs temperature + vector + imaginary parts + the N·m reading), operators and complex arithmetic with dimension rules, built-in functions and constants, the sheet top to bottom (RegionOut: LaTeX, result, unit choices, check, plot, error), Variables, number formatting
+crates/core/src/sym.rs         exact algebra: rationals (i128), polynomials and fractions of them, reduce (GCD for one symbol), factor (rational roots), from the sheet's expressions, text and LaTeX
 crates/core/src/latex.rs       expression tree → LaTeX (fractions, roots, subscripts, Greek, units in roman)
 crates/core/src/solve.rs       Brent's method after a 200-step scan for a sign change
 crates/core/src/packs.rs       the twenty calc packs (include_str! of crates/core/packs/*.dcalc), cards for File › New
@@ -159,6 +160,9 @@ tests_ui/run.cjs               Playwright UI tests against ui/dist with a mocked
 | 0.1.11 | Unit menu › Other unit… takes any unit of the kind; `∠` and `/_` for phasors; `log` after a plot range; `par`, `db`, complex trig; complex tables | The two user reports asked for a full solution, not the two cases |
 | 0.1.12 | The window is made in `setup` from tauri.conf.json (`"create": false`) and opens WebView2's debugging port only when `DATUM_CALC_TEST_PORT` is set | Tauri always passes its own WebView2 arguments, so WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS is ignored; the test must drive the exact published installer |
 | 0.1.12 | The release workflow runs tests_win/smoke.ps1 on the built installer before publishing | The user cannot test on Windows; nothing ships that a clean machine cannot install, update, use, recover and uninstall |
+| 0.2.0 | Fractions are recognised when shown (continued fractions, denominator ≤ 10 000, within 4 ulp), not carried through the engine | Exact arithmetic everywhere would mean rewriting every operation with units; the recognition is reliable for the arithmetic of small fractions and leaves π, √2 as decimals |
+| 0.2.0 | Exact algebra is its own module on polynomials with rational coefficients; only + − × ÷ and whole powers; undefined names are symbols | A small, testable core that never gives an inexact "exact" answer; anything else is refused with a plain message |
+| 0.2.0 | `y = expand(…)` keeps the expression in `Env.exprs`; using y as a value says it is an expression | Expressions are reused by later algebra lines without a general symbolic engine |
 
 ## 3. Roadmap
 
@@ -183,8 +187,8 @@ tests_ui/run.cjs               Playwright UI tests against ui/dist with a mocked
 | 0.1.10 | Save changes? before New/Open/pack/update; safer updates; review fixes (named recovery copy, lock age, typed torque, unit after brackets); Getting Started with torque and complex numbers | ✅ |
 | 0.1.11 | Complete frequency-domain work (∠ phasors, par, db, complex trig and tables, Bode plots on log axes, RC filter pack 20); ω in rad/s, Hz ↔ rpm right; named units for every kind; Other unit… | ✅ |
 | 0.1.12 | Windows install check in CI and before every release (tests_win): install over the previous release, publisher, .dcalc association, the real window through WebView2's debugging port, recovery after a crash, uninstall | ✅ |
-| 0.2.0 | Exact fractions; simplify, expand, factor | 🔜 |
-| 0.2.1 | Materials from Datum Atlas (`material("S355")`, if Atlas's data format allows) | ⬜ |
+| 0.2.0 | Exact fractions (View › Fractions); simplify, expand, factor (sym.rs) | ✅ |
+| 0.2.1 | Materials from Datum Atlas (`material("S355")`, if Atlas's data format allows) | 🔜 |
 | 0.2.2 | More packs: flange bolts, tank heat loss, three-phase power, a spring, a belt drive | ⬜ |
 | 0.3 | Matrices and linear systems, ODE solve, tables from CSV | ⬜ |
 | 0.4 | Programs inside a region, templates, a company title block | ⬜ |
@@ -288,12 +292,18 @@ tests_ui/run.cjs               Playwright UI tests against ui/dist with a mocked
 - Also merged the user's README family table (3 Nov) and pointed its icons at the hub.
 - Released 0.1.12. Still not tested by a person: the real Save as PDF dialog and the in-app download of an update (the install step of an update is tested).
 
+### 2026-11-11: Session 1, continued (0.2.0)
+- Exact maths: sym.rs (rationals, polynomials, RatF with reduce, factor by rational roots), simplify/expand/factor lines and kept expressions, View › Fractions (`Sheet.exact`), Math › Algebra keys, help and glossary.
+- Self-check: hand-worked cases, a property test (1,000 random polynomials: factors multiply back, (p·q)/q = p), a speed test of adversarial inputs (a constant with thousands of divisors capped the root search), the algebra sheet looked at in the window, every pack unchanged, 18,000 random sheets with the new functions, an independent review.
+
 ## 5. Known limits and next steps
 
 - Energy and torque share a dimension: a force times a length (and a power over a speed) shows in N·m, a power times a time in J; m·g·h shows in N·m too (choose J in the unit menu).
 - Complex values work in arithmetic, tables and sqrt, exp, ln, sin, cos, tan, sinh, cosh, tanh, abs, re, im, arg, conj, polar, par, db, sum and mean; checks, solve, plots and ranges take real values (plot db(H) and arg(H)). Results show j, also when i was typed.
 - A frequency typed as 1/s, or worked out without π (P/T for a torque T typed in J), is read as cycles (Hz); write ω = 2*pi*f, or a speed in rpm or rad/s, where radians are meant.
 - Two windows that crash together leave two copies; the newest is offered first, the other at the next start.
+- Exact algebra: polynomials and fractions of them only (no sin, roots, logs); several symbols cancel only by common symbols and exact division; factor splits one-symbol polynomials by rational roots (x² + 1, x² − 2 stay whole) and takes common factors out of several-symbol ones.
+- With View › Fractions, a result in a unit reads as a fraction of the unit shown (7/12 m in m, 1750/3 mm in mm); choose the unit for the nicer form.
 - Vectors are shown as their first values and the last; there are no matrices yet (0.3).
 - Tables hold values and formula columns, not free spreadsheet formulas per cell.
 - The installer is not code-signed (1.0).

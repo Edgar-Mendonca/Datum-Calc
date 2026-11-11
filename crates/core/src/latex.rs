@@ -53,7 +53,7 @@ pub fn unit(label: &str) -> String {
 
 fn unit_of(u: &crate::units::UnitExpr) -> String { unit(&crate::units::pretty(&u.text)) }
 
-const FUNCS: [&str; 28] = ["db", "par", "sin", "cos", "tan", "sinh", "cosh", "tanh", "ln", "log", "exp", "min", "max", "asin", "acos", "atan", "atan2", "abs", "round", "floor", "ceil", "sum", "mean", "len", "re", "im", "arg", "conj"];
+const FUNCS: [&str; 31] = ["simplify", "expand", "factor", "db", "par", "sin", "cos", "tan", "sinh", "cosh", "tanh", "ln", "log", "exp", "min", "max", "asin", "acos", "atan", "atan2", "abs", "round", "floor", "ceil", "sum", "mean", "len", "re", "im", "arg", "conj"];
 
 fn prec(n: &Node) -> u8 {
     match &n.e { E::Bin(op, ..) => match *op { "<" | "<=" | ">" | ">=" | "==" | "!=" => 1, "+" | "-" => 3, "*" => 5, "/" => 9, _ => 7 }, E::Neg(_) => 4, _ => 9 }
@@ -115,7 +115,7 @@ fn nd(n: &Node, s: &Sub) -> String {
                 "exp" if a.len() == 1 => format!("e^{{{}}}", a[0]),
                 "if" if a.len() == 3 => format!("\\begin{{cases}} {} & \\text{{if }} {} \\\\ {} & \\text{{otherwise}} \\end{{cases}}", a[1], a[0], a[2]),
                 "log" if a.len() == 1 => format!("\\log_{{10}}\\left({}\\right)", a[0]),
-                f if FUNCS.contains(&f) => format!("\\{}\\left({}\\right)", if matches!(f, "atan2" | "round" | "floor" | "ceil" | "sum" | "mean" | "len" | "asin" | "acos" | "atan" | "abs" | "re" | "im" | "arg" | "conj" | "db" | "par") { format!("operatorname{{{f}}}") } else { f.to_string() }, a.join(", ")),
+                f if FUNCS.contains(&f) => format!("\\{}\\left({}\\right)", if matches!(f, "atan2" | "round" | "floor" | "ceil" | "sum" | "mean" | "len" | "asin" | "acos" | "atan" | "abs" | "re" | "im" | "arg" | "conj" | "db" | "par" | "simplify" | "expand" | "factor") { format!("operatorname{{{f}}}") } else { f.to_string() }, a.join(", ")),
                 f => format!("{}\\left({}\\right)", name(f), a.join(", ")),
             }
         }

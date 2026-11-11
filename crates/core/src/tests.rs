@@ -425,7 +425,7 @@ fn whole_sheet_pump_power() {
     assert_eq!(o.vars.len(), 6);
     assert_eq!(o.vars[4].name, "P");
     assert_eq!(o.errors, 0);
-    let f = Fmt { digits: 3, eng: false, us: true, polar: false };
+    let f = Fmt { digits: 3, eng: false, us: true, polar: false, exact: false };
     let o = eval::run_with(&s, &f);
     assert_eq!(o.regions[5].result, "26.3 hp");
 }
@@ -479,7 +479,7 @@ mod packs {
 
     fn run(id: &str) -> (eval::SheetOut, eval::Env) {
         let s = crate::packs::sheet(id).unwrap_or_else(|| panic!("{id} does not open"));
-        let r = eval::run_env(&s, &Fmt { digits: 4, eng: false, us: false, polar: false });
+        let r = eval::run_env(&s, &Fmt { digits: 4, eng: false, us: false, polar: false, exact: false });
         let errs: Vec<String> = r.0.regions.iter().filter_map(|o| o.error.as_ref().map(|e| format!("region {}: {}", o.id, e.msg))).collect();
         assert!(errs.is_empty(), "{id}: {errs:?}");
         assert!(r.0.regions.iter().all(|o| o.warn.is_empty()), "{id}: a unit cannot show its value");
@@ -944,4 +944,88 @@ fn complex_numbers_for_ac_analysis() {
     assert_eq!(t.cols[1].cells, ["10 + 9.425j", "10 + 18.85j"]);
     assert_eq!(t.cols[1].unit, "Ω");
     assert_eq!(t.cols[2].cells, ["3 + 4j", "1j"]);
+}
+
+#[test]
+fn exact_algebra() {
+    // Worked by hand: (x + 1)² = x² + 2x + 1; (x² − 1)/(x − 1) = x + 1; 2x² − x − 1 = (2x + 1)(x − 1);
+    // 6x²y + 9xy = 3xy(2x + 3); x³ − 6x² + 11x − 6 = (x − 1)(x − 2)(x − 3); x⁴ − 1 = (x + 1)(x − 1)(x² + 1).
+    for (line, want) in [
+        ("expand((x+1)^2)", "x² + 2x + 1"), ("expand((x+1)*(x-1))", "x² − 1"), ("simplify((x^2-1)/(x-1))", "x + 1"),
+        ("simplify(3*(x+2) - x)", "2x + 6"), ("simplify(x/2 + x/3)", "(5/6)x"), ("simplify((x^2+2*x+1)/(x^2-1))", "(x + 1)/(x − 1)"),
+        ("factor(x^2-1)", "(x + 1)(x − 1)"), ("factor(2*x^2 - x - 1)", "(2x + 1)(x − 1)"), ("factor(6*x^2*y + 9*x*y)", "3xy(2x + 3)"),
+        ("factor(x^3 - 6*x^2 + 11*x - 6)", "(x − 1)(x − 2)(x − 3)"), ("factor(x^4 - 1)", "(x + 1)(x − 1)(x² + 1)"), ("factor(x^2 + 1)", "x² + 1"),
+        ("factor(3*x^2 - 3)", "3(x + 1)(x − 1)"), ("factor(-x^2 + 1)", "-(x + 1)(x − 1)"), ("factor((x+1)^3)", "(x + 1)³"),
+        ("expand(pi*(r+1)^2)", "πr² + 2πr + π"), ("expand(0.1*x + 0.2*x)", "(3/10)x"), ("simplify(x^2*y/(x*y^2))", "x/y"), ("factor(0)", "0"),
+    ] { assert_eq!(result(&[line]), want, "{line}"); }
+    // Defined plain numbers are put in; an expression kept in a name is used by later lines.
+    assert_eq!(result(&["a = 2", "expand((x+a)^2)"]), "x² + 4x + 4");
+    assert_eq!(result(&["y = expand((x+1)^3)", "factor(y)"]), "(x + 1)³");
+    assert_eq!(run(&["factor(2*x^2 - x - 1)"]).regions[0].result_tex, "\\left(2x + 1\\right)\\left(x - 1\\right)");
+    // What exact maths refuses, and says so.
+    for (lines, msg) in [
+        (&["simplify(2 m*x)"][..], "Exact maths works on numbers, names, + − × ÷ and whole powers, not units."),
+        (&["simplify(sin(x))"][..], "Exact maths works on numbers, names, + − × ÷ and whole powers, not the function sin."),
+        (&["2*expand(x)"][..], "expand gives an expression, not a value"),
+        (&["y = expand(x)", "y + 1"][..], "y is an expression, not a value"),
+        (&["L = 2 m", "expand(L*x)"][..], "L has units"),
+        (&["expand(x^0.5)"][..], "Exact maths needs a whole-number power."),
+        (&["simplify(1/(x - x))"][..], "Division by zero."),
+        (&["expand((x+1)^200)"][..], "A power above 64"),
+    ] { assert!(error(lines).starts_with(msg), "{lines:?}: {}", error(lines)); }
+}
+
+#[test]
+fn exact_algebra_holds_for_random_polynomials() {
+    use crate::sym::{factor, Poly, Q, RatF};
+    let mut seed = 0x0200_5EEDu64;
+    let mut rnd = |n: i128| { seed ^= seed << 13; seed ^= seed >> 7; seed ^= seed << 17; (seed % (2 * n as u64 + 1)) as i128 - n };
+    let x = Poly::symbol("x");
+    let y = Poly::symbol("y");
+    for round in 0..1000 {
+        // A product of linear factors with small roots, times a random quadratic, in x (and sometimes y).
+        let mut p = Poly::constant(Q::int(rnd(3).max(1)));
+        for _ in 0..(round % 4) { p = p.mul(&x.scale(Q::int(rnd(2).max(1))).unwrap().add(&Poly::constant(Q::int(rnd(4)))).unwrap()).unwrap(); }
+        let mut q = x.mul(&x).unwrap().add(&Poly::constant(Q::int(rnd(5)))).unwrap();
+        if round % 3 == 0 { q = q.add(&y.scale(Q::int(rnd(3))).unwrap()).unwrap(); }
+        let pq = p.mul(&q).unwrap();
+        // factor, multiplied back, is the polynomial.
+        let f = factor(&pq).unwrap();
+        let mut back = Poly::constant(f.c).mul(&Poly(std::iter::once((f.mono.clone(), Q::ONE)).collect())).unwrap();
+        for (part, k) in &f.parts { back = back.mul(&part.pow(*k).unwrap()).unwrap(); }
+        assert_eq!(back, pq, "round {round}: factor does not multiply back");
+        // (p·q)/q is p.
+        if !q.is_zero() {
+            let r = RatF::poly(pq.clone()).div(&RatF::poly(q.clone())).unwrap();
+            assert_eq!(r, RatF::poly(p.clone()), "round {round}: (p q)/q is not p");
+        }
+    }
+}
+
+#[test]
+fn fractions_shown_exactly() {
+    let shown = |lines: &[&str]| { let mut s = sheet(lines); s.exact = true; eval::run(&s).regions.last().unwrap().result.clone() };
+    assert_eq!(shown(&["x = 1/3"]), "1/3");
+    assert_eq!(shown(&["0.1 + 0.2"]), "3/10", "the decimal round-off of 3/10 is still 3/10");
+    let mut s = sheet(&["x = 7/12*1 m"]);
+    (s.exact, s.regions[0].unit) = (true, "m".into());
+    assert_eq!(eval::run(&s).regions[0].result, "7/12 m", "in the unit chosen");
+    assert_eq!(shown(&["z = 274863"]), "274\u{2009}863", "whole numbers in full, grouped with a thin space");
+    assert_eq!(shown(&["sqrt(2)"]), "1.414", "not a fraction: decimals as before");
+    assert_eq!(shown(&["pi"]), "3.142");
+    assert_eq!(shown(&["w = 2/3 + 1j/4"]), "2/3 + (1/4)j");
+    assert_eq!(shown(&["check 1/3 <= 1/2"]), "PASS (1/3 ≤ 1/2)");
+    assert_eq!(result(&["x = 1/3"]), "0.3333", "off by default: engineers keep decimals");
+    assert_eq!(crate::sym::fraction(0.333_333_333_333, 10_000), None, "a decimal typed short of 1/3 is not 1/3");
+}
+
+#[test]
+fn exact_algebra_stays_quick() {
+    // The worst cases a sheet can write: a constant with very many divisors, a large power, many symbols.
+    let t = std::time::Instant::now();
+    let lines = ["factor(963761198400*x^2 - 963761198400)", "expand((x+1)^64)", "expand((x+y+z)^12)", "factor(x^24 - 1)", "simplify((x^20 - 1)/(x^5 - 1))", "expand((a+b+c+d)^9)"];
+    for l in lines { let o = run(&[l]); assert!(o.regions[0].error.is_none() || o.regions[0].error.as_ref().unwrap().msg.contains("too"), "{l}: {:?}", o.regions[0].error); }
+    let limit = if cfg!(debug_assertions) { 10.0 } else { 1.0 };
+    assert!(t.elapsed().as_secs_f64() < limit, "took {:?}", t.elapsed());
+    assert!(result(&["factor(x^24 - 1)"]).matches("(").count() >= 2);
 }
