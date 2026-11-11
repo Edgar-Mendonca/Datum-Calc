@@ -5,6 +5,8 @@ const [mode, version] = process.argv.slice(2);
 let failed = 0;
 const check = (name, ok, info = "") => { console.log(`${ok ? "ok  " : "FAIL"} ${name}${ok ? "" : `  ${info}`}`); if (!ok) failed++; };
 const wait = ms => new Promise(r => setTimeout(r, ms));
+// The maths is drawn with thin spaces between a number and its unit: compare without spaces.
+const flat = s => (s ?? "").replace(/[\s\u2009\u00a0\u200a\u202f]/g, "");
 
 (async () => {
   const b = await chromium.connectOverCDP("http://127.0.0.1:9222");
@@ -25,13 +27,13 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     check("a sheet passed on the command line opens", text.includes("AC circuit"), text.slice(0, 120));
     check("its maths is drawn without errors", (await p.$$(".cpage .katex")).length > 20 && (await p.$$(".cpage .katex-error")).length === 0);
     check("the engine works it out: both checks pass", (await p.$$(".cpage .badge.pass")).length === 2, String((await p.$$(".cpage .badge.pass")).length));
-    check("complex results show", text.includes("12.04 − 3.346j"));
+    check("complex results show", flat(text).includes("12.04−3.346j"), flat(text).slice(0, 300));
     // An edit makes the sheet unsaved; a recovery copy is written (smoke.ps1 then kills the window, as a crash).
     const regions = await p.$$(".cpage .region");
     await regions[regions.length - 1].click(); await wait(200);
     await p.keyboard.press("Control+m"); await wait(300);
     await p.keyboard.type("x_test = 42 m"); await p.keyboard.press("Escape"); await wait(500);
-    check("an edit is worked out", (await p.textContent(".cpage")).includes("42 m"));
+    check("an edit is worked out", flat(await p.textContent(".cpage")).includes("x_{test}=42m") || flat(await p.textContent(".vars")).includes("42m"));
     check("the title shows unsaved changes", (await p.textContent(".top")).includes("•"));
     // New asks first while there are unsaved changes; Cancel keeps the sheet.
     await p.keyboard.press("Control+n"); await wait(400);
@@ -51,7 +53,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     await p.click(".bs aside button:has-text('New')"); await wait(400);
     await p.click(".tiles.packs .tile:has-text('RC low-pass')"); await wait(1500);
     const text = await p.textContent(".cpage");
-    check("a calc pack opens and works out", text.includes("994.7 Hz") && (await p.$$(".cpage canvas")).length === 2 && (await p.$$(".cpage .katex-error")).length === 0, text.slice(0, 200));
+    check("a calc pack opens and works out", flat(text).includes("994.7Hz") && (await p.$$(".cpage canvas")).length === 2 && (await p.$$(".cpage .katex-error")).length === 0, text.slice(0, 200));
   }
   check("no script errors in the window", errors.length === 0, errors.join(" | "));
   console.log(failed ? `${failed} failed` : "all passed");
