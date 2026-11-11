@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.2.1 — 2026-11-11
+
+Materials: the properties of about 250 materials, from Datum Atlas, as names with units on the sheet.
+
+**Material regions**
+- Insert › Material opens a library of 252 materials (metals, polymers, elastomers, ceramics and glasses, composites, foams and natural materials) with a search: S355, 6061, nylon, oak, alumina.
+- Pick one and give it a short name such as steel: its properties become names with units for the lines below — ρ_steel, E_steel, G_steel, ν_steel, σ_y,steel, σ_ts,steel, σ_c,steel, σ_e,steel, ε_f,steel, T_max,steel, λ_steel, α_steel, c_p,steel, ρ_e,steel and the others the material has.
+- Choose typical values (the middle of each range), or the low or the high end.
+- The region shows a small datasheet on the sheet and in print: each property with its value, unit, range and source.
+- The values are kept in the sheet when the material is picked, so a calculation reads the same when the library is updated later.
+- The library comes from Datum Atlas (MIT), where each value names its source. Atlas marks its values as typical ranges for generic grades, still being referenced, and the datasheet says so: for design, check the standard or the supplier's datasheet.
+- New units: µΩ and nΩ.
+
+**Checks**
+- 68 engine tests (new: every one of the 252 materials worked out in SI and US units; S355's values and units; low and high ends; a sheet keeps its values; what a material region says when it cannot; damaged material data), 98 UI tests (the datasheet, the picker on the real library, a search and a pick). Every pack prints as before. The Windows install check passes.
+
 ## 0.2.0 — 2026-11-11
 
 Exact maths: fractions that stay fractions, and algebra on expressions.

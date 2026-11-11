@@ -4,7 +4,7 @@ import { For, Show, createMemo, createSignal, onCleanup, onMount } from "solid-j
 import katex from "katex";
 import "katex/dist/katex.min.css";
 import { Chart, LineController, LineElement, PointElement, LinearScale, LogarithmicScale, Tooltip, Legend } from "chart.js";
-import { PlotOut, Region, RegionOut, TableOut } from "./api";
+import { MatOut, PlotOut, Region, RegionOut, TableOut } from "./api";
 import { out, act, call, openMenu, openDialog, setSelId, toast } from "./store";
 import { Dialog } from "./ui";
 import { Help } from "./help";
@@ -61,7 +61,7 @@ export const MathView = (p: { r: Region; paper?: boolean }) => {
   return (
     <Show when={o()} fallback={<div class="rtxt">{p.r.text}</div>}>{o => <>
       <Show when={p.r.text.trim() && p.r.kind === "table"}><div class="tcap">{p.r.text}</div></Show>
-      <div class="mline" classList={{ none: p.r.kind === "table" }}>
+      <div class="mline" classList={{ none: p.r.kind === "table" || p.r.kind === "material" }}>
         <Show when={o().latex}><Tex s={o().latex} display /></Show>
         <Show when={o().subst_tex && !o().check}><Tex s={`= ${o().subst_tex}`} class="subst" display /></Show>
         <Show when={o().result_tex && !o().input && !o().check}><Tex s={o().result_tex.startsWith("\\Rightarrow") ? o().result_tex : `= ${o().result_tex}`} class="res" display /></Show>
@@ -74,6 +74,7 @@ export const MathView = (p: { r: Region; paper?: boolean }) => {
       <Show when={o().check}>{c => <div class="checkvals">{c().lhs} {({ "<=": "≤", ">=": "≥", "!=": "≠", "==": "=" } as Record<string, string>)[c().op] ?? c().op} {c().rhs}</div>}</Show>
       <Show when={o().plot}>{pl => <PlotView p={pl()} id={p.r.id} paper={p.paper} />}</Show>
       <Show when={o().table}>{t => <TableView t={t()} />}</Show>
+      <Show when={o().material}>{m => <MaterialView m={m()} />}</Show>
       <Show when={o().error}>{e => <div class="rerr" role="alert"><span class="ico">⚠</span><span>{e().msg}</span><Show when={!p.paper && e().to > e().from}><Marked text={p.r.text} from={e().from} to={e().to} /></Show></div>}</Show>
       <Show when={o().warn}><div class="rwarn"><span class="ico">⚠</span>{o().warn}</div></Show>
     </>}</Show>
@@ -113,6 +114,15 @@ export const PlotView = (p: { p: PlotOut; id: number; paper?: boolean }) => {
     </div>
   );
 };
+
+/** A material region: a small datasheet with each property's name, value, range and source. */
+export const MaterialView = (p: { m: MatOut }) => (
+  <div class="matview">
+    <div class="mathead"><b>{p.m.title}</b><span class="muted">{p.m.family}{p.m.des ? ` · ${p.m.des}` : ""} · {p.m.pick === "typical" ? "typical values (middle of each range)" : `${p.m.pick} end of each range`}</span></div>
+    <table class="ctable mat"><tbody><For each={p.m.rows}>{r => <tr><td class="l"><Tex s={r.tex} /></td><td class="w">{r.what}</td><td>{r.value}</td><td class="u">{r.unit}</td><td class="rg">{r.range}</td></tr>}</For></tbody></table>
+    <div class="matsrc muted">Source: {p.m.sources.join("; ")}.{p.m.draft ? " Typical values for a generic grade, not design values: check the standard or the supplier's datasheet." : ""}{p.m.notes ? ` ${p.m.notes}` : ""}</div>
+  </div>
+);
 
 /** A table region as worked out: headings as maths, units under them, numbers right-aligned. */
 export const TableView = (p: { t: TableOut }) => (

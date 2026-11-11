@@ -9,7 +9,7 @@ const GH = "https://github.com/Edgar-Mendonca/Datum-Calc";
 export const keep = (then: (discarded?: boolean) => void) => out()?.dirty ? D.confirmClose(then) : then();
 /** Where a new region goes: below the selected one, or at the end. */
 const below = () => { const i = out()?.sheet.regions.findIndex(r => r.id === selId()) ?? -1; return i >= 0 ? i + 1 : out()?.sheet.regions.length ?? 0; };
-const STARTER: Record<Kind, string> = { math: "", text: "", check: "check ", solve: "solve x^2 = 2 for x in 0 .. 10", plot: "plot sin(x), cos(x) for x in 0 .. 2*pi", table: "", image: "" };
+const STARTER: Record<Kind, string> = { math: "", text: "", check: "check ", solve: "solve x^2 = 2 for x in 0 .. 10", plot: "plot sin(x), cos(x) for x in 0 .. 2*pi", table: "", image: "", material: "" };
 
 /** The textarea being edited, so symbol buttons can type into it. */
 let field: HTMLTextAreaElement | null = null;
@@ -104,7 +104,7 @@ export const C = {
 
 /** Every command with a name, for Tell Me and the shortcut list. */
 export const ALL_CMDS: [string, () => void, string?][] = [
-  ["Insert math region", () => C.insert("math"), "Ctrl+M"], ["Insert text region", () => C.insert("text"), "Ctrl+T"], ["Insert check", () => C.insert("check")], ["Insert table", () => C.insert("table")], ["Insert picture", () => C.picture()], ["Units list", () => D.unitsList()], ["Functions and constants", () => D.unitsList("functions")], ["Insert solve", () => C.insert("solve")], ["Insert plot", () => C.insert("plot")],
+  ["Insert math region", () => C.insert("math"), "Ctrl+M"], ["Insert text region", () => C.insert("text"), "Ctrl+T"], ["Insert check", () => C.insert("check")], ["Insert table", () => C.insert("table")], ["Insert material (properties from the library)", () => C.insert("material")], ["Insert picture", () => C.picture()], ["Units list", () => D.unitsList()], ["Functions and constants", () => D.unitsList("functions")], ["Insert solve", () => C.insert("solve")], ["Insert plot", () => C.insert("plot")],
   ["Delete region", C.del, "Delete"], ["Duplicate region", C.duplicate, "Ctrl+D"], ["Insert above", C.insertAbove, "Ctrl+Shift+M"], ["3 significant figures", () => C.figures(3)], ["4 significant figures", () => C.figures(4)], ["5 significant figures", () => C.figures(5)], ["Move region up", () => C.move(true), "Alt+↑"], ["Move region down", () => C.move(false), "Alt+↓"],
   ["Copy", C.copy, "Ctrl+C"], ["Copy result", C.copyResult], ["Copy as LaTeX", C.copyLatex], ["Export CSV (inputs and results)", C.csv], ["Show numbers in equations", () => act({ SheetSet: { field: "subst", value: !out()?.sheet.subst } })], ["Polar form for complex values", () => act({ SheetSet: { field: "polar", value: !out()?.sheet.polar } })], ["Fractions (exact results)", () => act({ SheetSet: { field: "exact", value: !out()?.sheet.exact } })], ["Simplify, expand or factor an expression", () => typeText("simplify()", 1)], ["New from pack", () => C.file("new")], ["Paste", () => C.paste(), "Ctrl+V"], ["Undo", C.undo, "Ctrl+Z"], ["Redo", C.redo, "Ctrl+Y"],
   ["Save", () => C.save(), "Ctrl+S"], ["Save as", () => C.save(true)], ["Open", () => C.open(), "Ctrl+O"], ["New sheet", C.newSheet, "Ctrl+N"], ["Print / PDF", C.print, "Ctrl+P"],

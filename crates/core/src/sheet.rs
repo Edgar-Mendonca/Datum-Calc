@@ -25,6 +25,8 @@ pub enum Kind {
     Plot,
     Table,
     Image,
+    /// A material from the library: its properties become names with units.
+    Material,
 }
 
 /// One region of the sheet. `text` is what the user types (an equation, a paragraph, a check);

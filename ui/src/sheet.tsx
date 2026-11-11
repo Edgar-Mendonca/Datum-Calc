@@ -1,7 +1,7 @@
 // The calc sheet on screen: the page with its title block and regions, top to bottom.
 // Click selects a region; double-click or Enter edits it; Esc or a click outside finishes.
-import { ErrorBoundary, For, Index, Show, createEffect, createSignal, onMount } from "solid-js";
-import { Region, TableData } from "./api";
+import { ErrorBoundary, For, Index, Show, createEffect, createMemo, createResource, createSignal, onMount } from "solid-js";
+import { MatLibrary, Material, Region, TableData } from "./api";
 import { act, call, out, S, selId, setSelId, editId, setEditId, zoom, openMenu } from "./store";
 import { C, setField } from "./cmds";
 import * as D from "./dialogs";
@@ -11,7 +11,7 @@ import { MathView, ImageView, outs } from "./calc";
 
 const MM = 96 / 25.4;
 const PH: Record<string, string> = { math: "Q = 120 m^3/h", check: "check sigma <= sigma_allow", solve: "solve x^2 = 2 for x in 0 .. 10", plot: "plot f(x) for x in 0 .. 10", image: "Caption, such as Free-body diagram of the bracket" };
-const KIND: Record<string, string> = { math: "Math", text: "Text", check: "Check", solve: "Solve", plot: "Plot", table: "Table", image: "Picture" };
+const KIND: Record<string, string> = { math: "Math", text: "Text", check: "Check", solve: "Solve", plot: "Plot", table: "Table", image: "Picture", material: "Material" };
 
 /** The region editor: a textarea that grows with its text and saves when it loses focus. */
 const Editor = (p: { r: Region }) => {
@@ -88,6 +88,45 @@ const TableEditor = (p: { r: Region }) => {
   );
 };
 
+/** A short name from a material's name: the last plain word before any comma (Structural steel, EN S355 → steel). */
+const shortName = (m: Material) => (m.name.split(",")[0].split(/\s+/).reverse().find(w => /^[A-Za-z]+$/.test(w)) ?? "mat").toLowerCase().slice(0, 12);
+
+/** The material picker: search the library, pick one, name it, choose typical, low or high values. Each change
+ *  is kept in the sheet with the material's values, so the sheet reads the same when the library changes. */
+const MaterialEditor = (p: { r: Region }) => {
+  const [lib] = createResource(async () => JSON.parse((await call<string>("materials")) ?? "{}") as MatLibrary);
+  const d = () => (p.r.data ?? {}) as { id?: string; name?: string; pick?: string; mat?: Material };
+  const [q, setQ] = createSignal("");
+  const [name, setName] = createSignal(d().name ?? "");
+  const [pick, setPick] = createSignal(d().pick || "typical");
+  const list = createMemo(() => { const w = q().toLowerCase().split(/\s+/).filter(Boolean); return (lib()?.materials ?? []).filter(m => { const t = `${m.name} ${m.syn.join(" ")} ${m.des} ${m.family}`.toLowerCase(); return w.every(x => t.includes(x)); }); });
+  const families = () => [...new Set(list().map(m => m.family))];
+  const save = (m: Material | undefined, n: string, pk: string) => {
+    const sources = m ? Object.fromEntries(Object.values(m.props).map(v => [v[2], lib()?.sources[v[2]]?.title ?? v[2]])) : {};
+    act({ Set: { id: p.r.id, field: "data", value: { id: m?.id ?? "", name: n, pick: pk, mat: m ?? null, sources } } });
+  };
+  // A name still as suggested for the last material follows the new one (steel → aluminium); one typed is kept.
+  const choose = (m: Material) => { const old = d().mat ?? lib()?.materials.find(x => x.id === d().id); const n = !name() || (old && name() === shortName(old)) ? shortName(m) : name(); setName(n); save(m, n, pick()); };
+  return (
+    <div class="matedit" onMouseDown={e => e.stopPropagation()}>
+      <div class="matbar">
+        <label>Name <input class="matname" value={name()} placeholder="steel" onInput={e => setName(e.currentTarget.value)} onChange={() => save(d().mat, name().trim(), pick())} /></label>
+        <label>Values <select value={pick()} onChange={e => { setPick(e.currentTarget.value); save(d().mat, name().trim(), e.currentTarget.value); }}><option value="typical">typical (middle of the range)</option><option value="low">low end</option><option value="high">high end</option></select></label>
+        <span class="grow" /><button class="btn sm pri" onClick={() => setEditId(0)}>Done</button>
+      </div>
+      <input class="find" placeholder="Search 250 materials: S355, 6061, nylon, oak, alumina…" value={q()} onInput={e => setQ(e.currentTarget.value)} />
+      <div class="matlist">
+        <Show when={lib()} fallback={<span class="muted">Loading the library…</span>}>
+          <For each={families()}>{f => <><h4>{f}</h4><For each={list().filter(m => m.family === f)}>{m =>
+            <button classList={{ on: d().id === m.id }} onClick={() => choose(m)}><b>{m.name}</b><Show when={m.des || m.syn.length}><span class="muted"> · {[m.des, ...m.syn].filter(Boolean).join(", ")}</span></Show></button>}</For></>}</For>
+          <Show when={!list().length}><span class="muted">No material matches “{q()}”.</span></Show>
+        </Show>
+      </div>
+      <p class="muted small">From Datum Atlas: typical ranges for generic grades, still being referenced. For design, check the standard or the supplier's datasheet.</p>
+    </div>
+  );
+};
+
 /** Picture size choices for the Format tab. */
 export const pickPicture = async (id: number) => { const src = await call<string | null>("pick_image"); if (src) act({ Set: { id, field: "data", value: { ...(S().regions.find(r => r.id === id)?.data ?? {}), src } } }); };
 
@@ -108,15 +147,17 @@ const RegionView = (p: { r: Region }) => {
       <span class="rtag">{KIND[p.r.kind]}</span>
       <Show when={editing()} fallback={
         p.r.kind === "image" ? <ImageView r={p.r} />
-          : p.r.kind === "table" ? <MathView r={p.r} />
+          : p.r.kind === "table" || p.r.kind === "material" ? <MathView r={p.r} />
           : !p.r.text.trim() ? empty()
           : p.r.kind === "text" ? <div class="rtxt">{p.r.text}</div>
           : <MathView r={p.r} />}>
+        <Show when={p.r.kind !== "material"} fallback={<><MaterialEditor r={p.r} /><MathView r={p.r} /></>}>
         <Show when={p.r.kind === "table"} fallback={<>
           <Show when={p.r.kind === "image"}><ImageView r={p.r} /><div class="imgbtns"><button class="btn sm" onMouseDown={e => e.preventDefault()} onClick={() => pickPicture(p.r.id)}>Choose picture…</button><span class="muted">Type the caption below.</span></div></Show>
           <Editor r={p.r} />
           <Show when={outs().get(p.r.id)?.error}>{e => <div class="rerr live"><span class="ico">⚠</span>{e().msg}</div>}</Show>
         </>}><TableEditor r={p.r} /></Show>
+        </Show>
       </Show>
     </div>
   );

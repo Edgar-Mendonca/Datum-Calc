@@ -709,3 +709,21 @@ h3.packf { font: 500 10.5px var(--mono); letter-spacing: .12em; text-transform: 
 .psum .tex { font-size: 12px; }
 .crash { flex: 1; padding: 40px; color: var(--text); }
 .crash h3 { color: var(--crit); }
+
+/* Material regions: the picker and the datasheet */
+.matedit { display: flex; flex-direction: column; gap: 6px; padding: 4px 0 8px; }
+.matbar { display: flex; gap: 14px; align-items: center; font-size: 12px; }
+.matbar input.matname { width: 120px; margin-left: 6px; }
+.matbar select { margin-left: 6px; }
+.matlist { max-height: 260px; overflow: auto; border: 1px solid var(--line); background: var(--panel); }
+.matlist h4 { margin: 6px 8px 2px; font: 500 10px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.matlist button { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 3px 10px; font-size: 12px; cursor: pointer; color: var(--text); }
+.matlist button:hover { background: var(--sel); }
+.matlist button.on { background: var(--sel2); }
+.matview { margin: 2px 0; }
+.mathead { display: flex; gap: 10px; align-items: baseline; font-size: 12.5px; flex-wrap: wrap; }
+.ctable.mat td.l { text-align: left; font-family: var(--sans); }
+.ctable.mat td.w { text-align: left; font-family: var(--sans); color: #3B4859; }
+.ctable.mat td.u { text-align: left; }
+.ctable.mat td.rg { color: #5B6878; }
+.matsrc { font-size: 10.5px; margin-top: 2px; max-width: 160mm; }

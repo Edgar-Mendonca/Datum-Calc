@@ -281,6 +281,28 @@ const check = (name, ok, info = "") => { console.log(`${ok ? "ok  " : "FAIL"} ${
   check("View › Fractions turns fractions off", fr.includes('"field":"exact"') && fr.includes('"value":false'), fr);
   await p7.close();
 
+  // 13d. A material region: the datasheet draws; double-click opens the picker on the real library; a search and a
+  // click keep the material with its values; Insert › Material is on the ribbon (0.2.1).
+  const lib = fs.readFileSync(path.join(__dirname, "../crates/core/data/materials.json"), "utf8");
+  const p8 = await b.newPage({ viewport: { width: 1440, height: 1000 } });
+  p8.on("pageerror", e => errors.push(String(e)));
+  await p8.addInitScript(([st, lib]) => { window.__calls = []; window.__TAURI__ = { core: { invoke: async (c, a) => { window.__calls.push([c, a]); return c === "state" || c === "apply" ? st : c === "materials" ? lib : c === "options" ? { theme: "light", autosave: 0, units: "SI", digits: 4, paper: "A4", number: "auto" } : c === "recent" || c === "packs" ? [] : null; } }, event: { listen: async () => () => {} } }; }, [fix.mat, lib]);
+  await p8.goto(url); await p8.waitForTimeout(500); await p8.click(".bs aside .back"); await p8.waitForTimeout(500);
+  check("a material region draws its datasheet", (await p8.$$(".cpage .matview .ctable.mat tr")).length >= 10 && (await p8.textContent(".cpage .matview")).includes("Structural steel, EN S355") && (await p8.textContent(".cpage .matsrc")).includes("not design values") && (await p8.$$(".cpage .katex-error")).length === 0);
+  check("its names work in the lines below", (await p8.$$(".cpage .badge.pass")).length === 1 && (await p8.textContent(".vars")).includes("360"));
+  await p8.dblclick(".cpage .region.k-material"); await p8.waitForTimeout(400);
+  const all = (await p8.$$(".matlist button")).length;
+  await p8.fill(".matedit input.find", "6061"); await p8.waitForTimeout(150);
+  const found = await p8.$$eval(".matlist button", bs => bs.map(b => b.textContent));
+  check("the picker lists the library and finds by search", all >= 250 && found.length >= 1 && found.every(t => t.includes("6061")), `${all} ${JSON.stringify(found)}`);
+  await p8.click(".matlist button"); await p8.waitForTimeout(150);
+  const picked = await p8.evaluate(() => JSON.stringify(window.__calls.filter(c => c[0] === "apply").pop() ?? null));
+  check("a click keeps the material with its values in the sheet", picked.includes('"field":"data"') && picked.includes('"id":"al-6061-t6"') && picked.includes('"mat":{') && picked.includes('"name":"aluminium"'), picked.slice(0, 300));
+  await p8.click(".matedit .btn.pri"); await p8.waitForTimeout(150);
+  await p8.click(".tabs > button:text-is('Insert')"); await p8.waitForTimeout(100);
+  check("Insert has a Material button", (await p8.$$(".ribbon button:has-text('Material')")).length === 1);
+  await p8.close();
+
   // 14. Recovery: Discard removes the kept copy; × only closes, so the copy is offered again next time (0.1.9).
   for (const [how, sel, want] of [["Discard", ".dlg footer .btn:not(.pri)", true], ["×", ".dlg header .x", false]]) {
     const p4 = await b.newPage({ viewport: { width: 1440, height: 900 } });

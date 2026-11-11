@@ -50,8 +50,8 @@ It is for mechanical, process, structural and electrical engineers, students and
 
 | Version | What |
 | --- | --- |
-| 0.1.0 – 0.2.0 ✅ | The calc sheet and its printing with a summary of checks; units, equations, checks, solve and plot; tables and pictures; twenty calc packs; equations with their numbers; complex numbers for AC circuits, phasors and Bode plots; a Getting Started sheet; recovery per window; Save changes? before a sheet is replaced; hardening; every release installed and used on a clean Windows machine before it is published; exact fractions with simplify, expand and factor |
-| 0.2.1 – 0.2.2 | Materials from Datum Atlas, more packs |
+| 0.1.0 – 0.2.1 ✅ | The calc sheet and its printing with a summary of checks; units, equations, checks, solve and plot; tables and pictures; twenty calc packs; equations with their numbers; complex numbers for AC circuits, phasors and Bode plots; a Getting Started sheet; recovery per window; Save changes? before a sheet is replaced; hardening; every release installed and used on a clean Windows machine before it is published; exact fractions with simplify, expand and factor; 250 materials from Datum Atlas as names with units |
+| 0.2.2 | More packs |
 | 0.3 – 1.0 | Matrices and ODEs, templates, a validation report, a signed installer |
 
 File › Roadmap in the app shows the full list; it comes from [`docs/site.json`](docs/site.json).

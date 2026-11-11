@@ -30,7 +30,7 @@ fn unit_factors_match_nist() {
         ("mph", 4.4704e-1), ("kn", 5.144444e-1), ("knot", 5.144444e-1), ("kph", 2.777778e-1), ("fpm", 5.08e-3), ("fps", 3.048e-1),
         ("gpm", 6.309020e-5), ("cfm", 4.719474e-4), ("lpm", 1.666667e-5), ("bpd", 1.840131e-6), ("MGD", 4.381264e-2), ("tph", 2.777778e-1),
         ("P", 0.1), ("cP", 1e-3), ("St", 1e-4), ("cSt", 1e-6),
-        ("V", 1.0), ("mV", 1e-3), ("kV", 1e3), ("Ω", 1.0), ("ohm", 1.0), ("kΩ", 1e3), ("kohm", 1e3), ("MΩ", 1e6), ("mΩ", 1e-3), ("S", 1.0), ("C", 1.0), ("Ah", 3600.0), ("mAh", 3.6),
+        ("V", 1.0), ("mV", 1e-3), ("kV", 1e3), ("Ω", 1.0), ("ohm", 1.0), ("kΩ", 1e3), ("kohm", 1e3), ("MΩ", 1e6), ("mΩ", 1e-3), ("µΩ", 1e-6), ("nΩ", 1e-9), ("S", 1.0), ("C", 1.0), ("Ah", 3600.0), ("mAh", 3.6),
         ("F", 1.0), ("µF", 1e-6), ("uF", 1e-6), ("nF", 1e-9), ("pF", 1e-12), ("H", 1.0), ("mH", 1e-3), ("Wb", 1.0), ("T", 1.0), ("mT", 1e-3),
         ("sg", 1000.0), ("%", 0.01), ("ppm", 1e-6), ("ppb", 1e-9),
         ("dm", 0.1), ("Mg", 1e3), ("µg", 1e-9), ("ns", 1e-9), ("gon", 1.570796e-2), ("cc", 1e-6), ("qt", 9.463529e-4), ("pt", 4.731765e-4), ("fl_oz", 2.957353e-5),
@@ -1056,4 +1056,88 @@ fn exact_algebra_review_of_0_2_0() {
     let mut s = sheet(&["q = 2/3*1 m"]);
     (s.exact, s.regions[0].unit) = (true, "m".into());
     assert_eq!(eval::run(&s).regions[0].result, "(2/3) m");
+}
+
+mod materials {
+    use super::close;
+    use crate::eval;
+    use crate::sheet::{Kind, Region, Sheet};
+
+    fn with_material(data: serde_json::Value, lines: &[&str]) -> Sheet {
+        let mut s = Sheet::new("m");
+        s.regions.push(Region { id: 1, kind: Kind::Material, data, ..Default::default() });
+        for (i, l) in lines.iter().enumerate() { s.regions.push(Region { id: i as u32 + 2, kind: if l.starts_with("check") { Kind::Check } else { Kind::Math }, text: l.to_string(), ..Default::default() }); }
+        s
+    }
+
+    #[test]
+    fn the_library_loads_and_every_unit_reads() {
+        let lib = crate::materials::library();
+        assert_eq!(lib.materials.len(), 252, "{}", lib.from);
+        assert!(lib.from.starts_with("Datum Atlas"));
+        for (_, _, _, unit) in crate::materials::KEYS { assert!(unit.is_empty() || crate::units::parse(unit).is_ok(), "{unit}"); }
+        for m in &lib.materials { for (_, _, src) in m.props.values() { assert!(lib.sources.contains_key(src), "{}: {src}", m.id); } }
+    }
+
+    #[test]
+    fn s355_defines_its_properties_with_units() {
+        // Atlas S355: ρ 7850–7870 kg/m³, E 200–210 GPa, σy 345–375 MPa, α 11.5–12.5 µm/(m·K), Tmax 350–400 °C, ρe 16–18 µΩ·cm.
+        let s = with_material(serde_json::json!({ "id": "steel-s355", "name": "steel" }), &["check 200 MPa <= sigma_y_steel/1.1", "m = rho_steel*1 m^3"]);
+        let (o, e) = eval::run_env(&s, &eval::Fmt { digits: 4, eng: false, us: false, polar: false, exact: false });
+        let v = |n: &str| e.vars.get(&eval::canon(n)).unwrap_or_else(|| panic!("{n}")).x();
+        assert!(close(v("rho_steel"), 7860.0, 1e-12) && close(v("E_steel"), 205e9, 1e-12) && close(v("sigma_y_steel"), 360e6, 1e-12));
+        assert!(close(v("alpha_steel"), 12e-6, 1e-12) && close(v("T_max_steel"), 375.0 + 273.15, 1e-12) && close(v("rho_e_steel"), 17e-8, 1e-12));
+        assert!(e.vars.get(&eval::canon("T_max_steel")).unwrap().abs, "an absolute temperature");
+        let m = o.regions[0].material.as_ref().unwrap();
+        assert_eq!(m.title, "Structural steel, EN S355");
+        assert!(m.draft && m.rows.len() >= 10 && m.sources.len() == 1);
+        let row = |w: &str| m.rows.iter().find(|r| r.what == w).unwrap();
+        assert_eq!((row("yield strength").value.as_str(), row("yield strength").unit.as_str(), row("yield strength").range.as_str()), ("360", "MPa", "345 – 375"));
+        assert_eq!(row("thermal expansion").unit, "µm/(m·K)");
+        assert!(o.regions[1].check.as_ref().unwrap().pass);
+        assert_eq!(o.regions[2].result, "7.86 t");
+        assert!(o.vars.iter().any(|v| v.name == eval::canon("sigma_y_steel") && v.value == "360" && v.unit == "MPa"), "listed in Variables");
+        // Low and high ends.
+        let low = |pk: &str| eval::run_env(&with_material(serde_json::json!({ "id": "steel-s355", "name": "s", "pick": pk }), &[]), &eval::Fmt { digits: 4, eng: false, us: false, polar: false, exact: false }).1.vars[&eval::canon("sigma_y_s")].x();
+        assert!(close(low("low"), 345e6, 1e-12) && close(low("high"), 375e6, 1e-12));
+    }
+
+    #[test]
+    fn a_sheet_keeps_its_values() {
+        // A kept material wins over the library: the sheet reads as it did when the material was picked.
+        let kept = serde_json::json!({ "id": "steel-s355", "name": "steel", "mat": { "id": "steel-s355", "name": "Structural steel, EN S355", "family": "Metals", "status": "draft", "props": { "E": [100, 100, "atlas-typ"] } }, "sources": { "atlas-typ": "Kept title" } });
+        let o = eval::run(&with_material(kept, &["E_steel ="]));
+        assert_eq!(o.regions[1].result, "100 GPa");
+        assert_eq!(o.regions[0].material.as_ref().unwrap().sources, ["Kept title"]);
+        // A material this version does not have, but the sheet kept, still works.
+        let gone = serde_json::json!({ "id": "no-such", "name": "x", "mat": { "id": "no-such", "name": "Old alloy", "props": { "rho": [2700, 2700, "src"] } } });
+        assert_eq!(eval::run(&with_material(gone, &["rho_x ="])).regions[1].result, "2700 kg/m³");
+    }
+
+    #[test]
+    fn what_a_material_region_says_when_it_cannot() {
+        let err = |d: serde_json::Value| eval::run(&with_material(d, &[])).regions[0].error.as_ref().map(|e| e.msg.clone()).unwrap_or_default();
+        assert_eq!(err(serde_json::json!({})), "Choose a material from the list.");
+        assert!(err(serde_json::json!({ "id": "no-such", "name": "x" })).contains("is not in this version's materials"));
+        assert!(err(serde_json::json!({ "id": "steel-s355", "name": "" })).starts_with("Give the material a short name"));
+        assert!(err(serde_json::json!({ "id": "steel-s355", "name": "2bad" })).starts_with("Give the material a short name"));
+        // Used above the region: defined further down.
+        let mut s = with_material(serde_json::json!({ "id": "steel-s355", "name": "steel" }), &[]);
+        s.regions.insert(0, Region { id: 9, kind: Kind::Math, text: "E_steel =".into(), ..Default::default() });
+        assert!(eval::run(&s).regions[0].error.as_ref().unwrap().msg.contains("defined further down"));
+    }
+
+    #[test]
+    fn every_material_works_out_in_si_and_us() {
+        for m in &crate::materials::library().materials {
+            for us in [false, true] {
+                let mut s = with_material(serde_json::json!({ "id": m.id, "name": "m" }), &[]);
+                if us { s.units = "US".into(); }
+                let o = eval::run(&s);
+                assert!(o.regions[0].error.is_none(), "{}: {:?}", m.id, o.regions[0].error);
+                let mo = o.regions[0].material.as_ref().unwrap();
+                assert!(!mo.rows.is_empty() && mo.rows.iter().all(|r| !r.value.is_empty() && !r.value.contains("NaN") && r.value != "—"), "{}: {:?}", m.id, mo.rows);
+            }
+        }
+    }
 }

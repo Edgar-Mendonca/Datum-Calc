@@ -146,7 +146,7 @@ pub static UNITS: &[Unit] = units![
     "P", 0.1, DVISC, "poise", "Viscosity"; "cP", 1e-3, DVISC, "centipoise", "Viscosity"; "St", 1e-4, KVISC, "stokes", "Viscosity"; "cSt", 1e-6, KVISC, "centistokes", "Viscosity";
     // Electric
     "V", 1.0, VOLT, "volt", "Electric"; "mV", 1e-3, VOLT, "millivolt", "Electric"; "kV", 1e3, VOLT, "kilovolt", "Electric";
-    "Ω", 1.0, OHM, "ohm", "Electric"; "ohm", 1.0, OHM, "ohm", "Electric"; "kΩ", 1e3, OHM, "kilohm", "Electric"; "kohm", 1e3, OHM, "kilohm", "Electric"; "MΩ", 1e6, OHM, "megohm", "Electric"; "mΩ", 1e-3, OHM, "milliohm", "Electric";
+    "Ω", 1.0, OHM, "ohm", "Electric"; "ohm", 1.0, OHM, "ohm", "Electric"; "kΩ", 1e3, OHM, "kilohm", "Electric"; "kohm", 1e3, OHM, "kilohm", "Electric"; "MΩ", 1e6, OHM, "megohm", "Electric"; "mΩ", 1e-3, OHM, "milliohm", "Electric"; "µΩ", 1e-6, OHM, "microohm", "Electric"; "nΩ", 1e-9, OHM, "nanoohm", "Electric";
     "S", 1.0, SIEMENS, "siemens", "Electric"; "C", 1.0, CHARGE, "coulomb", "Electric"; "Ah", 3600.0, CHARGE, "ampere hour", "Electric"; "mAh", 3.6, CHARGE, "milliampere hour", "Electric";
     "F", 1.0, FARAD, "farad", "Electric"; "µF", 1e-6, FARAD, "microfarad", "Electric"; "uF", 1e-6, FARAD, "microfarad", "Electric"; "nF", 1e-9, FARAD, "nanofarad", "Electric"; "pF", 1e-12, FARAD, "picofarad", "Electric";
     "H", 1.0, HENRY, "henry", "Electric"; "mH", 1e-3, HENRY, "millihenry", "Electric"; "Wb", 1.0, WEBER, "weber", "Electric"; "T", 1.0, TESLA, "tesla", "Electric"; "mT", 1e-3, TESLA, "millitesla", "Electric";
@@ -360,9 +360,9 @@ pub fn list() -> Vec<(&'static str, &'static str, &'static str, String)> {
 /// US customary symbols (the rest are SI or neutral, such as s, A, V, rpm, %).
 const US_SYMS: [&str; 41] = ["in", "ft", "yd", "mi", "mil", "lb", "lbm", "oz", "slug", "ton_us", "grain", "°R", "degR", "Δ°F", "delta°F", "deltaF", "°F", "degF", "acre", "gal", "bbl",
     "lbf", "kip", "psi", "ksi", "psf", "psia", "inHg", "inH2O", "BTU", "Btu", "therm", "MMBTU", "hp", "TR", "mph", "fpm", "fps", "gpm", "cfm", "pcf"];
-const NEUTRAL: [&str; 50] = ["s", "ms", "µs", "us", "ns", "min", "h", "hr", "day", "week", "yr", "A", "mA", "kA", "µA", "uA", "V", "mV", "kV", "rpm", "rps", "rad", "deg", "°",
+const NEUTRAL: [&str; 52] = ["s", "ms", "µs", "us", "ns", "min", "h", "hr", "day", "week", "yr", "A", "mA", "kA", "µA", "uA", "V", "mV", "kV", "rpm", "rps", "rad", "deg", "°",
     // Electrical and viscosity units are used the same way in both systems.
-    "Ω", "ohm", "kΩ", "kohm", "MΩ", "mΩ", "GΩ", "S", "C", "Ah", "mAh", "F", "µF", "uF", "nF", "pF", "H", "mH", "µH", "Wb", "T", "mT", "µT", "G", "cP", "cSt"];
+    "Ω", "ohm", "kΩ", "kohm", "MΩ", "mΩ", "µΩ", "nΩ", "GΩ", "S", "C", "Ah", "mAh", "F", "µF", "uF", "nF", "pF", "H", "mH", "µH", "Wb", "T", "mT", "µT", "G", "cP", "cSt"];
 
 /// Which system a unit expression belongs to: Some(true) for US customary, Some(false) for SI and
 /// metric, None when it only uses units common to both (s, A, V, rpm, %).

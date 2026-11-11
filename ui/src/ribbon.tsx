@@ -102,7 +102,7 @@ export const Ribbon = () => (
       <G l="Print" h="print"><B big i="print" l="Print / PDF" run={C.print} /></G>
     </Show>
     <Show when={tab() === "insert"}>
-      <G l="Regions" h="insert"><B big i="math" l="Math" run={() => C.insert("math")} /><B big i="text" l="Text" run={() => C.insert("text")} /><B big i="check" l="Check" run={() => C.insert("check")} /><B big i="solve" l="Solve" run={() => C.insert("solve")} /><B big i="plot" l="Plot" run={() => C.insert("plot")} /><B big i="table" l="Table" run={() => C.insert("table")} /><B big i="image" l="Picture" run={() => C.picture()} />
+      <G l="Regions" h="insert"><B big i="math" l="Math" run={() => C.insert("math")} /><B big i="text" l="Text" run={() => C.insert("text")} /><B big i="check" l="Check" run={() => C.insert("check")} /><B big i="solve" l="Solve" run={() => C.insert("solve")} /><B big i="plot" l="Plot" run={() => C.insert("plot")} /><B big i="table" l="Table" run={() => C.insert("table")} /><B big i="mat" l="Material" title="Properties of a material from the library: density, modulus, strength, conductivity …" run={() => C.insert("material")} /><B big i="image" l="Picture" run={() => C.picture()} />
         <S_><B i="text" l="Heading" run={() => C.insert("text").then(() => setStyle("heading"))} /><B i="text" l="Reference" run={() => C.insert("text", "Ref: ").then(() => setStyle("ref"))} /><B i="math" l="Input" run={() => C.insert("math").then(() => setStyle("input"))} /></S_></G>
     </Show>
     <Show when={tab() === "math"}>

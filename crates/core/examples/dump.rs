@@ -54,5 +54,13 @@ fn main() {
     alg.next_id = 7;
     alg.exact = true;
     let alg = serde_json::json!({ "sheet": alg, "calc": eval::run(&alg), "path": null, "dirty": false, "undo": false, "redo": false, "rev": 1 });
-    println!("{}", serde_json::json!({ "state": state, "packs": datum_core::packs::cards(), "ac": ac, "rc": rc, "alg": alg }));
+    // A material region (0.2.1): S355 as "steel", used by the lines below.
+    let mut mat = Sheet::new("Materials");
+    mat.regions.push(datum_core::Region { id: 1, kind: Kind::Material, data: serde_json::json!({ "id": "steel-s355", "name": "steel", "pick": "typical" }), ..Default::default() });
+    for (k, t) in ["sigma = 200 MPa", "check sigma <= sigma_y_steel/1.1", "m = rho_steel*0.5 m^3"].iter().enumerate() {
+        mat.regions.push(datum_core::Region { id: k as u32 + 2, kind: if t.starts_with("check") { Kind::Check } else { Kind::Math }, text: t.to_string(), ..Default::default() });
+    }
+    mat.next_id = 5;
+    let mat = serde_json::json!({ "sheet": mat, "calc": eval::run(&mat), "path": null, "dirty": false, "undo": false, "redo": false, "rev": 1 });
+    println!("{}", serde_json::json!({ "state": state, "packs": datum_core::packs::cards(), "ac": ac, "rc": rc, "alg": alg, "mat": mat }));
 }

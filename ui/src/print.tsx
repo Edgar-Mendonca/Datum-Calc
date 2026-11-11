@@ -31,7 +31,7 @@ const SummaryBlock = () => {
 
 const PrintRegionIn = (p: { r: Region }) => p.r.id === -1 ? <SummaryBlock /> : (
   <div class={`pr k-${p.r.kind}`} classList={{ [`s-${p.r.style}`]: !!p.r.style }}>
-    {p.r.kind === "image" ? <ImageView r={p.r} /> : p.r.kind === "table" || (p.r.kind !== "text" && p.r.text.trim()) ? <MathView r={p.r} paper /> : <div class="prtext">{p.r.text || " "}</div>}
+    {p.r.kind === "image" ? <ImageView r={p.r} /> : p.r.kind === "table" || p.r.kind === "material" || (p.r.kind !== "text" && p.r.text.trim()) ? <MathView r={p.r} paper /> : <div class="prtext">{p.r.text || " "}</div>}
   </div>
 );
 

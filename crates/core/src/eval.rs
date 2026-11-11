@@ -569,6 +569,8 @@ pub struct RegionOut {
     pub check: Option<CheckOut>,
     pub plot: Option<PlotOut>,
     pub table: Option<TableOut>,
+    /// A material region worked out: its datasheet.
+    pub material: Option<MatOut>,
     /// Names a table defines (one per column), for the Variables panel.
     pub defs: Vec<VarOut>,
     /// Units this result can be shown in (same dimension), for the unit menu.
@@ -578,6 +580,13 @@ pub struct RegionOut {
     /// The equation again with each name replaced by its value (when the sheet shows numbers).
     pub subst_tex: String,
 }
+
+/// A material region as shown: the material, which end of the ranges is used, and a row per property.
+#[derive(Debug, Clone, Serialize, PartialEq, Default)]
+pub struct MatOut { pub title: String, pub family: String, pub des: String, pub notes: String, pub pick: String, pub draft: bool, pub rows: Vec<MatRow>, pub sources: Vec<String> }
+
+#[derive(Debug, Clone, Serialize, PartialEq, Default)]
+pub struct MatRow { pub tex: String, pub what: String, pub value: String, pub unit: String, pub range: String, pub source: String }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
 pub struct VarOut { pub name: String, pub tex: String, pub value: String, pub unit: String, pub id: u32 }
@@ -738,7 +747,10 @@ fn run_here(s: &Sheet, f: &Fmt) -> (SheetOut, Env) {
     let mut env = Env::new();
     // Names defined anywhere, so a name used too early gets a helpful message.
     for r in &s.regions {
-        if r.kind == Kind::Table {
+        if r.kind == Kind::Material {
+            let d: crate::materials::MatData = serde_json::from_value(r.data.clone()).unwrap_or_default();
+            if let Some(m) = d.mat.as_ref().or_else(|| crate::materials::find(&d.id)) { for k in crate::materials::KEYS.iter().filter(|k| m.props.contains_key(k.0)) { env.later.insert(canon(&format!("{}_{}", k.1, d.name)), false); } }
+        } else if r.kind == Kind::Table {
             for c in serde_json::from_value::<TableData>(r.data.clone()).unwrap_or_default().cols { if !c.name.trim().is_empty() { env.later.insert(canon(c.name.trim()), false); } }
         } else if let Some(n) = defined_name(split_note(&r.text).0) { env.later.insert(canon(&n), false); }
     }
@@ -810,6 +822,7 @@ fn substituted(env: &Env, e: &Node, f: &Fmt) -> String {
 fn region(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>, subst: bool) -> RegionOut {
     let mut o = RegionOut { id: r.id, ..Default::default() };
     if r.kind == Kind::Table { table(env, r, f, known, &mut o); return o; }
+    if r.kind == Kind::Material { material(env, r, f, known, &mut o); return o; }
     if !matches!(r.kind, Kind::Math | Kind::Check | Kind::Solve | Kind::Plot) || r.text.trim().is_empty() { return o; }
     // Text after # describes the line: `Q = 120 m^3/h  # design flow`.
     let (code, note) = split_note(&r.text);
@@ -1101,6 +1114,48 @@ fn table(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>, o: &mut Re
     }
     if let Some(m) = first_err { o.error = Some(ErrOut { msg: m, from: 0, to: 0 }); }
     o.table = Some(t);
+}
+
+/// A material region: each property the material has becomes a name (ρ_steel, σ_y,steel) with its unit, from
+/// the values kept in the sheet (or the library, for a sheet written by hand), at the end of the range chosen.
+fn material(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>, o: &mut RegionOut) {
+    use crate::materials::{self as mats, KEYS};
+    let d: mats::MatData = serde_json::from_value(r.data.clone()).unwrap_or_default();
+    let Some(m) = d.mat.clone().or_else(|| mats::find(&d.id).cloned()) else {
+        o.error = Some(ErrOut { msg: if d.id.is_empty() { "Choose a material from the list.".into() } else { format!("“{}” is not in this version's materials.", d.id) }, from: 0, to: 0 });
+        return;
+    };
+    let mut mo = MatOut { title: m.name.clone(), family: m.family.clone(), des: m.des.clone(), notes: m.notes.clone(), pick: if d.pick.is_empty() { "typical".into() } else { d.pick.clone() }, draft: m.status == "draft", ..Default::default() };
+    if !mats::valid_name(&d.name) {
+        o.material = Some(mo);
+        o.error = Some(ErrOut { msg: "Give the material a short name of letters and digits, such as steel: its properties become ρ_steel, E_steel …".into(), from: 0, to: 0 });
+        return;
+    }
+    for (key, base, what, unit) in KEYS {
+        let Some((lo, hi, src)) = m.props.get(key) else { continue };
+        if !lo.is_finite() || !hi.is_finite() { continue; }
+        let u = if unit.is_empty() { None } else { units::parse(unit).ok() };
+        let val = |x: f64| match &u { Some(u) => Val { v: vec![x * u.factor + u.offset], dim: u.dim, abs: u.offset != 0.0, ..Default::default() }, None => Val::plain(x) };
+        let v = val(mats::pick(*lo, *hi, &d.pick));
+        // Shown in the unit the library keeps (US units on a US sheet).
+        let want = if f.us || unit.is_empty() { String::new() } else { units::pretty(unit) };
+        let (_, _, value, shown) = show_val(&v, &want, f);
+        let (_, _, a, _) = show_val(&val(*lo), &shown, f);
+        let (_, _, b, _) = show_val(&val(*hi), &shown, f);
+        let raw = format!("{base}_{}", d.name);
+        let k = canon(&raw);
+        mo.rows.push(MatRow { tex: latex::name(&raw), what: what.to_string(), value: value.clone(), unit: shown.clone(), range: if a == b { String::new() } else { format!("{a} – {b}") }, source: d.sources.get(src).cloned().unwrap_or_else(|| mats::source_title(src)) });
+        o.defs.push(VarOut { name: k.clone(), tex: latex::name(&raw), value, unit: shown.clone(), id: r.id });
+        env.shown.insert(k.clone(), shown);
+        env.exprs.remove(&k);
+        env.vars.insert(k, v);
+        known.push(raw);
+    }
+    let mut srcs: Vec<String> = mo.rows.iter().map(|x| x.source.clone()).collect();
+    srcs.sort();
+    srcs.dedup();
+    mo.sources = srcs;
+    o.material = Some(mo);
 }
 
 /// The code of a line and its description after `#`.

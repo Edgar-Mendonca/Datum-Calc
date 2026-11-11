@@ -422,6 +422,10 @@ fn lists() -> Lists {
 #[tauri::command]
 fn version() -> &'static str { env!("CARGO_PKG_VERSION") }
 
+/// The materials library (from Datum Atlas) for Insert › Material, as JSON.
+#[tauri::command]
+fn materials() -> &'static str { datum_core::materials::JSON }
+
 #[tauri::command]
 fn quit(app: AppHandle) {
     leave(&app);
@@ -479,7 +483,7 @@ fn main() {
         })
         .invoke_handler(tauri::generate_handler![
             state, apply, history, new_sheet, packs, new_from_pack, open, save, save_file, pick_image,
-            lists, options, set_options, autosave, recovery, recover, recent, startup_file, version, open_url, quit, check_update, install_update
+            lists, materials, options, set_options, autosave, recovery, recover, recent, startup_file, version, open_url, quit, check_update, install_update
         ])
         .run(tauri::generate_context!())
         .expect("Datum Calc failed to start");

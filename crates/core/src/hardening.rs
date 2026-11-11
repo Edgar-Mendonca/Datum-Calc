@@ -298,3 +298,23 @@ fn every_pack_survives_saving_and_damage() {
         }
     }
 }
+
+#[test]
+fn damaged_material_regions_never_panic() {
+    // A material region's data as a damaged or hand-edited file might hold it.
+    let datas = [
+        json!(null), json!(7), json!("steel"), json!({ "id": 5 }), json!({ "id": "steel-s355", "name": 3 }), json!({ "id": "steel-s355", "name": "s", "pick": [1] }),
+        json!({ "id": "x", "name": "m", "mat": { "props": { "E": [1e308, 1e308, "s"], "rho": ["a", 2, "s"], "sy": [-1, null, "s"] } } }),
+        json!({ "name": "m", "mat": { "name": "", "props": { "E": [1e300, -1e300, ""], "tm": [-1e6, 1e9, "s"], "zz": [1, 2, "s"] } } }),
+        json!({ "id": "steel-s355", "name": "averyveryverylongnamethatgoesonandon" }), json!({ "id": "steel-s355", "name": "ü_ß" }),
+    ];
+    for (k, d) in datas.into_iter().enumerate() {
+        let mut s = Sheet::new("m");
+        s.regions.push(Region { id: 1, kind: Kind::Material, data: d, ..Default::default() });
+        s.regions.push(Region { id: 2, kind: Kind::Math, text: "E_m =".into(), ..Default::default() });
+        for us in [false, true] {
+            let o = crate::eval::run_with(&s, &crate::eval::Fmt { digits: 4, eng: false, us, polar: false, exact: k % 2 == 0 });
+            assert_eq!(o.regions.len(), 2);
+        }
+    }
+}
