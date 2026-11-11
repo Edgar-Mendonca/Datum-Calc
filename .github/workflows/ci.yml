@@ -56,3 +56,27 @@ jobs:
       - run: npm ci
       - run: npm run build:ui
       - run: cargo test --workspace
+
+  # The installer on a clean Windows machine: over the previous release, the real window driven through
+  # WebView2, recovery after a crash, uninstall (tests_win/smoke.ps1). The release workflow runs it too.
+  windows-install:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx tauri build --bundles nsis
+      - name: Install and use it as a user would
+        shell: pwsh
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+        run: |
+          npm i --no-save playwright@1.63.0
+          $v = (Select-String -Path src-tauri/Cargo.toml -Pattern '^version = "(.+)"' | Select-Object -First 1).Matches[0].Groups[1].Value
+          $setup = Get-ChildItem target/release/bundle/nsis/*-setup.exe | Select-Object -First 1
+          ./tests_win/smoke.ps1 -Installer $setup.FullName -Version $v

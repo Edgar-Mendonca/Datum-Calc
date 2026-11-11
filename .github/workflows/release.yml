@@ -38,6 +38,14 @@ jobs:
           mkdir out
           cp target/release/bundle/nsis/*-setup.exe "out/DatumCalc-$V-setup.exe"
           cd out && sha256sum "DatumCalc-$V-setup.exe" > SHA256SUMS.txt && cat SHA256SUMS.txt
+      # Nothing is published unless the installer works on a clean machine (tests_win/smoke.ps1).
+      - name: Install and use it as a user would
+        shell: pwsh
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+        run: |
+          npm i --no-save playwright@1.63.0
+          ./tests_win/smoke.ps1 -Installer "out/DatumCalc-$env:V-setup.exe" -Version $env:V
       - name: Release notes from CHANGELOG.md
         shell: bash
         run: |
