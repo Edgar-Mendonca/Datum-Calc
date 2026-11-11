@@ -33,11 +33,11 @@ Datum Calc is a desktop app for engineering calculation sheets. You write the ca
 3. **Show the numbers.** View › Numbers repeats each equation with its values put in, as on a hand calculation.
 4. **Print the calc sheet.** Fill in the title block (project, calc number, by, checked, date, revision) and save a PDF.
 
-**Twenty calc packs** start you off (File › New from pack), each with its inputs at the top, its results and checks below and its references at the end, and each checked against a hand calculation in the tests:
+**Twenty-five calc packs** start you off (File › New from pack), each with its inputs at the top, its results and checks below and its references at the end, and each checked against a hand calculation in the tests:
 
 | Rotating equipment | Process | Mechanical | Electrical |
 | --- | --- | --- | --- |
-| Pump power, efficiency and motor size · NPSH available against required · Pump curve against system curve (operating point) · Compressor polytropic head and power · Shaft torsion | Pipe pressure drop (Darcy–Weisbach, Colebrook) · Heat exchanger duty and LMTD · Tank volume and fill time · Pipe wall thickness · Heat loss from an insulated pipe | Thin-walled pressure vessel · Beams: deflection and bending stress · Bolt preload and tightening torque · Thermal expansion of a pipe · Column buckling (Euler) · Fillet weld in shear | Electric motor: current, power factor and starting current · Cable voltage drop · AC circuit: impedance, current and power factor · RC low-pass filter: Bode plots |
+| Pump power, efficiency and motor size · NPSH available against required · Pump curve against system curve (operating point) · Compressor polytropic head and power · Shaft torsion · Flat belt drive | Pipe pressure drop (Darcy–Weisbach, Colebrook) · Heat exchanger duty and LMTD · Tank volume and fill time · Pipe wall thickness · Heat loss from an insulated pipe · Tank heating time | Thin-walled pressure vessel · Beams: deflection and bending stress · Bolt preload and tightening torque · Thermal expansion of a pipe · Column buckling (Euler) · Fillet weld in shear · Bolted flange · Helical compression spring | Electric motor: current, power factor and starting current · Cable voltage drop · AC circuit: impedance, current and power factor · RC low-pass filter: Bode plots · Three-phase load and power-factor correction |
 
 <table><tr>
 <td width="50%"><img src="docs/images/print.png" alt="The printed calc sheet with its title block"><br><sub>The printed calc sheet: title block, maths, results, PASS/FAIL checks, page numbers.</sub></td>
@@ -50,8 +50,7 @@ It is for mechanical, process, structural and electrical engineers, students and
 
 | Version | What |
 | --- | --- |
-| 0.1.0 – 0.2.1 ✅ | The calc sheet and its printing with a summary of checks; units, equations, checks, solve and plot; tables and pictures; twenty calc packs; equations with their numbers; complex numbers for AC circuits, phasors and Bode plots; a Getting Started sheet; recovery per window; Save changes? before a sheet is replaced; hardening; every release installed and used on a clean Windows machine before it is published; exact fractions with simplify, expand and factor; 250 materials from Datum Atlas as names with units |
-| 0.2.2 | More packs |
+| 0.1.0 – 0.2.2 ✅ | The calc sheet and its printing with a summary of checks; units, equations, checks, solve and plot; tables and pictures; twenty-five calc packs; equations with their numbers; complex numbers for AC circuits, phasors and Bode plots; a Getting Started sheet; recovery per window; Save changes? before a sheet is replaced; hardening; every release installed and used on a clean Windows machine before it is published; exact fractions with simplify, expand and factor; 250 materials from Datum Atlas as names with units |
 | 0.3 – 1.0 | Matrices and ODEs, templates, a validation report, a signed installer |
 
 File › Roadmap in the app shows the full list; it comes from [`docs/site.json`](docs/site.json).

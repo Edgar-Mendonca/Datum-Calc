@@ -20,7 +20,7 @@
     "Readable maths: what is shown is drawn from the same expression the engine computes.",
     "Checks with PASS or FAIL and the utilisation ratio.",
     "Solve for the value that makes an equation zero within a range, plot functions such as a pump curve against the system curve, and tables with units per column.",
-    "Twenty ready calc packs, each with its reference and a test against a worked example.",
+    "Twenty-five ready calc packs, each with its reference and a test against a worked example.",
     "Complex numbers for AC circuits in the frequency domain: impedances such as (8 + 9.42j) Ω, phasors as 230 V∠-30°, impedances in parallel, complex power, and Bode plots on a log frequency axis.",
     "Each equation can be shown again with its numbers put in, as on a hand calculation.",
     "Exact maths: fractions that stay fractions, and simplify, expand and factor on expressions.",
@@ -33,8 +33,7 @@
     "docs/images/units.png"
   ],
   "roadmap": [
-    { "v": "0.2.2", "title": "More packs", "when": "Next", "items": ["More calc packs: flange bolts, tank heat loss, three-phase power, a spring, a belt drive"] },
-    { "v": "0.3", "title": "Matrices and ODEs", "when": "Later", "items": ["Matrices and linear systems", "Solve ordinary differential equations", "Tables from CSV"] },
+        { "v": "0.3", "title": "Matrices and ODEs", "when": "Next", "items": ["Matrices and linear systems", "Solve ordinary differential equations", "Tables from CSV"] },
     { "v": "0.4", "title": "Programs and templates", "when": "Later", "items": ["Loops and conditions inside a region", "Sheet templates", "A company title block"] },
     { "v": "1.0", "title": "Validation", "when": "Goal", "items": ["A validation report: every pack against its reference", "A user guide", "A signed installer"] }
   ]

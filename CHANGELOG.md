@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.2.2 — 2026-11-11
+
+Five more calc packs (25 in all), each checked against a hand calculation.
+
+**New calc packs**
+- Bolted flange: the operating and gasket-seating bolt loads and the bolt area needed against the bolt area provided (ASME Section VIII Division 1, Appendix 2).
+- Tank heating time with heat losses: the exact time for a heater to bring a well-mixed tank to temperature while it loses heat, against the time allowed.
+- Three-phase load: line current, apparent and reactive power, the capacitor bank for power-factor correction (kvar and µF per phase) and the current after correction against the cable rating.
+- Helical compression spring: rate, deflection and shear stress with the Bergsträsser factor, music wire's strength from its diameter, against the static allowable.
+- Flat belt drive: wrap angle, belt speed, tight- and slack-side tensions, driven speed and belt length, against the rated tension.
+
+**Equations with their numbers**
+- An angle is put in as radians: R = e^(μθ) = e^(0.3·2.84 rad), not e^(0.3·162.7°), which read as 48.8 in the exponent.
+
+**Checks**
+- 74 engine tests (each new pack against its hand calculation), 99 UI tests. The earlier packs print exactly as before. An independent engineering check of the five packs agreed with every equation, input and result; it corrected two section numbers in the references and asked for wording that stays true when inputs change.
+
 ## 0.2.1 — 2026-11-11
 
 Materials: the properties of about 250 materials, from Datum Atlas, as names with units on the sheet.

@@ -491,7 +491,7 @@ mod packs {
     #[test]
     fn all_packs_open_and_list() {
         let cards = crate::packs::cards();
-        assert_eq!(cards.len(), 20);
+        assert_eq!(cards.len(), 25);
         for c in &cards { assert!(!c.name.is_empty() && !c.desc.is_empty() && !c.field.is_empty() && c.checks > 0, "{}", c.id); }
     }
 
@@ -652,6 +652,64 @@ mod packs {
         assert!(close(p.xs[0], 10.0, 1e-12) && close(*p.xs.last().unwrap(), 100_000.0, 1e-9) && close(p.xs[30], 100.0, 1e-9), "evenly spaced in decades");
         assert!(close(p.series[0].ys[60], 20.0 * (1.0 / (1.0f64 + (1000.0 / 994.718_394f64).powi(2)).sqrt()).log10(), 1e-6), "−3 dB near the cut-off");
         assert_eq!(plots[1].yunit, "°");
+    }
+
+    #[test]
+    fn flange_bolts() {
+        // H = π/4 0.2² 2e6 = 62 831.9 N; H_p = 2 0.008 π 0.2 3 2e6 = 60 318.6 N; W_m1 = 123 150.4 N; W_m2 = π 0.008 0.2 69e6 = 346 831.8 N;
+        // A_m = max(716.0, 2016.5) mm² = 2016.5 mm²; A_b = 12 × 225.2 = 2702.4 mm²; utilisation 0.74618.
+        let (o, e) = run("flange-bolts");
+        assert!(close(v(&e, "W_m1"), 123_150.432, 1e-8) && close(v(&e, "W_m2"), 346_831.829, 1e-8));
+        assert!(close(v(&e, "A_m"), 2016.464_122e-6, 1e-8) && close(v(&e, "A_b"), 2702.4e-6, 1e-12));
+        assert!(checks(&o)[0].0 && close(checks(&o)[0].1, 2016.464_122 / 2702.4, 1e-8));
+    }
+
+    #[test]
+    fn tank_heating() {
+        // m = 4990 kg; UA = 5 × 18 = 90 W/K; τ = 4990 × 4182/90 = 231 868.7 s; t = τ ln((50 000 − 90×5)/(50 000 − 90×50)) = 19 771.4 s = 5.4921 h;
+        // without losses 4990 × 4182 × 45/50 000 = 18 781.4 s = 5.2170 h: the losses add about 5 %.
+        let (o, e) = run("tank-heating");
+        assert!(close(v(&e, "tau"), 231_868.666_7, 1e-9));
+        assert!(close(v(&e, "t"), 19_771.426_09, 1e-8) && close(v(&e, "t_0"), 18_781.362, 1e-8));
+        assert!(o.regions.iter().any(|r| r.result == "5.492 h") && checks(&o)[0].0);
+    }
+
+    #[test]
+    fn three_phase() {
+        // I_1 = 75 000/(√3 400 0.82) = 132.016 A; S_1 = 91.463 kVA; Q_1 = 52.350 kvar; Q_c = 75 000 (0.69800 − 0.32868) = 27.699 kvar;
+        // I_2 = 113.951 A; ω = 314.16 rad/s; C = 27 699/(3 × 314.16 × 400²) = 183.68 µF.
+        let (o, e) = run("three-phase");
+        assert!(close(v(&e, "I_1"), 132.016_068, 1e-8) && close(v(&e, "I_2"), 113.950_711, 1e-8));
+        assert!(close(v(&e, "Q_c"), 27_699.014_14, 1e-8) && close(v(&e, "C"), 183.684_792e-6, 1e-8));
+        assert!(o.regions.iter().any(|r| r.result == "314.2 rad/s") && o.regions.iter().any(|r| r.result == "183.7 µF"));
+        assert!(checks(&o)[0].0);
+    }
+
+    #[test]
+    fn spring() {
+        // C = 8; K_B = 34/29 = 1.17241; k = 81e9 × 0.003⁴/(8 × 0.024³ × 8) = 7415.77 N/m; y = 20.227 mm; τ = K_B 8 150 0.024/(π 0.003³) = 398.07 MPa;
+        // S_ut = 2211/3^0.145 = 1885.41 MPa; τ_allow = 848.44 MPa (Shigley Table 10-6, 45 %).
+        let (o, e) = run("spring");
+        assert!(close(v(&e, "k"), 7415.771_484, 1e-9) && close(v(&e, "tau"), 398.070_294e6, 1e-8));
+        assert!(close(v(&e, "S_ut"), 1885.411_539e6, 1e-8) && close(v(&e, "y"), 20.227_160e-3, 1e-7));
+        assert!(o.regions.iter().any(|r| r.result == "7.416 N/mm") && checks(&o)[0].0 && close(checks(&o)[0].1, 0.469_182, 1e-5));
+    }
+
+    #[test]
+    fn belt_drive() {
+        // θ = π − 2 asin(240/1600) = 2.840456 rad (162.75°); v = 1450 × 2π/60 × 0.08 = 12.1475 m/s; ΔT = 617.411 N; e^(0.3θ) = 2.344652;
+        // T_2 = 459.161 N; T_1 = 1076.572 N; n_2 = 580 rpm; L = 2.497646 m.
+        let (o, e) = run("belt-drive");
+        assert!(close(v(&e, "theta"), 2.840_456_108, 1e-9) && close(v(&e, "v"), 12.147_491_59, 1e-9));
+        assert!(close(v(&e, "T_1"), 1076.572_291, 1e-8) && close(v(&e, "T_2"), 459.160_873, 1e-8));
+        assert!(close(v(&e, "L"), 2.497_645_943, 1e-9));
+        assert!(o.regions.iter().any(|r| r.result == "580 rpm") && o.regions.iter().any(|r| r.result == "162.7°"));
+        // With its numbers put in, the angle in the exponent reads in radians.
+        let mut s = crate::packs::sheet("belt-drive").unwrap();
+        s.subst = true;
+        let r = eval::run(&s).regions.into_iter().find(|r| r.name == "R").unwrap();
+        assert!(r.subst_tex.contains("2.84\\,\\mathrm{rad}") && !r.subst_tex.contains("circ"), "{}", r.subst_tex);
+        assert!(checks(&o)[0].0);
     }
 
     #[test]

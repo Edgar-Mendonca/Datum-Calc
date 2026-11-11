@@ -1,0 +1,197 @@
+{
+ "format": 1,
+ "name": "Helical compression spring: rate and stress",
+ "title": {
+  "project": "",
+  "number": "PACK-24",
+  "title": "Helical compression spring: rate and stress",
+  "by": "",
+  "checked": "",
+  "date": "",
+  "rev": "A",
+  "company": "",
+  "client": "",
+  "logo": ""
+ },
+ "page": {
+  "paper": "A4",
+  "margins": [
+   15.0,
+   15.0,
+   15.0,
+   20.0
+  ]
+ },
+ "units": "SI",
+ "digits": 4,
+ "regions": [
+  {
+   "id": 1,
+   "kind": "text",
+   "text": "Helical compression spring: rate and stress",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 2,
+   "kind": "text",
+   "text": "Rate k = G d⁴/(8 D³ n_a). The shear stress τ = K_B 8 F D/(π d³) includes the Bergsträsser factor K_B for the curvature of the wire. Music wire's tensile strength falls with its diameter, S_ut = A/d^m; the static allowable without set removal is 45 % of it.",
+   "unit": "",
+   "style": "note",
+   "data": null
+  },
+  {
+   "id": 3,
+   "kind": "text",
+   "text": "Inputs",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 4,
+   "kind": "math",
+   "text": "F = 150 N  # working load",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 5,
+   "kind": "math",
+   "text": "d = 3 mm  # wire diameter (music wire)",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 6,
+   "kind": "math",
+   "text": "D = 24 mm  # mean coil diameter",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 7,
+   "kind": "math",
+   "text": "n_a = 8  # active coils",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 8,
+   "kind": "math",
+   "text": "G = 81.0 GPa  # shear modulus of music wire, 1.61–3 mm",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 9,
+   "kind": "math",
+   "text": "A_ut = 2211 MPa  # strength constant A of music wire, in MPa·mm^m with d in mm (not the inch-unit value)",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 10,
+   "kind": "math",
+   "text": "m_ut = 0.145  # strength exponent m",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 11,
+   "kind": "text",
+   "text": "Results",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 12,
+   "kind": "math",
+   "text": "C = D/d  # spring index",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 13,
+   "kind": "math",
+   "text": "K_B = (4*C + 2)/(4*C - 3)  # Bergsträsser factor",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 14,
+   "kind": "math",
+   "text": "k = G*d^4/(8*D^3*n_a)  # spring rate",
+   "unit": "N/mm",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 15,
+   "kind": "math",
+   "text": "y = F/k  # deflection under F",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 16,
+   "kind": "math",
+   "text": "tau = K_B*8*F*D/(pi*d^3)  # shear stress",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 17,
+   "kind": "math",
+   "text": "S_ut = A_ut/(d/(1 mm))^m_ut  # tensile strength of the wire",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 18,
+   "kind": "math",
+   "text": "tau_allow = 0.45*S_ut  # static allowable, without set removal",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 19,
+   "kind": "check",
+   "text": "check tau <= tau_allow",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 20,
+   "kind": "text",
+   "text": "Ref: R. G. Budynas, J. K. Nisbett, Shigley's Mechanical Engineering Design, 10th ed., §10-1 to §10-3: stresses in helical springs, the curvature effect (Bergsträsser factor) and deflection; Table 10-4: strength constants A and m; Table 10-5: G; Table 10-6: allowable torsional stress.",
+   "unit": "",
+   "style": "ref",
+   "data": null
+  }
+ ],
+ "next_id": 21,
+ "ui": {
+  "pack": {
+   "id": "spring",
+   "field": "Mechanical",
+   "desc": "Rate, deflection and shear stress of a helical compression spring in music wire, with the wire's tensile strength from its diameter, against the allowable static stress."
+  }
+ }
+}

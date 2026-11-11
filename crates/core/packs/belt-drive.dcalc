@@ -1,0 +1,205 @@
+{
+ "format": 1,
+ "name": "Flat belt drive: tensions and length",
+ "title": {
+  "project": "",
+  "number": "PACK-25",
+  "title": "Flat belt drive: tensions and length",
+  "by": "",
+  "checked": "",
+  "date": "",
+  "rev": "A",
+  "company": "",
+  "client": "",
+  "logo": ""
+ },
+ "page": {
+  "paper": "A4",
+  "margins": [
+   15.0,
+   15.0,
+   15.0,
+   20.0
+  ]
+ },
+ "units": "SI",
+ "digits": 4,
+ "regions": [
+  {
+   "id": 1,
+   "kind": "text",
+   "text": "Flat belt drive: tensions and length",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 2,
+   "kind": "text",
+   "text": "The tensions on the tight and slack sides differ by the power over the belt speed, and their ratio is e^(μθ) at the point of slipping (θ: the wrap on the small pulley). Centrifugal tension is neglected at this speed. A speed in rpm is an angular speed, so the belt speed is v = ω r.",
+   "unit": "",
+   "style": "note",
+   "data": null
+  },
+  {
+   "id": 3,
+   "kind": "text",
+   "text": "Inputs",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 4,
+   "kind": "math",
+   "text": "P = 7.5 kW  # power transmitted",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 5,
+   "kind": "math",
+   "text": "n_1 = 1450 rpm  # driver speed",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 6,
+   "kind": "math",
+   "text": "D_1 = 160 mm  # driver pulley",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 7,
+   "kind": "math",
+   "text": "D_2 = 400 mm  # driven pulley",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 8,
+   "kind": "math",
+   "text": "C = 800 mm  # centre distance",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 9,
+   "kind": "math",
+   "text": "mu = 0.3  # friction coefficient, belt on pulley",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 10,
+   "kind": "math",
+   "text": "T_allow = 1500 N  # rated belt tension",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 11,
+   "kind": "text",
+   "text": "Results",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 12,
+   "kind": "math",
+   "text": "theta = pi - 2*asin((D_2 - D_1)/(2*C))  # wrap on the small pulley",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 13,
+   "kind": "math",
+   "text": "v = n_1*D_1/2  # belt speed",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 14,
+   "kind": "math",
+   "text": "dT = P/v  # tension difference",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 15,
+   "kind": "math",
+   "text": "R = exp(mu*theta)  # tension ratio at the point of slipping",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 16,
+   "kind": "math",
+   "text": "T_2 = dT/(R - 1)  # slack-side tension",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 17,
+   "kind": "math",
+   "text": "T_1 = T_2 + dT  # tight-side tension",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 18,
+   "kind": "math",
+   "text": "n_2 = n_1*D_1/D_2  # driven speed",
+   "unit": "rpm",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 19,
+   "kind": "math",
+   "text": "L = 2*C + pi*(D_1 + D_2)/2 + (D_2 - D_1)^2/(4*C)  # belt length (the usual approximation of the open-belt length)",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 20,
+   "kind": "check",
+   "text": "check T_1 <= T_allow",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 21,
+   "kind": "text",
+   "text": "Ref: R. G. Budynas, J. K. Nisbett, Shigley's Mechanical Engineering Design, 10th ed., §17-1: contact angle and belt length; §17-2: flat belt tension ratio.",
+   "unit": "",
+   "style": "ref",
+   "data": null
+  }
+ ],
+ "next_id": 22,
+ "ui": {
+  "pack": {
+   "id": "belt-drive",
+   "field": "Rotating equipment",
+   "desc": "Wrap angle, belt speed, tight- and slack-side tensions of a flat belt drive from the power and friction, the driven speed and the belt length, against the belt's rated tension."
+  }
+ }
+}

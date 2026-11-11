@@ -812,7 +812,9 @@ fn substituted(env: &Env, e: &Node, f: &Fmt) -> String {
         if k == "π" || k == "e" { return None; }
         if let Some(t) = imag_unit(env, name) { return Some(t); }
         let v = env.vars.get(&k).cloned().or_else(|| constant(&k).filter(|v| !v.cx())).filter(|v| !v.vec && !v.logic)?;
-        let t = show_val(&v, env.shown.get(&k).map(|u| u.as_str()).unwrap_or(""), f).1;
+        // An angle is put in as radians: e^(0.3·2.840 rad), not e^(0.3·162.7°), which reads as 48.8 in the exponent.
+        let want = if units::is_none(&v.dim) && v.dim[7] != 0 { "rad" } else { env.shown.get(&k).map(|u| u.as_str()).unwrap_or("") };
+        let t = show_val(&v, want, f).1;
         // A complex value inside a product is bracketed: (3 + 4j) · 2.
         Some(if v.cx() && !t.starts_with("\\left(") { format!("\\left({t}\\right)") } else { t })
     };

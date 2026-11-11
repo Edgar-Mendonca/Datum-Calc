@@ -1,0 +1,189 @@
+{
+ "format": 1,
+ "name": "Three-phase load: current and power-factor correction",
+ "title": {
+  "project": "",
+  "number": "PACK-23",
+  "title": "Three-phase load: current and power-factor correction",
+  "by": "",
+  "checked": "",
+  "date": "",
+  "rev": "A",
+  "company": "",
+  "client": "",
+  "logo": ""
+ },
+ "page": {
+  "paper": "A4",
+  "margins": [
+   15.0,
+   15.0,
+   15.0,
+   20.0
+  ]
+ },
+ "units": "SI",
+ "digits": 4,
+ "regions": [
+  {
+   "id": 1,
+   "kind": "text",
+   "text": "Three-phase load: current and power-factor correction",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 2,
+   "kind": "text",
+   "text": "A balanced three-phase load draws P = √3 V_L I cos φ. Capacitors supply part of its reactive power, Q_c = P (tan φ_1 − tan φ_2), so the line current falls. Here the current before correction is above the cable rating; after correction it is below.",
+   "unit": "",
+   "style": "note",
+   "data": null
+  },
+  {
+   "id": 3,
+   "kind": "text",
+   "text": "Inputs",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 4,
+   "kind": "math",
+   "text": "P = 75 kW  # real power of the load",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 5,
+   "kind": "math",
+   "text": "V_L = 400 V  # line voltage",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 6,
+   "kind": "math",
+   "text": "f = 50 Hz  # supply frequency",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 7,
+   "kind": "math",
+   "text": "PF_1 = 0.82  # power factor now",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 8,
+   "kind": "math",
+   "text": "PF_2 = 0.95  # power factor wanted",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 9,
+   "kind": "math",
+   "text": "I_cable = 125 A  # cable current rating as installed",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 10,
+   "kind": "text",
+   "text": "Results",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 11,
+   "kind": "math",
+   "text": "I_1 = P/(sqrt(3)*V_L*PF_1)  # line current now",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 12,
+   "kind": "math",
+   "text": "S_1 = P/PF_1  # apparent power",
+   "unit": "kVA",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 13,
+   "kind": "math",
+   "text": "Q_1 = sqrt(S_1^2 - P^2)  # reactive power",
+   "unit": "kvar",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 14,
+   "kind": "math",
+   "text": "Q_c = P*(tan(acos(PF_1)) - tan(acos(PF_2)))  # reactive power the capacitors supply",
+   "unit": "kvar",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 15,
+   "kind": "math",
+   "text": "I_2 = P/(sqrt(3)*V_L*PF_2)  # line current after correction",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 16,
+   "kind": "math",
+   "text": "omega = 2*pi*f  # angular frequency",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 17,
+   "kind": "math",
+   "text": "C = Q_c/(3*omega*V_L^2)  # capacitance per phase, delta connected",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 18,
+   "kind": "check",
+   "text": "check I_2 <= I_cable",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 19,
+   "kind": "text",
+   "text": "Ref: J. W. Nilsson, S. A. Riedel, Electric Circuits, 11th ed., ch. 10: complex power and power factor; ch. 11: balanced three-phase circuits.",
+   "unit": "",
+   "style": "ref",
+   "data": null
+  }
+ ],
+ "next_id": 20,
+ "ui": {
+  "pack": {
+   "id": "three-phase",
+   "field": "Electrical",
+   "desc": "Line current, apparent and reactive power of a three-phase load, the capacitor bank that raises its power factor, and the current after correction against the cable rating."
+  }
+ }
+}

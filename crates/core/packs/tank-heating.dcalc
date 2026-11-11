@@ -1,0 +1,205 @@
+{
+ "format": 1,
+ "name": "Tank heating time with heat losses",
+ "title": {
+  "project": "",
+  "number": "PACK-22",
+  "title": "Tank heating time with heat losses",
+  "by": "",
+  "checked": "",
+  "date": "",
+  "rev": "A",
+  "company": "",
+  "client": "",
+  "logo": ""
+ },
+ "page": {
+  "paper": "A4",
+  "margins": [
+   15.0,
+   15.0,
+   15.0,
+   20.0
+  ]
+ },
+ "units": "SI",
+ "digits": 4,
+ "regions": [
+  {
+   "id": 1,
+   "kind": "text",
+   "text": "Tank heating time with heat losses",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 2,
+   "kind": "text",
+   "text": "A well-mixed tank heated at a constant power loses heat through its wall in proportion to its temperature above ambient. The energy balance m c_p dT/dt = P − UA (T − T_a) gives the time from T_1 to T_2 exactly; without losses it would be m c_p (T_2 − T_1)/P.",
+   "unit": "",
+   "style": "note",
+   "data": null
+  },
+  {
+   "id": 3,
+   "kind": "text",
+   "text": "Inputs",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 4,
+   "kind": "math",
+   "text": "V = 5 m^3  # water in the tank",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 5,
+   "kind": "math",
+   "text": "rho = 998 kg/m^3  # water at 20 °C",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 6,
+   "kind": "math",
+   "text": "c_p = 4182 J/(kg*K)  # specific heat of water",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 7,
+   "kind": "math",
+   "text": "T_1 = 15 °C  # start temperature",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 8,
+   "kind": "math",
+   "text": "T_2 = 60 °C  # target temperature",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 9,
+   "kind": "math",
+   "text": "T_a = 10 °C  # ambient",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 10,
+   "kind": "math",
+   "text": "P = 50 kW  # heater power",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 11,
+   "kind": "math",
+   "text": "U = 5 W/(m^2*K)  # overall heat transfer coefficient, uninsulated steel wall in still air",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 12,
+   "kind": "math",
+   "text": "A = 18 m^2  # outside area",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 13,
+   "kind": "math",
+   "text": "t_max = 6 h  # time allowed",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 14,
+   "kind": "text",
+   "text": "Results",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 15,
+   "kind": "math",
+   "text": "m = rho*V  # mass of water",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 16,
+   "kind": "math",
+   "text": "UA = U*A  # heat loss per kelvin",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 17,
+   "kind": "math",
+   "text": "tau = m*c_p/UA  # time constant of the tank",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 18,
+   "kind": "math",
+   "text": "t = tau*ln((P - UA*(T_1 - T_a))/(P - UA*(T_2 - T_a)))  # heating time",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 19,
+   "kind": "math",
+   "text": "t_0 = m*c_p*(T_2 - T_1)/P  # without losses",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 20,
+   "kind": "check",
+   "text": "check t <= t_max",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 21,
+   "kind": "text",
+   "text": "Ref: T. L. Bergman, A. S. Lavine, F. P. Incropera, D. P. DeWitt, Fundamentals of Heat and Mass Transfer, 7th ed., §1.3.1: conservation of energy for a control volume; §5.3: the lumped system, here with a heat input.",
+   "unit": "",
+   "style": "ref",
+   "data": null
+  }
+ ],
+ "next_id": 22,
+ "ui": {
+  "pack": {
+   "id": "tank-heating",
+   "field": "Process",
+   "desc": "Time for a heater to bring a well-mixed tank of water to temperature while it loses heat to the surroundings, against the time allowed."
+  }
+ }
+}
