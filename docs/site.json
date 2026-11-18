@@ -11,16 +11,26 @@
     "Checks compare results with their limits and show PASS or FAIL with the utilisation. The sheet prints as a clean, referenced calc sheet with a title block (project, calc number, by, checked, date, revision) and page numbers, ready to hand in. Ready-made calc packs for pumps, pipes, compressors, heat exchangers, tanks, pipe walls, pipe insulation, vessels, beams, columns, shafts, bolts, welds, thermal expansion, motors, cables, AC circuits and filters start you off. Complex numbers (3 + 4j) work out AC circuits, shown as 3 + 4j or as magnitude and angle."
   ],
   "steps": [
-    { "title": "Write the equations", "text": "Type each equation with its units, top to bottom, as on paper; the maths is shown as you would write it." },
-    { "title": "Check the results", "text": "Every answer carries its unit; checks against your limits show PASS or FAIL with the utilisation ratio." },
-    { "title": "Print the calc sheet", "text": "Fill in the title block and print or save a PDF with page numbers and references." }
+    {
+      "title": "Write the equations",
+      "text": "Type each equation with its units, top to bottom, as on paper; the maths is shown as you would write it."
+    },
+    {
+      "title": "Check the results",
+      "text": "Every answer carries its unit; checks against your limits show PASS or FAIL with the utilisation ratio."
+    },
+    {
+      "title": "Print the calc sheet",
+      "text": "Fill in the title block and print or save a PDF with page numbers and references."
+    }
   ],
   "highlights": [
     "Equations with real units: about 200 units, SI with prefixes and US customary, absolute and difference temperatures, torques in N·m, angular frequencies in rad/s, any result in any unit of its kind, dimension errors caught on the line.",
     "Readable maths: what is shown is drawn from the same expression the engine computes.",
     "Checks with PASS or FAIL and the utilisation ratio.",
     "Solve for the value that makes an equation zero within a range, plot functions such as a pump curve against the system curve, and tables with units per column.",
-    "Twenty-five ready calc packs, each with its reference and a test against a worked example.",
+    "Solve one equation in a range, or several equations together for several unknowns, with units.",
+    "Twenty-six ready calc packs, each with its reference and a test against a worked example.",
     "Complex numbers for AC circuits in the frequency domain: impedances such as (8 + 9.42j) Ω, phasors as 230 V∠-30°, impedances in parallel, complex power, and Bode plots on a log frequency axis.",
     "Each equation can be shown again with its numbers put in, as on a hand calculation.",
     "Exact maths: fractions that stay fractions, and simplify, expand and factor on expressions.",
@@ -33,8 +43,55 @@
     "docs/images/units.png"
   ],
   "roadmap": [
-        { "v": "0.3", "title": "Matrices and ODEs", "when": "Next", "items": ["Matrices and linear systems", "Solve ordinary differential equations", "Tables from CSV"] },
-    { "v": "0.4", "title": "Programs and templates", "when": "Later", "items": ["Loops and conditions inside a region", "Sheet templates", "A company title block"] },
-    { "v": "1.0", "title": "Validation", "when": "Goal", "items": ["A validation report: every pack against its reference", "A user guide", "A signed installer"] }
+    {
+      "v": "0.2.4",
+      "title": "Vectors and matrices",
+      "when": "Next",
+      "items": [
+        "Matrices with units",
+        "Multiply, transpose, inverse, determinant",
+        "Linear systems"
+      ]
+    },
+    {
+      "v": "0.2.5–0.2.7",
+      "title": "Programs, thermophysical data, data in",
+      "when": "Soon",
+      "items": [
+        "if/else and loops in a region",
+        "Water, steam, air and gas properties",
+        "Paste or import CSV into tables; curve fitting"
+      ]
+    },
+    {
+      "v": "0.2.8–0.2.10",
+      "title": "ODEs, templates, export",
+      "when": "Soon",
+      "items": [
+        "Differential equations with units",
+        "Custom units, templates and a company title block",
+        "Export to Word and HTML"
+      ]
+    },
+    {
+      "v": "0.2.11 →",
+      "title": "Engineering modules",
+      "when": "Later",
+      "items": [
+        "Dynamic systems and signal processing",
+        "Pumps and fluids, process and heat transfer",
+        "Electrical, mechanical and structural, HVAC"
+      ]
+    },
+    {
+      "v": "1.0",
+      "title": "Validation",
+      "when": "Goal",
+      "items": [
+        "A validation report: every pack against its reference",
+        "A user guide",
+        "A signed installer"
+      ]
+    }
   ]
 }

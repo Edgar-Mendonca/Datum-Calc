@@ -96,6 +96,9 @@ pub enum Stmt {
     Range { name: String, at: Span, start: Node, next: Option<Node>, end: Node },
     Check { e: Node },
     Solve { lhs: Node, rhs: Node, var: String, lo: Node, hi: Node },
+    /// Several equations for as many unknowns, each from a starting guess (which gives its unit):
+    /// `solve x + y = 3, x - y = 1 for x = 0, y = 0`.
+    SolveSys { eqs: Vec<(Node, Node)>, vars: Vec<(String, Node)> },
     /// `log` after the range: a logarithmic x axis (a frequency sweep for a Bode plot).
     Plot { ys: Vec<Node>, var: String, lo: Node, hi: Node, log: bool },
     Show { e: Node },
@@ -333,18 +336,42 @@ pub fn statement(s: &str, known: &[String]) -> Result<Stmt, Error> {
     if let (Some(Tok::Id(_)), Some(Tok::Op("("))) = (t.first().map(|x| &x.0), t.get(1).map(|x| &x.0)) {
         if is_def(&t) { names.extend(t.iter().skip(2).take_while(|x| x.0 != Tok::Op(")")).filter_map(|x| if let Tok::Id(n) = &x.0 { Some(n.clone()) } else { None })); }
     }
-    if let Some(k) = t.iter().position(|x| x.0 == Tok::Id("for".into())) { if let Some((Tok::Id(n), _)) = t.get(k + 1) { names.push(n.clone()); } }
+    // The unknowns after "for" (for x in …, or for x = guess, y = guess) are names on this line.
+    if let Some(k) = t.iter().position(|x| x.0 == Tok::Id("for".into())) {
+        if let Some((Tok::Id(n), _)) = t.get(k + 1) { names.push(n.clone()); }
+        for j in k + 1..t.len() { if let (Tok::Id(n), Some((Tok::Op("="), _))) = (&t[j].0, t.get(j + 1)) { names.push(n.clone()); } }
+    }
     if t.len() > MAX_TOKENS { return err(format!("This line is too long (more than {MAX_TOKENS} symbols): split it over several lines."), (0, s2.chars().count())); }
     let mut p = P { end: s2.chars().count(), t, i: 0, known: &names, depth: 0 };
     let st = match (&p.t[0].0, p.t.get(1).map(|x| &x.0)) {
         (Tok::Id(w), Some(_)) if w == "check" => { p.i = 1; Stmt::Check { e: p.expr(0)? } }
         (Tok::Id(w), Some(_)) if w == "solve" => {
             p.i = 1;
-            let lhs = p.expr(2)?;
-            p.eat("=")?;
-            let rhs = p.expr(2)?;
-            let (var, lo, hi) = p.for_in()?;
-            Stmt::Solve { lhs, rhs, var, lo, hi }
+            let mut eqs = vec![];
+            loop {
+                let lhs = p.expr(2)?;
+                p.eat("=")?;
+                let rhs = p.expr(2)?;
+                eqs.push((lhs, rhs));
+                if p.is(",") { p.i += 1; } else { break; }
+            }
+            // "for x = guess, …": from starting guesses (several equations); "for x in a .. b": in a range (one).
+            if p.word("for") && matches!(p.t.get(p.i + 2).map(|x| &x.0), Some(Tok::Op("="))) {
+                p.i += 1;
+                let mut vars = vec![];
+                loop {
+                    let (n, _) = p.name()?;
+                    p.eat("=")?;
+                    vars.push((n, p.expr(2)?));
+                    if p.is(",") { p.i += 1; } else { break; }
+                }
+                Stmt::SolveSys { eqs, vars }
+            } else {
+                if eqs.len() > 1 { return err("Several equations need a starting guess for each unknown: for x = 1 m, y = 2 m.", p.at()); }
+                let (lhs, rhs) = eqs.pop().ok_or_else(|| Error { msg: "Write an equation to solve.".into(), at: p.at() })?;
+                let (var, lo, hi) = p.for_in()?;
+                Stmt::Solve { lhs, rhs, var, lo, hi }
+            }
         }
         (Tok::Id(w), Some(_)) if w == "plot" => {
             p.i = 1;
@@ -381,6 +408,7 @@ pub fn statement(s: &str, known: &[String]) -> Result<Stmt, Error> {
         Stmt::Assign { e, .. } | Stmt::Func { e, .. } | Stmt::Check { e } | Stmt::Show { e } => vec![e],
         Stmt::Range { start, next, end, .. } => [Some(start), next.as_ref(), Some(end)].into_iter().flatten().collect(),
         Stmt::Solve { lhs, rhs, lo, hi, .. } => vec![lhs, rhs, lo, hi],
+        Stmt::SolveSys { eqs, vars } => eqs.iter().flat_map(|(a, b)| [a, b]).chain(vars.iter().map(|v| &v.1)).collect(),
         Stmt::Plot { ys, lo, hi, .. } => ys.iter().chain([lo, hi]).collect(),
         Stmt::Empty => vec![],
     };

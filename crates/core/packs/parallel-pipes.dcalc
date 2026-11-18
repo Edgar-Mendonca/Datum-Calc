@@ -1,0 +1,213 @@
+{
+ "format": 1,
+ "name": "Parallel pipes: flow split",
+ "title": {
+  "project": "",
+  "number": "PACK-26",
+  "title": "Parallel pipes: flow split",
+  "by": "",
+  "checked": "",
+  "date": "",
+  "rev": "A",
+  "company": "",
+  "client": "",
+  "logo": ""
+ },
+ "page": {
+  "paper": "A4",
+  "margins": [
+   15.0,
+   15.0,
+   15.0,
+   20.0
+  ]
+ },
+ "units": "SI",
+ "digits": 4,
+ "regions": [
+  {
+   "id": 1,
+   "kind": "text",
+   "text": "Parallel pipes: flow split",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 2,
+   "kind": "text",
+   "text": "Two pipes join the same two points, so they have the same pressure drop, Δp = f (L/D) ρ v²/2, and their flows add up to the total. The two equations are solved together for the two flows (solve … for Q_1 = guess, Q_2 = guess). Friction factors are taken as fixed (fully turbulent).",
+   "unit": "",
+   "style": "note",
+   "data": null
+  },
+  {
+   "id": 3,
+   "kind": "text",
+   "text": "Inputs",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 4,
+   "kind": "math",
+   "text": "Q = 100 m^3/h  # total flow",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 5,
+   "kind": "math",
+   "text": "rho = 998 kg/m^3  # water at 20 °C",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 6,
+   "kind": "math",
+   "text": "D_1 = 100 mm  # pipe 1 bore",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 7,
+   "kind": "math",
+   "text": "L_1 = 50 m  # pipe 1 length",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 8,
+   "kind": "math",
+   "text": "f_1 = 0.020  # pipe 1 friction factor",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 9,
+   "kind": "math",
+   "text": "D_2 = 80 mm  # pipe 2 bore",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 10,
+   "kind": "math",
+   "text": "L_2 = 30 m  # pipe 2 length",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 11,
+   "kind": "math",
+   "text": "f_2 = 0.021  # pipe 2 friction factor",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 12,
+   "kind": "math",
+   "text": "v_max = 3 m/s  # highest velocity allowed",
+   "unit": "",
+   "style": "input",
+   "data": null
+  },
+  {
+   "id": 13,
+   "kind": "text",
+   "text": "Results",
+   "unit": "",
+   "style": "heading",
+   "data": null
+  },
+  {
+   "id": 14,
+   "kind": "math",
+   "text": "A_1 = pi/4*D_1^2  # pipe 1 area",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 15,
+   "kind": "math",
+   "text": "A_2 = pi/4*D_2^2  # pipe 2 area",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 16,
+   "kind": "math",
+   "text": "dp(Q_x, f_x, L_x, D_x, A_x) = f_x*L_x/D_x*rho/2*(Q_x/A_x)^2  # Darcy–Weisbach pressure drop",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 17,
+   "kind": "solve",
+   "text": "solve Q_1 + Q_2 = Q, dp(Q_1, f_1, L_1, D_1, A_1) = dp(Q_2, f_2, L_2, D_2, A_2) for Q_1 = 50 m^3/h, Q_2 = 50 m^3/h",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 18,
+   "kind": "math",
+   "text": "dp_12 = dp(Q_1, f_1, L_1, D_1, A_1)  # pressure drop across both",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 19,
+   "kind": "math",
+   "text": "v_1 = Q_1/A_1  # velocity in pipe 1",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 20,
+   "kind": "math",
+   "text": "v_2 = Q_2/A_2  # velocity in pipe 2",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 21,
+   "kind": "check",
+   "text": "check max(v_1, v_2) <= v_max",
+   "unit": "",
+   "style": "",
+   "data": null
+  },
+  {
+   "id": 22,
+   "kind": "text",
+   "text": "Ref: F. M. White, Fluid Mechanics, 8th ed., §6.6 (Darcy–Weisbach) and §6.9: pipes in parallel share the head loss and add their flows.",
+   "unit": "",
+   "style": "ref",
+   "data": null
+  }
+ ],
+ "next_id": 23,
+ "ui": {
+  "pack": {
+   "id": "parallel-pipes",
+   "field": "Process",
+   "desc": "How a flow divides between two pipes in parallel: both carry the same pressure drop and their flows add up, solved together from starting guesses."
+  }
+ }
+}

@@ -491,7 +491,7 @@ mod packs {
     #[test]
     fn all_packs_open_and_list() {
         let cards = crate::packs::cards();
-        assert_eq!(cards.len(), 25);
+        assert_eq!(cards.len(), 26);
         for c in &cards { assert!(!c.name.is_empty() && !c.desc.is_empty() && !c.field.is_empty() && c.checks > 0, "{}", c.id); }
     }
 
@@ -710,6 +710,16 @@ mod packs {
         let r = eval::run(&s).regions.into_iter().find(|r| r.name == "R").unwrap();
         assert!(r.subst_tex.contains("2.84\\,\\mathrm{rad}") && !r.subst_tex.contains("circ"), "{}", r.subst_tex);
         assert!(checks(&o)[0].0);
+    }
+
+    #[test]
+    fn parallel_pipes() {
+        // K_i = f L/D ρ/(2A²): K_1 = 8.08948e7, K_2 = 1.55529e8 Pa/(m³/s)²; Q_1/Q_2 = √(K_2/K_1) = 1.38659; Q_1 = 58.099 m³/h,
+        // Q_2 = 41.901 m³/h; Δp = K_1 Q_1² = 21.069 kPa; v_1 = 2.0548 m/s, v_2 = 2.3155 m/s.
+        let (o, e) = run("parallel-pipes");
+        assert!(close(v(&e, "Q_1") * 3600.0, 58.099_058_17, 1e-8) && close(v(&e, "Q_2") * 3600.0, 41.900_941_83, 1e-8));
+        assert!(close(v(&e, "dp_12"), 21_069.487_2, 1e-8) && close(v(&e, "v_2"), 2.315_535_421, 1e-8));
+        assert!(o.regions.iter().any(|r| r.result == "Q_1 = 58.1 m³/h, Q_2 = 41.9 m³/h") && checks(&o)[0].0);
     }
 
     #[test]
@@ -1216,4 +1226,31 @@ mod materials {
             }
         }
     }
+}
+
+#[test]
+fn several_equations_solved_together() {
+    // x + y = 3, x − y = 1 → (2, 1); x² + y² = 25 with y = x + 1 → (3, 4) from (1, 1); beam reactions R_A + R_B = F,
+    // 4 R_B = 1 F → 750 N, 250 N; series resonance 1/(2π √(LC)) = 1 s⁻¹·… with L = 2 mH, C = 100 µF → 355.88 Hz.
+    assert_eq!(result(&["solve x + y = 3, x - y = 1 for x = 0, y = 0"]), "x = 2, y = 1");
+    assert_eq!(result(&["solve x^2 + y^2 = 25, y = x + 1 for x = 1, y = 1"]), "x = 3, y = 4");
+    assert_eq!(result(&["F = 1000 N", "solve R_A + R_B = F, R_B*4 m = F*1 m for R_A = 0 N, R_B = 0 N"]), "R_A = 750 N, R_B = 250 N");
+    assert_eq!(result(&["C = 100 µF", "solve 2*pi*f_r*sqrt(L_r*C) = 1, L_r = 2 mH for f_r = 50 Hz, L_r = 1 mH", "f_r ="]), "355.9 Hz");
+    assert_eq!(result(&["solve exp(t) = 5 for t = 0"]), "t = 1.609", "one equation from a guess");
+    assert_eq!(result(&["solve x + y = 3, x - y = 1 for x = 0, y = 0", "x*y ="]), "2", "the unknowns are defined below");
+    let o = run(&["solve x + y = 3, x - y = 1 for x = 0, y = 0"]);
+    assert!(o.vars.iter().any(|v| v.name == "x") && o.vars.iter().any(|v| v.name == "y"), "both in the Variables panel");
+    assert!(o.regions[0].latex.contains("\\begin{cases}") && o.regions[0].result_tex.starts_with("\\Rightarrow"));
+    // What it says when it cannot.
+    for (lines, msg) in [
+        (&["solve x + y = 1 for x = 0, y = 0"][..], "1 equation for 2 unknowns"),
+        (&["solve x + y = 1, 2*x + 2*y = 2 for x = 0, y = 0"][..], "The equations do not fix every unknown"),
+        (&["solve x^2 + 1 = 0 for x = 1"][..], "No solution found from these guesses"),
+        (&["solve a + b = 1, a - b = 2 m for a = 0, b = 0"][..], "Cannot compare a pure number and a length"),
+        (&["solve x = 1, y = 2 for x in 0 .. 1"][..], "Several equations need a starting guess"),
+        (&["solve x = 1j for x = 0"][..], "solve needs a real value"),
+    ] { assert!(error(lines).starts_with(msg), "{lines:?}: {}", error(lines)); }
+    // A failed solve leaves earlier values as they were; its unknowns are marked as errors further down.
+    assert!(error(&["solve x^2 + 1 = 0 for x = 1", "x + 1"]).contains("has an error on its own line"));
+    assert_eq!(result(&["x = 7", "solve x^2 + 1 = 0 for x = 1", "x + 1 ="]), "8");
 }

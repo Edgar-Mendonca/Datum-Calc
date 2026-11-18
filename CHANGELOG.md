@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.2.3 — 2026-11-18
+
+Several equations solved together.
+
+**Systems of equations**
+- solve now takes several equations, separated by commas, and an unknown for each, each from a starting guess: solve Q_1 + Q_2 = Q, K_1*Q_1^2 = K_2*Q_2^2 for Q_1 = 50 m^3/h, Q_2 = 50 m^3/h. Each unknown takes the unit of its guess, and every unknown is defined for the lines below and listed in the Variables panel.
+- One equation can be solved from a guess too (solve exp(t) = 5 for t = 0), as well as in a range as before.
+- When the equations cannot be solved it says why: more unknowns than equations, equations that do not fix every unknown (2x + 2y = 2 with x + y = 1), units that do not match, or no solution near the guesses.
+- New calc pack (26 in all): parallel pipes, the flow split between two pipes that share a pressure drop, solved together and checked against a hand calculation.
+
+**Checks**
+- 76 engine tests (systems with and without units, the beam reactions, a resonance in mixed units, what it says when it cannot, the new pack), 99 UI tests; the random-sheet test writes systems too. Every earlier pack prints as before.
+
 ## 0.2.2 — 2026-11-11
 
 Five more calc packs (25 in all), each checked against a hand calculation.

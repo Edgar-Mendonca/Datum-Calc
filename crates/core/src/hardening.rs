@@ -194,6 +194,7 @@ fn random_expressions_never_panic() {
             let e = random_expr(&mut r, 4);
             let text = match r.below(6) {
                 0 => format!("check {e} <= {}", random_expr(&mut r, 2)),
+                1 if r.below(2) == 0 => format!("solve {e} = {}, x - y = {} for x = {}, y = {}", random_expr(&mut r, 2), random_expr(&mut r, 1), random_expr(&mut r, 1), random_expr(&mut r, 1)),
                 1 => format!("solve {e} = {} for x in {} .. {}", random_expr(&mut r, 2), random_expr(&mut r, 1), random_expr(&mut r, 1)),
                 2 => format!("plot {e} for x in {} .. {}{}", ["0", "1 Hz", "a"][r.below(3)], random_expr(&mut r, 1), [" log", ""][r.below(2)]),
                 3 if r.below(3) == 0 => format!("w{} = {}((x + {e})^{} / (x - 1))", r.below(5), ["simplify", "expand", "factor"][r.below(3)], r.below(5)),

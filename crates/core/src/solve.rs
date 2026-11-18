@@ -46,3 +46,28 @@ pub fn root(f: &mut dyn FnMut(f64) -> f64, a: f64, b: f64) -> Result<f64, String
     }
     Ok(b)
 }
+
+/// x with A x = b, by Gaussian elimination with partial pivoting; None when A is singular (a pivot is
+/// negligible beside the largest entry of its column).
+pub fn linear(mut a: Vec<Vec<f64>>, mut b: Vec<f64>) -> Option<Vec<f64>> {
+    let n = b.len();
+    if a.len() != n || a.iter().any(|r| r.len() != n) { return None; }
+    let big = a.iter().flatten().fold(0.0f64, |m, v| m.max(v.abs()));
+    if !(big.is_finite() && big > 0.0) { return None; }
+    for k in 0..n {
+        let p = (k..n).max_by(|&i, &j| a[i][k].abs().total_cmp(&a[j][k].abs()))?;
+        if a[p][k].abs() <= 1e-13 * big { return None; }
+        a.swap(k, p);
+        b.swap(k, p);
+        for i in k + 1..n {
+            let f = a[i][k] / a[k][k];
+            if f == 0.0 { continue; }
+            let (top, rest) = a.split_at_mut(i);
+            for (x, y) in rest[0][k..].iter_mut().zip(&top[k][k..]) { *x -= f * y; }
+            b[i] -= f * b[k];
+        }
+    }
+    let mut x = vec![0.0; n];
+    for i in (0..n).rev() { x[i] = (b[i] - (i + 1..n).map(|j| a[i][j] * x[j]).sum::<f64>()) / a[i][i]; }
+    x.iter().all(|v| v.is_finite()).then_some(x)
+}

@@ -752,14 +752,18 @@ fn run_here(s: &Sheet, f: &Fmt) -> (SheetOut, Env) {
             if let Some(m) = d.mat.as_ref().or_else(|| crate::materials::find(&d.id)) { for k in crate::materials::KEYS.iter().filter(|k| m.props.contains_key(k.0)) { env.later.insert(canon(&format!("{}_{}", k.1, d.name)), false); } }
         } else if r.kind == Kind::Table {
             for c in serde_json::from_value::<TableData>(r.data.clone()).unwrap_or_default().cols { if !c.name.trim().is_empty() { env.later.insert(canon(c.name.trim()), false); } }
-        } else if let Some(n) = defined_name(split_note(&r.text).0) { env.later.insert(canon(&n), false); }
+        } else { for n in defined_names(split_note(&r.text).0) { env.later.insert(canon(&n), false); } }
     }
     let mut out = SheetOut::default();
     let mut known: Vec<String> = vec![];
     for r in &s.regions {
         let o = region(&mut env, r, f, &mut known, s.subst);
         if let Some(c) = &o.check { out.checks += 1; if !c.pass { out.failed += 1; } }
-        if o.error.is_some() { out.errors += 1; if !o.name.is_empty() { env.later.insert(canon(&o.name), true); } }
+        if o.error.is_some() {
+            out.errors += 1;
+            if !o.name.is_empty() { env.later.insert(canon(&o.name), true); }
+            if r.kind != Kind::Table && r.kind != Kind::Material { for n in defined_names(split_note(&r.text).0) { env.later.insert(canon(&n), true); } }
+        }
         for v in &o.defs { out.vars.retain(|x| x.name != v.name); out.vars.push(v.clone()); }
         if let Some(t) = &o.table { for c in t.cols.iter().filter(|c| !c.error.is_empty() && !c.name.is_empty()) { env.later.insert(canon(&c.name), true); } }
         if o.error.is_none() && !o.name.is_empty() && !o.unit.is_empty() { env.shown.insert(canon(&o.name), o.unit.clone()); }
@@ -771,6 +775,18 @@ fn run_here(s: &Sheet, f: &Fmt) -> (SheetOut, Env) {
         out.regions.push(o);
     }
     (out, env)
+}
+
+/// Every name a line defines: one, or the unknowns of `solve … for x = g, y = g`.
+fn defined_names(t: &str) -> Vec<String> {
+    let Ok(toks) = parse::lex(t) else { return vec![] };
+    if matches!(toks.first().map(|x| &x.0), Some(parse::Tok::Id(w)) if w == "solve") {
+        if let Some(k) = toks.iter().position(|x| x.0 == parse::Tok::Id("for".into())) {
+            let sys: Vec<String> = (k + 1..toks.len()).filter_map(|j| match (&toks[j].0, toks.get(j + 1).map(|x| &x.0)) { (parse::Tok::Id(n), Some(parse::Tok::Op("="))) => Some(n.clone()), _ => None }).collect();
+            if !sys.is_empty() { return sys; }
+        }
+    }
+    defined_name(t).into_iter().collect()
 }
 
 /// The name a line defines (`x = …`, `f(x) = …`, `solve … for x in …`), without parsing it fully.
@@ -844,7 +860,7 @@ fn region(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>, subst: bo
         return o;
     }
     // j and i, when they are the imaginary unit rather than a name of the sheet, are drawn upright like a unit.
-    let bound: Vec<&str> = match &st { Stmt::Func { params, .. } => params.iter().map(|p| p.as_str()).collect(), Stmt::Solve { var, .. } | Stmt::Plot { var, .. } => vec![var.as_str()], _ => vec![] };
+    let bound: Vec<&str> = match &st { Stmt::Func { params, .. } => params.iter().map(|p| p.as_str()).collect(), Stmt::Solve { var, .. } | Stmt::Plot { var, .. } => vec![var.as_str()], Stmt::SolveSys { vars, .. } => vars.iter().map(|v| v.0.as_str()).collect(), _ => vec![] };
     o.latex = latex::stmt_with(&st, &|v| imag_unit(env, v).filter(|_| !bound.contains(&v)));
     // simplify, expand and factor give an exact expression, not a value.
     let sym_call = |e: &Node| match &e.e { E::Call(fname, args) if crate::sym::OPS.contains(&fname.as_str()) && args.len() == 1 => Some((fname.clone(), args[0].clone())), _ => None };
@@ -967,6 +983,85 @@ fn region(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>, subst: bo
                 env.exprs.remove(&k);
                 env.vars.insert(k, v);
                 known.push(var.clone());
+            }
+            Stmt::SolveSys { eqs, vars } => {
+                let n = vars.len();
+                if eqs.len() != n { return fail(format!("{} equation{} for {} unknown{}: give as many equations as unknowns.", eqs.len(), if eqs.len() == 1 { "" } else { "s" }, n, if n == 1 { "" } else { "s" }), (eqs[0].0.at.0, vars[n - 1].1.at.1)); }
+                if n > 20 { return fail("At most 20 equations can be solved together.", vars[20].1.at); }
+                // The guesses give each unknown its starting value and its unit.
+                let mut g = vec![];
+                for (_, e) in vars { let v = env.eval(e)?; real(&v, "A starting guess", e.at)?; if v.vec { return fail("A starting guess is one value.", e.at); } g.push(v); }
+                let keys: Vec<String> = vars.iter().map(|v| canon(&v.0)).collect();
+                let saved: Vec<Option<Val>> = keys.iter().map(|k| env.vars.get(k).cloned()).collect();
+                let restore = |env: &mut Env| for (k, s) in keys.iter().zip(&saved) { match s { Some(v) => { env.vars.insert(k.clone(), v.clone()); } None => { env.vars.remove(k); } } };
+                // Each equation as left − right, divided by the size of its sides at the guess, so equations in
+                // different units weigh alike.
+                let mut scale = vec![1.0; n];
+                let residual = |env: &mut Env, x: &[f64], scale: &[f64]| -> R<(Vec<f64>, Vec<f64>)> {
+                    for (i, k) in keys.iter().enumerate() { env.vars.insert(k.clone(), Val { v: vec![x[i]], ..g[i].clone() }); }
+                    let (mut r, mut size) = (vec![0.0; n], vec![0.0; n]);
+                    for (i, (a, b)) in eqs.iter().enumerate() {
+                        let (l, rr) = (env.eval(a)?, env.eval(b)?);
+                        real(&l, "solve", a.at)?;
+                        real(&rr, "solve", b.at)?;
+                        if l.vec || rr.vec { return fail("Each equation is between single values.", (a.at.0, b.at.1)); }
+                        same_or(&l, &rr, "compare", (a.at.0, b.at.1))?;
+                        r[i] = (l.x() - rr.x()) / scale[i];
+                        size[i] = l.x().abs().max(rr.x().abs());
+                    }
+                    Ok((r, size))
+                };
+                let mut x: Vec<f64> = g.iter().map(|v| v.x()).collect();
+                let res: R<Vec<f64>> = (|| {
+                    let (_, size) = residual(env, &x, &scale)?;
+                    for i in 0..n { scale[i] = if size[i] > 0.0 && size[i].is_finite() { size[i] } else { 1.0 }; }
+                    let (mut r, _) = residual(env, &x, &scale)?;
+                    let norm = |r: &[f64]| r.iter().fold(0.0f64, |m, v| m.max(v.abs()));
+                    for step in 0..200 {
+                        if norm(&r) < 1e-12 { return Ok(x.clone()); }
+                        // The Jacobian by forward differences, then a Newton step, halved until it does better.
+                        let mut jac = vec![vec![0.0; n]; n];
+                        for j in 0..n {
+                            // A step of √ε of the value (or of the guess, or of one SI unit from a guess of zero).
+                            let h = 1.5e-8 * if x[j] != 0.0 { x[j].abs() } else if g[j].x() != 0.0 { g[j].x().abs() } else { 1.0 };
+                            let mut xh = x.clone();
+                            xh[j] += h;
+                            let (rh, _) = residual(env, &xh, &scale)?;
+                            for i in 0..n { jac[i][j] = (rh[i] - r[i]) / h; }
+                        }
+                        // Singular at the guess: the equations do not fix the unknowns. Later on the way: no solution there.
+                        let Some(dx) = crate::solve::linear(jac, r.iter().map(|v| -v).collect()) else {
+                            return Err(Error { msg: if step == 0 { "The equations do not fix every unknown here (they are not independent at this point): check that each unknown appears, or try other guesses.".into() } else { "No solution found from these guesses: try others closer to the answer.".into() }, at: (eqs[0].0.at.0, eqs[n - 1].1.at.1) });
+                        };
+                        let mut lam = 1.0;
+                        loop {
+                            let xn: Vec<f64> = x.iter().zip(&dx).map(|(a, d)| a + lam * d).collect();
+                            match residual(env, &xn, &scale) {
+                                Ok((rn, _)) if rn.iter().all(|v| v.is_finite()) && (norm(&rn) < norm(&r) || lam < 1e-4) => { x = xn; r = rn; break; }
+                                _ if lam < 1e-4 => { return Err(Error { msg: "No solution found from these guesses: try others closer to the answer.".into(), at: (eqs[0].0.at.0, vars[n - 1].1.at.1) }); }
+                                _ => lam /= 2.0,
+                            }
+                        }
+                        if dx.iter().zip(&x).all(|(d, a)| (lam * d).abs() <= 1e-14 * a.abs().max(1e-300)) && norm(&r) < 1e-9 { return Ok(x.clone()); }
+                    }
+                    if norm(&r) < 1e-9 { Ok(x.clone()) } else { Err(Error { msg: "No solution found from these guesses: try others closer to the answer.".into(), at: (eqs[0].0.at.0, vars[n - 1].1.at.1) }) }
+                })();
+                let x = match res { Ok(x) => x, Err(e) => { restore(env); return Err(e); } };
+                let (mut texts, mut texes) = (vec![], vec![]);
+                for (i, (name, _)) in vars.iter().enumerate() {
+                    let v = Val { v: vec![x[i]], ..g[i].clone() };
+                    let (t, tx, value, unit) = show_val(&v, "", f);
+                    texts.push(format!("{} = {t}", canon(name)));
+                    texes.push(format!("{} = {tx}", latex::name(name)));
+                    o.defs.push(VarOut { name: keys[i].clone(), tex: latex::name(name), value, unit: unit.clone(), id: r.id });
+                    if !unit.is_empty() { env.shown.insert(keys[i].clone(), unit); }
+                    env.exprs.remove(&keys[i]);
+                    env.vars.insert(keys[i].clone(), v);
+                    known.push(name.clone());
+                }
+                o.name = keys[0].clone();
+                o.result = texts.join(", ");
+                o.result_tex = format!("\\Rightarrow\\; {}", texes.join(",\\; "));
             }
             Stmt::Plot { ys, var, lo, hi, log } => {
                 let (a, b) = (env.eval(lo)?, env.eval(hi)?);
