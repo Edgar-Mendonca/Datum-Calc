@@ -52,11 +52,11 @@ pub fn root(f: &mut dyn FnMut(f64) -> f64, a: f64, b: f64) -> Result<f64, String
 pub fn linear(mut a: Vec<Vec<f64>>, mut b: Vec<f64>) -> Option<Vec<f64>> {
     let n = b.len();
     if a.len() != n || a.iter().any(|r| r.len() != n) { return None; }
-    let big = a.iter().flatten().fold(0.0f64, |m, v| m.max(v.abs()));
-    if !(big.is_finite() && big > 0.0) { return None; }
+    let col: Vec<f64> = (0..n).map(|k| a.iter().fold(0.0f64, |m, r| m.max(r[k].abs()))).collect();
+    if !col.iter().all(|c| c.is_finite() && *c > 0.0) { return None; }
     for k in 0..n {
         let p = (k..n).max_by(|&i, &j| a[i][k].abs().total_cmp(&a[j][k].abs()))?;
-        if a[p][k].abs() <= 1e-13 * big { return None; }
+        if a[p][k].abs() <= 1e-13 * col[k] { return None; }
         a.swap(k, p);
         b.swap(k, p);
         for i in k + 1..n {

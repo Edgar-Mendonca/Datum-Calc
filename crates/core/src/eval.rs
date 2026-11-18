@@ -994,57 +994,72 @@ fn region(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>, subst: bo
                 let keys: Vec<String> = vars.iter().map(|v| canon(&v.0)).collect();
                 let saved: Vec<Option<Val>> = keys.iter().map(|k| env.vars.get(k).cloned()).collect();
                 let restore = |env: &mut Env| for (k, s) in keys.iter().zip(&saved) { match s { Some(v) => { env.vars.insert(k.clone(), v.clone()); } None => { env.vars.remove(k); } } };
-                // Each equation as left − right, divided by the size of its sides at the guess, so equations in
-                // different units weigh alike.
-                let mut scale = vec![1.0; n];
-                let residual = |env: &mut Env, x: &[f64], scale: &[f64]| -> R<(Vec<f64>, Vec<f64>)> {
+                // Each equation as left − right. It is measured against the size of its terms (the larger side, or
+                // how strongly it moves with the unknowns), so equations in different units weigh alike and an
+                // equation of small quantities is not held to one SI unit.
+                let residual = |env: &mut Env, x: &[f64]| -> R<(Vec<f64>, Vec<f64>)> {
                     for (i, k) in keys.iter().enumerate() { env.vars.insert(k.clone(), Val { v: vec![x[i]], ..g[i].clone() }); }
-                    let (mut r, mut size) = (vec![0.0; n], vec![0.0; n]);
+                    let (mut d, mut size) = (vec![0.0; n], vec![0.0; n]);
                     for (i, (a, b)) in eqs.iter().enumerate() {
                         let (l, rr) = (env.eval(a)?, env.eval(b)?);
                         real(&l, "solve", a.at)?;
                         real(&rr, "solve", b.at)?;
                         if l.vec || rr.vec { return fail("Each equation is between single values.", (a.at.0, b.at.1)); }
                         same_or(&l, &rr, "compare", (a.at.0, b.at.1))?;
-                        r[i] = (l.x() - rr.x()) / scale[i];
+                        d[i] = l.x() - rr.x();
                         size[i] = l.x().abs().max(rr.x().abs());
                     }
-                    Ok((r, size))
+                    Ok((d, size))
                 };
+                let nf = || Error { msg: "No solution found from these guesses: try others closer to the answer.".into(), at: (eqs[0].0.at.0, vars[n - 1].1.at.1) };
+                let rel = |d: &[f64], size: &[f64], term: &[f64]| d.iter().enumerate().fold(0.0f64, |m, (i, v)| {
+                    let s = size[i].max(term[i]);
+                    m.max(if s > 0.0 && s.is_finite() { v.abs() / s } else { v.abs() })
+                });
                 let mut x: Vec<f64> = g.iter().map(|v| v.x()).collect();
                 let res: R<Vec<f64>> = (|| {
-                    let (_, size) = residual(env, &x, &scale)?;
-                    for i in 0..n { scale[i] = if size[i] > 0.0 && size[i].is_finite() { size[i] } else { 1.0 }; }
-                    let (mut r, _) = residual(env, &x, &scale)?;
-                    let norm = |r: &[f64]| r.iter().fold(0.0f64, |m, v| m.max(v.abs()));
+                    let (mut d, mut size) = residual(env, &x)?;
+                    let mut term = vec![0.0; n];
                     for step in 0..200 {
-                        if norm(&r) < 1e-12 { return Ok(x.clone()); }
-                        // The Jacobian by forward differences, then a Newton step, halved until it does better.
+                        // The Jacobian by forward differences, each unknown relative to its size (so MPa beside mm²
+                        // or a strain stays well conditioned); a step of √ε, larger if that moves nothing.
+                        let cs: Vec<f64> = (0..n).map(|j| if x[j] != 0.0 { x[j].abs() } else if g[j].x() != 0.0 { g[j].x().abs() } else { 1.0 }).collect();
                         let mut jac = vec![vec![0.0; n]; n];
                         for j in 0..n {
-                            // A step of √ε of the value (or of the guess, or of one SI unit from a guess of zero).
-                            let h = 1.5e-8 * if x[j] != 0.0 { x[j].abs() } else if g[j].x() != 0.0 { g[j].x().abs() } else { 1.0 };
-                            let mut xh = x.clone();
-                            xh[j] += h;
-                            let (rh, _) = residual(env, &xh, &scale)?;
-                            for i in 0..n { jac[i][j] = (rh[i] - r[i]) / h; }
+                            for h in [1.5e-8, 1e-5, 1e-2].map(|e| e * cs[j]) {
+                                let mut xh = x.clone();
+                                xh[j] += h;
+                                let (dh, _) = residual(env, &xh)?;
+                                for i in 0..n { jac[i][j] = (dh[i] - d[i]) / h * cs[j]; }
+                                if (0..n).any(|i| jac[i][j] != 0.0) { break; }
+                            }
                         }
+                        for i in 0..n { term[i] = jac[i].iter().map(|v| v.abs()).sum(); }
+                        let m = rel(&d, &size, &term);
+                        if m < 1e-12 { return Ok(x.clone()); }
+                        // Each row divided by its size, then a Newton step, halved until it does better.
+                        let s: Vec<f64> = (0..n).map(|i| { let s = size[i].max(term[i]); if s > 0.0 && s.is_finite() { s } else { 1.0 } }).collect();
+                        let a = jac.iter().zip(&s).map(|(r, s)| r.iter().map(|v| v / s).collect()).collect();
                         // Singular at the guess: the equations do not fix the unknowns. Later on the way: no solution there.
-                        let Some(dx) = crate::solve::linear(jac, r.iter().map(|v| -v).collect()) else {
-                            return Err(Error { msg: if step == 0 { "The equations do not fix every unknown here (they are not independent at this point): check that each unknown appears, or try other guesses.".into() } else { "No solution found from these guesses: try others closer to the answer.".into() }, at: (eqs[0].0.at.0, eqs[n - 1].1.at.1) });
+                        let Some(dy) = crate::solve::linear(a, d.iter().zip(&s).map(|(v, s)| -v / s).collect()) else {
+                            return Err(if step == 0 { Error { msg: "The equations do not fix every unknown here (they are not independent at this point): check that each unknown appears, or try other guesses.".into(), at: (eqs[0].0.at.0, eqs[n - 1].1.at.1) } } else { nf() });
                         };
                         let mut lam = 1.0;
                         loop {
-                            let xn: Vec<f64> = x.iter().zip(&dx).map(|(a, d)| a + lam * d).collect();
-                            match residual(env, &xn, &scale) {
-                                Ok((rn, _)) if rn.iter().all(|v| v.is_finite()) && (norm(&rn) < norm(&r) || lam < 1e-4) => { x = xn; r = rn; break; }
-                                _ if lam < 1e-4 => { return Err(Error { msg: "No solution found from these guesses: try others closer to the answer.".into(), at: (eqs[0].0.at.0, vars[n - 1].1.at.1) }); }
+                            let xn: Vec<f64> = x.iter().zip(dy.iter().zip(&cs)).map(|(a, (d, c))| a + lam * d * c).collect();
+                            match residual(env, &xn) {
+                                Ok((dn, sn)) if dn.iter().all(|v| v.is_finite()) && (rel(&dn, &sn, &term) < m || lam < 1e-4) => {
+                                    let small = dy.iter().all(|v| (lam * v).abs() <= 1e-14);
+                                    (x, d, size) = (xn, dn, sn);
+                                    if small && rel(&d, &size, &term) < 1e-9 { return Ok(x.clone()); }
+                                    break;
+                                }
+                                _ if lam < 1e-4 => return Err(nf()),
                                 _ => lam /= 2.0,
                             }
                         }
-                        if dx.iter().zip(&x).all(|(d, a)| (lam * d).abs() <= 1e-14 * a.abs().max(1e-300)) && norm(&r) < 1e-9 { return Ok(x.clone()); }
                     }
-                    if norm(&r) < 1e-9 { Ok(x.clone()) } else { Err(Error { msg: "No solution found from these guesses: try others closer to the answer.".into(), at: (eqs[0].0.at.0, vars[n - 1].1.at.1) }) }
+                    if rel(&d, &size, &term) < 1e-9 { Ok(x.clone()) } else { Err(nf()) }
                 })();
                 let x = match res { Ok(x) => x, Err(e) => { restore(env); return Err(e); } };
                 let (mut texts, mut texes) = (vec![], vec![]);

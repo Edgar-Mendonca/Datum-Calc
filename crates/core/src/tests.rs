@@ -1234,6 +1234,11 @@ fn several_equations_solved_together() {
     // 4 R_B = 1 F → 750 N, 250 N; series resonance 1/(2π √(LC)) = 1 s⁻¹·… with L = 2 mH, C = 100 µF → 355.88 Hz.
     assert_eq!(result(&["solve x + y = 3, x - y = 1 for x = 0, y = 0"]), "x = 2, y = 1");
     assert_eq!(result(&["solve x^2 + y^2 = 25, y = x + 1 for x = 1, y = 1"]), "x = 3, y = 4");
+    // Unknowns of very different sizes (GPa beside a strain, MPa beside mm²), guesses far off, and an equation that
+    // is exactly zero at the guess with small quantities (y = x³ ≈ 8×10⁻²⁷, not held to one SI unit).
+    assert_eq!(result(&["solve E_s*eps = 200 MPa, eps = 0.001 for E_s = 100 GPa, eps = 0.002"]), "E_s = 200 GPa, eps = 0.001");
+    assert_eq!(result(&["solve sigma = F/A_s, F = 2 kN, A_s = 10 mm^2 for sigma = 1 MPa, F = 1 N, A_s = 1 mm^2"]), "σ = 200 MPa, F = 2 kN, A_s = 10 mm²");
+    assert_eq!(result(&["solve x^3 - y = 0, x + y = 2e-9 for x = 1e-3, y = 1e-9"]), "x = 2×10⁻⁹, y = 8×10⁻²⁷");
     assert_eq!(result(&["F = 1000 N", "solve R_A + R_B = F, R_B*4 m = F*1 m for R_A = 0 N, R_B = 0 N"]), "R_A = 750 N, R_B = 250 N");
     assert_eq!(result(&["C = 100 µF", "solve 2*pi*f_r*sqrt(L_r*C) = 1, L_r = 2 mH for f_r = 50 Hz, L_r = 1 mH", "f_r ="]), "355.9 Hz");
     assert_eq!(result(&["solve exp(t) = 5 for t = 0"]), "t = 1.609", "one equation from a guess");
