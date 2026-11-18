@@ -50,8 +50,8 @@ It is for mechanical, process, structural and electrical engineers, students and
 
 | Version | What |
 | --- | --- |
-| 0.1.0 – 0.2.3 ✅ | The calc sheet and its printing with a summary of checks; units, equations, checks, solve and plot; tables and pictures; twenty-six calc packs; several equations solved together; equations with their numbers; complex numbers for AC circuits, phasors and Bode plots; a Getting Started sheet; recovery per window; Save changes? before a sheet is replaced; hardening; every release installed and used on a clean Windows machine before it is published; exact fractions with simplify, expand and factor; 250 materials from Datum Atlas as names with units |
-| 0.2.4 – 0.2.10 | Matrices, programs in a region, water/steam and gas properties, data in and curve fitting, differential equations, custom units and templates, export to Word and HTML |
+| 0.1.0 – 0.2.4 ✅ | The calc sheet and its printing with a summary of checks; units, equations, checks, solve and plot; tables and pictures; twenty-six calc packs; several equations solved together; vectors and matrices with units; equations with their numbers; complex numbers for AC circuits, phasors and Bode plots; a Getting Started sheet; recovery per window; Save changes? before a sheet is replaced; hardening; every release installed and used on a clean Windows machine before it is published; exact fractions with simplify, expand and factor; 250 materials from Datum Atlas as names with units |
+| 0.2.5 – 0.2.10 | Programs in a region, water/steam and gas properties, data in and curve fitting, differential equations, custom units and templates, export to Word and HTML |
 | 0.2.11 → | Engineering modules: dynamic systems, signal processing, pumps and fluids, process, electrical, mechanical, HVAC |
 | 1.0 | A validation report, a user guide, a signed installer |
 

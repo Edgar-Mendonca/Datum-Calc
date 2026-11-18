@@ -53,7 +53,7 @@ pub fn unit(label: &str) -> String {
 
 fn unit_of(u: &crate::units::UnitExpr) -> String { unit(&crate::units::pretty(&u.text)) }
 
-const FUNCS: [&str; 31] = ["simplify", "expand", "factor", "db", "par", "sin", "cos", "tan", "sinh", "cosh", "tanh", "ln", "log", "exp", "min", "max", "asin", "acos", "atan", "atan2", "abs", "round", "floor", "ceil", "sum", "mean", "len", "re", "im", "arg", "conj"];
+const FUNCS: [&str; 37] = ["lsolve", "identity", "dot", "cross", "rows", "cols", "simplify", "expand", "factor", "db", "par", "sin", "cos", "tan", "sinh", "cosh", "tanh", "ln", "log", "exp", "min", "max", "asin", "acos", "atan", "atan2", "abs", "round", "floor", "ceil", "sum", "mean", "len", "re", "im", "arg", "conj"];
 
 fn prec(n: &Node) -> u8 {
     match &n.e { E::Bin(op, ..) => match *op { "<" | "<=" | ">" | ">=" | "==" | "!=" => 1, "+" | "-" => 3, "*" => 5, "/" => 9, _ => 7 }, E::Neg(_) => 4, _ => 9 }
@@ -79,6 +79,12 @@ fn nd(n: &Node, s: &Sub) -> String {
             _ => format!("{}\\,\\mathrm{{{c}}}", nd(e, s)),
         },
         E::Unit(e, u) => format!("{}\\,{}", nd(e, s), unit_of(u)),
+        E::Mat(matrix, rows) => {
+            let body = rows.iter().map(|r| r.iter().map(|x| strip(x, s)).collect::<Vec<_>>().join(" & ")).collect::<Vec<_>>().join(" \\\\ ");
+            // A vector is written as a column, as it computes.
+            if *matrix { format!("\\begin{{bmatrix}} {body} \\end{{bmatrix}}") } else { format!("\\begin{{bmatrix}} {} \\end{{bmatrix}}", rows[0].iter().map(|x| strip(x, s)).collect::<Vec<_>>().join(" \\\\ ")) }
+        }
+        E::Index(a, idx) => format!("{{{}}}_{{{}}}", nd(a, s), idx.iter().map(|x| strip(x, s)).collect::<Vec<_>>().join(",")),
         E::Var(v) => s(v).map(|t| if t.starts_with('-') { format!("\\left({t}\\right)") } else { t }).unwrap_or_else(|| name(v)),
         E::Group(e) => format!("\\left({}\\right)", nd(e, s)),
         E::Neg(e) => if prec(e) < 5 { format!("-\\left({}\\right)", nd(e, s)) } else { format!("-{}", nd(e, s)) },
@@ -111,11 +117,15 @@ fn nd(n: &Node, s: &Sub) -> String {
                 "cbrt" if a.len() == 1 => format!("\\sqrt[3]{{{}}}", a[0]),
                 "abs" if a.len() == 1 => format!("\\left|{}\\right|", a[0]),
                 "conj" if a.len() == 1 => format!("\\overline{{{}}}", a[0]),
+                "transpose" if a.len() == 1 => format!("{{{}}}^{{\\mathsf{{T}}}}", a[0]),
+                "inv" if a.len() == 1 => format!("{{{}}}^{{-1}}", a[0]),
+                "det" if a.len() == 1 => format!("\\det\\left({}\\right)", a[0]),
+                "norm" if a.len() == 1 => format!("\\left\\lVert {} \\right\\rVert", a[0]),
                 "polar" if a.len() == 2 => format!("{}\\angle {}", a[0], a[1]),
                 "exp" if a.len() == 1 => format!("e^{{{}}}", a[0]),
                 "if" if a.len() == 3 => format!("\\begin{{cases}} {} & \\text{{if }} {} \\\\ {} & \\text{{otherwise}} \\end{{cases}}", a[1], a[0], a[2]),
                 "log" if a.len() == 1 => format!("\\log_{{10}}\\left({}\\right)", a[0]),
-                f if FUNCS.contains(&f) => format!("\\{}\\left({}\\right)", if matches!(f, "atan2" | "round" | "floor" | "ceil" | "sum" | "mean" | "len" | "asin" | "acos" | "atan" | "abs" | "re" | "im" | "arg" | "conj" | "db" | "par" | "simplify" | "expand" | "factor") { format!("operatorname{{{f}}}") } else { f.to_string() }, a.join(", ")),
+                f if FUNCS.contains(&f) => format!("\\{}\\left({}\\right)", if matches!(f, "atan2" | "round" | "floor" | "ceil" | "sum" | "mean" | "len" | "asin" | "acos" | "atan" | "abs" | "re" | "im" | "arg" | "conj" | "db" | "par" | "simplify" | "expand" | "factor" | "lsolve" | "identity" | "dot" | "cross" | "rows" | "cols") { format!("operatorname{{{f}}}") } else { f.to_string() }, a.join(", ")),
                 f => format!("{}\\left({}\\right)", name(f), a.join(", ")),
             }
         }
@@ -153,6 +163,8 @@ pub fn plain(n: &Node) -> String {
         E::Num(x, u) => match u { Some(u) => format!("{x} {}", crate::units::pretty(&u.text)), None => format!("{x}") },
         E::Im(c, e) => match &e.e { E::Num(x, Some(u)) => format!("{x}{c} {}", crate::units::pretty(&u.text)), E::Num(x, None) => format!("{x}{c}"), _ => plain(e) },
         E::Unit(e, u) => format!("{} {}", plain(e), crate::units::pretty(&u.text)),
+        E::Mat(_, rows) => format!("[{}]", rows.iter().map(|r| r.iter().map(plain).collect::<Vec<_>>().join(", ")).collect::<Vec<_>>().join("; ")),
+        E::Index(a, idx) => format!("{}[{}]", plain(a), idx.iter().map(plain).collect::<Vec<_>>().join(", ")),
         E::Var(v) => canon(v),
         E::Group(e) => format!("({})", plain(e)),
         E::Neg(e) => format!("−{}", plain(e)),

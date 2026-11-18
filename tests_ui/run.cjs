@@ -273,6 +273,7 @@ const check = (name, ok, info = "") => { console.log(`${ok ? "ok  " : "FAIL"} ${
   const algText = (await p7.textContent(".cpage")).replace(/[\s  ]/g, "");
   check("algebra results draw as maths", algText.includes("x2+2x+1") && algText.includes("(2x+1)(x−1)") && algText.includes("(x+1)3") && (await p7.$$(".cpage .katex-error")).length === 0 && (await p7.$$(".cpage .rerr")).length === 0, algText.slice(0, 300));
   check("a fraction draws as a fraction", (await p7.$$(".cpage .katex .mfrac")).length >= 2);
+  check("a matrix draws in brackets with its unit", (await p7.$$(".cpage .katex .mtable")).length >= 3 && algText.includes("kN/m"), algText.slice(-200));
   await p7.click(".tabs > button:text-is('Math')"); await p7.waitForTimeout(100);
   check("the Math tab has the Algebra keys", (await p7.$$eval(".ribbon .rb.key", bs => bs.map(b => b.textContent))).filter(t => ["simplify", "expand", "factor"].includes(t)).length === 3);
   await p7.click(".tabs > button:text-is('View')"); await p7.waitForTimeout(100);

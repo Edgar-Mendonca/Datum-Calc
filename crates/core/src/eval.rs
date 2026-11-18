@@ -13,7 +13,7 @@ use std::collections::HashMap;
 /// `pi` is the power of π in a plain number (2π: 1, 1/(2π): −1); `w` marks a frequency made with it (ω = 2πf), shown in rad/s.
 /// Neither changes the dimension, so nothing worked out from ω (ωτ, ωL/R) is taken for an angle.
 #[derive(Debug, Clone, PartialEq, Default)]
-pub struct Val { pub v: Vec<f64>, pub dim: Dim, pub abs: bool, pub vec: bool, pub logic: bool, pub im: Vec<f64>, pub nm: bool, pub pi: i8, pub w: bool }
+pub struct Val { pub v: Vec<f64>, pub dim: Dim, pub abs: bool, pub vec: bool, pub logic: bool, pub im: Vec<f64>, pub nm: bool, pub pi: i8, pub w: bool, pub rows: usize }
 
 impl Val {
     pub fn num(x: f64, dim: Dim) -> Self { Self { v: vec![x], dim, ..Default::default() } }
@@ -22,6 +22,10 @@ impl Val {
     /// The first value (a scalar's value); NaN for an empty vector, never a panic.
     pub fn x(&self) -> f64 { self.v.first().copied().unwrap_or(f64::NAN) }
     pub fn cx(&self) -> bool { !self.im.is_empty() }
+    /// A matrix keeps its entries row by row in `v`, with `rows` rows (0 for a number or a vector).
+    pub fn mat(&self) -> bool { self.rows > 0 }
+    /// (rows, columns): a vector is a column, a number is 1 × 1.
+    pub fn shape(&self) -> (usize, usize) { if self.rows > 0 { (self.rows, self.v.len() / self.rows) } else if self.vec { (self.v.len(), 1) } else { (1, 1) } }
     /// Value k as (real, imaginary); a scalar gives its one value for every k.
     fn at(&self, k: usize) -> (f64, f64) { let i = if self.vec { k } else { 0 }; (self.v.get(i).copied().unwrap_or(f64::NAN), self.im.get(i).copied().unwrap_or(0.0)) }
     /// A complex value whose imaginary parts are negligible is real (j² = −1, not −1 + 0j).
@@ -70,7 +74,7 @@ pub const CONSTANTS: [(&str, &str); 9] = [("π", "pi, 3.14159…"), ("j", "the i
     ("σ_SB", "Stefan–Boltzmann constant, 5.670374419×10⁻⁸ W/(m²·K⁴)"), ("N_A", "Avogadro constant, 6.02214076×10²³ /mol"), ("k_B", "Boltzmann constant, 1.380649×10⁻²³ J/K"), ("c_0", "speed of light, 299792458 m/s")];
 
 /// Built-in functions: name, arguments, what it does (for help and the window's menus).
-pub const FUNCTIONS: [(&str, &str); 37] = [
+pub const FUNCTIONS: [(&str, &str); 47] = [
     ("sqrt(x)", "square root"), ("cbrt(x)", "cube root"), ("abs(x)", "absolute value"), ("exp(x)", "e to the power x"), ("ln(x)", "natural logarithm"), ("log(x)", "logarithm base 10"),
     ("sin(x)", "sine (x in rad, or with deg)"), ("cos(x)", "cosine"), ("tan(x)", "tangent"), ("asin(x)", "inverse sine (an angle)"), ("acos(x)", "inverse cosine"), ("atan(x)", "inverse tangent"),
     ("atan2(y, x)", "angle of the point (x, y)"), ("sinh(x)", "hyperbolic sine"), ("cosh(x)", "hyperbolic cosine"), ("tanh(x)", "hyperbolic tangent"),
@@ -82,6 +86,9 @@ pub const FUNCTIONS: [(&str, &str); 37] = [
     ("db(x)", "decibels of a ratio: 20·log₁₀|x|"),
     ("simplify(e)", "an expression in lowest terms: like terms collected, fractions cancelled"), ("expand(e)", "an expression multiplied out: (x + 1)² → x² + 2x + 1"),
     ("factor(e)", "an expression as a product: x² − 1 → (x − 1)(x + 1)"),
+    ("transpose(M)", "rows and columns swapped"), ("inv(M)", "inverse of a square matrix (also M^-1)"), ("det(M)", "determinant of a square matrix"),
+    ("lsolve(A, b)", "x with A x = b, a linear system"), ("identity(n)", "the n × n identity matrix"), ("dot(a, b)", "dot product of two vectors"),
+    ("cross(a, b)", "cross product of two 3-vectors"), ("norm(v)", "length of a vector (Frobenius norm of a matrix)"), ("rows(M)", "number of rows"), ("cols(M)", "number of columns"),
 ];
 
 pub struct Env {
@@ -144,6 +151,34 @@ impl Env {
                 Some(u) => Val { v: vec![x * u.factor + u.offset], dim: u.dim, abs: u.offset != 0.0, nm: units::same(&u.dim, &ENERGY) && u.text.contains('*'), ..Default::default() },
             }),
             E::Im(_, e) => { let v = self.eval(e)?; if v.abs { return fail("A temperature cannot be imaginary.", n.at); } Ok(Val { im: v.v.clone(), v: vec![0.0; v.v.len()], ..v }.tidy()) }
+            E::Mat(matrix, rows) => {
+                // Every entry a single real value with the same units; a matrix is kept row by row.
+                let (mut v, mut dim): (Vec<f64>, Option<Dim>) = (vec![], None);
+                if rows.len() * rows[0].len() > 10_000 { return fail("A matrix holds at most 10,000 values.", n.at); }
+                for x in rows.iter().flatten() {
+                    let e = self.eval(x)?;
+                    real(&e, "A matrix", x.at)?;
+                    if e.vec { return fail("An entry of a matrix is one value.", x.at); }
+                    if e.abs { return fail("A matrix cannot hold absolute temperatures; use differences (K).", x.at); }
+                    match dim { Some(d) if !units::same(&d, &e.dim) => return fail(format!("Every entry needs the same units: this is {}, the first is {}.", dim_name(&e.dim), dim_name(&d)), x.at), None => dim = Some(e.dim), _ => {} }
+                    v.push(e.x());
+                }
+                Ok(Val { v, dim: dim.unwrap_or(NONE), vec: true, rows: if *matrix { rows.len() } else { 0 }, ..Default::default() })
+            }
+            E::Index(a, idx) => {
+                let base = self.eval(a)?;
+                let ix = idx.iter().map(|x| { let v = self.eval(x)?; if !units::is_none(&v.dim) || v.vec || v.x().fract() != 0.0 || v.x() < 1.0 { return fail("An index is a whole number from 1.", x.at); } Ok(v.x() as usize) }).collect::<R<Vec<usize>>>()?;
+                let (r, c) = base.shape();
+                let k = match (base.mat(), ix.as_slice()) {
+                    (true, [i, j]) if *i <= r && *j <= c => (i - 1) * c + j - 1,
+                    (false, [i]) if base.vec && *i <= r => i - 1,
+                    (true, [_, _]) | (false, [_]) => return fail(format!("Out of range: this has {r} row{}{}.", if r == 1 { "" } else { "s" }, if base.mat() { format!(" and {c} column{}", if c == 1 { "" } else { "s" }) } else { String::new() }), n.at),
+                    (true, _) => return fail("A matrix entry needs a row and a column: M[1, 2].", n.at),
+                    _ => return fail(if base.vec { "A vector entry needs one index: v[2]." } else { "Only a vector or a matrix has entries." }, n.at),
+                };
+                let (x, y) = base.at(k);
+                Ok(Val { v: vec![x], im: if base.cx() { vec![y] } else { vec![] }, dim: base.dim, abs: base.abs, ..Default::default() })
+            }
             E::Unit(e, u) => {
                 let v = self.eval(e)?;
                 // (3 + 4j) Ω gives a plain number its unit; it is not a conversion of a value that has one.
@@ -244,6 +279,64 @@ fn moment(op: &str, a: &Val, b: &Val, dim: &Dim) -> bool {
         "*" => units::same(dim, &ENERGY) && dim[7] == 0 && (force(a) || force(b) || (a.nm && units::is_none(&b.dim)) || (b.nm && units::is_none(&a.dim))),
         "/" => a.nm && units::is_none(&b.dim) && dim[7] == 0,
         _ => false,
+    }
+}
+
+/// A matrix from its shape and entries: n × 1 is a vector, 1 × 1 a number.
+fn mat_val(r: usize, c: usize, v: Vec<f64>, dim: Dim) -> Val {
+    match (r, c) { (1, 1) => Val::num(v[0], dim), (_, 1) => Val { v, dim, vec: true, ..Default::default() }, _ => Val { v, dim, vec: true, rows: r, ..Default::default() } }
+}
+
+/// The matrix product of (m × k) and (k × n), entries row by row.
+fn matmul(a: &[f64], (m, k): (usize, usize), b: &[f64], n: usize) -> Vec<f64> {
+    let mut out = vec![0.0; m * n];
+    for i in 0..m { for t in 0..k { let x = a[i * k + t]; if x != 0.0 { for j in 0..n { out[i * n + j] += x * b[t * n + j]; } } } }
+    out
+}
+
+/// The inverse of a square matrix by solving for each column of the identity; None when singular.
+fn inverse(a: &[f64], n: usize) -> Option<Vec<f64>> {
+    let rows: Vec<Vec<f64>> = (0..n).map(|i| a[i * n..(i + 1) * n].to_vec()).collect();
+    let mut out = vec![0.0; n * n];
+    for j in 0..n {
+        let col = crate::solve::linear(rows.clone(), (0..n).map(|i| if i == j { 1.0 } else { 0.0 }).collect())?;
+        for i in 0..n { out[i * n + j] = col[i]; }
+    }
+    Some(out)
+}
+
+/// + − × ÷ and powers with a matrix: entry by entry with a number or a matrix of the same shape; × of two is the
+///   matrix product (rows of the first by columns of the second); a square matrix to a whole power, −1 its inverse.
+fn mat_bin(op: &str, a: &Val, b: &Val, at: Span, rat: Span) -> R<Val> {
+    if a.cx() || b.cx() { return fail("Matrices of complex values are not supported.", at); }
+    let (sa, sb) = (a.shape(), b.shape());
+    let scalar = |v: &Val| !v.vec;
+    let each = |f: &dyn Fn(f64, f64) -> f64, dim: Dim| -> R<Val> {
+        let (r, c) = if scalar(a) { sb } else { sa };
+        if !scalar(a) && !scalar(b) && sa != sb { return fail(format!("These have different shapes ({}×{} and {}×{}).", sa.0, sa.1, sb.0, sb.1), at); }
+        let v = (0..r * c).map(|k| f(if scalar(a) { a.x() } else { a.v[k] }, if scalar(b) { b.x() } else { b.v[k] })).collect();
+        Ok(mat_val(r, c, v, dim))
+    };
+    match op {
+        "+" | "-" => { same_or(a, b, if op == "+" { "add" } else { "subtract" }, at)?; each(&|x, y| if op == "+" { x + y } else { x - y }, a.dim) }
+        "*" if scalar(a) || scalar(b) => each(&|x, y| x * y, units::mul(&a.dim, &b.dim)),
+        "*" => {
+            if sa.1 != sb.0 { return fail(format!("A {}×{} times a {}×{}: the columns of the first must match the rows of the second.", sa.0, sa.1, sb.0, sb.1), at); }
+            Ok(mat_val(sa.0, sb.1, matmul(&a.v, sa, &b.v, sb.1), units::mul(&a.dim, &b.dim)))
+        }
+        "/" if scalar(b) => { if b.x() == 0.0 { return fail("Division by zero.", rat); } each(&|x, y| x / y, units::div(&a.dim, &b.dim)) }
+        "/" => fail("To divide by a matrix, multiply by its inverse: A*inv(B).", rat),
+        "^" => {
+            if !scalar(b) || !units::is_none(&b.dim) || b.x().fract() != 0.0 || b.x().abs() > 64.0 { return fail("A matrix power is a whole number up to 64 (−1 for the inverse).", rat); }
+            if sa.0 != sa.1 { return fail("Only a square matrix has powers.", at); }
+            let n = sa.0;
+            let mut base = a.v.clone();
+            if b.x() < 0.0 { base = inverse(&a.v, n).ok_or_else(|| Error { msg: "This matrix has no inverse (it is singular).".into(), at })?; }
+            let mut r: Vec<f64> = (0..n * n).map(|k| if k / n == k % n { 1.0 } else { 0.0 }).collect();
+            for _ in 0..b.x().abs() as usize { r = matmul(&r, (n, n), &base, n); }
+            Ok(mat_val(n, n, r, pow_dim(&a.dim, b.x(), at)?))
+        }
+        _ => { same_or(a, b, "compare", at)?; let mut v = each(&|x, y| { let t = |x: f64, y: f64| (x - y).abs() <= 1e-12 * x.abs().max(y.abs()); (match op { "<" => x < y, "<=" => x <= y || t(x, y), ">" => x > y, ">=" => x >= y || t(x, y), "==" => t(x, y), _ => !t(x, y) }) as u8 as f64 }, NONE)?; v.logic = true; Ok(v) }
     }
 }
 
@@ -349,6 +442,7 @@ fn bin_raw2(op: &str, a: &Val, b: &Val, at: Span, rat: Span) -> R<Val> {
         let b = if units::is_none(&b.dim) && b.dim[7] == 0 && !b.cx() { Val { v: b.v.iter().map(|x| x.to_radians()).collect(), dim: units::ANGLE, ..b } } else { b };
         return builtin("polar", vec![a, b], at);
     }
+    if a.mat() || b.mat() { return mat_bin(op, &a, &b, at, rat); }
     if a.cx() || b.cx() { return bin_complex(op, a, b, at, rat); }
     let vec = a.vec || b.vec;
     let mk = |v: Vec<f64>, dim: Dim, abs: bool| Val { v, dim, abs, vec, nm: moment(op, &a, &b, &dim), ..Default::default() };
@@ -389,7 +483,7 @@ fn bin_raw2(op: &str, a: &Val, b: &Val, at: Span, rat: Span) -> R<Val> {
 fn builtin(f: &str, a: Vec<Val>, at: Span) -> R<Val> {
     let n = a.len();
     let want = |m: usize| -> R<()> { if n == m { Ok(()) } else { fail(format!("{f} takes {m} value{}.", if m == 1 { "" } else { "s" }), at) } };
-    let map = |v: &Val, dim: Dim, g: &dyn Fn(f64) -> f64| Val { v: v.v.iter().map(|x| g(*x)).collect(), dim, vec: v.vec, ..Default::default() };
+    let map = |v: &Val, dim: Dim, g: &dyn Fn(f64) -> f64| Val { v: v.v.iter().map(|x| g(*x)).collect(), dim, vec: v.vec, rows: v.rows, ..Default::default() };
     // A complex function, value by value; the result is complex.
     let cmap = |v: &Val, dim: Dim, g: &dyn Fn((f64, f64)) -> (f64, f64)| { let (re, im) = (0..v.v.len()).map(|k| g(v.at(k))).unzip(); Val { v: re, im, dim, vec: v.vec, ..Default::default() } };
     let plain = |v: &Val| -> R<()> { if units::is_none(&v.dim) { Ok(()) } else { Err(Error { msg: format!("{f} needs a plain number, not {}.", dim_name(&v.dim)), at }) } };
@@ -498,6 +592,65 @@ fn builtin(f: &str, a: Vec<Val>, at: Span) -> R<Val> {
             Val { v: vec![a[0].v.iter().sum::<f64>() / k], im, dim: a[0].dim, abs: f == "mean" && a[0].abs, nm: a[0].nm, ..Default::default() }
         }
         "len" => { want(1)?; Val::plain(a[0].v.len() as f64) }
+        "rows" | "cols" => { want(1)?; let (r, c) = a[0].shape(); Val::plain(if f == "rows" { r } else { c } as f64) }
+        "transpose" => {
+            want(1)?;
+            let (r, c) = a[0].shape();
+            if !a[0].vec { return fail("transpose needs a vector or a matrix.".into()); }
+            let v: Vec<f64> = (0..r * c).map(|k| a[0].v[(k % r) * c + k / r]).collect();
+            // A vector (a column) becomes a row: a 1 × n matrix.
+            if c == 1 { Val { v, dim: a[0].dim, vec: true, rows: 1, ..Default::default() } } else { mat_val(c, r, v, a[0].dim) }
+        }
+        "inv" | "det" => {
+            want(1)?;
+            let (r, c) = a[0].shape();
+            if !a[0].mat() || r != c { return fail(format!("{f} needs a square matrix.")); }
+            if f == "det" && r > 60 { return fail("det is for matrices up to 60 × 60.".into()); }
+            if f == "inv" {
+                let v = inverse(&a[0].v, r).ok_or_else(|| Error { msg: "This matrix has no inverse (it is singular).".into(), at })?;
+                mat_val(r, r, v, units::pow(&a[0].dim, -1))
+            } else {
+                // Elimination with partial pivoting: the product of the pivots, with a sign per row swap.
+                let mut m: Vec<Vec<f64>> = (0..r).map(|i| a[0].v[i * r..(i + 1) * r].to_vec()).collect();
+                let mut d = 1.0;
+                for k in 0..r {
+                    let p = (k..r).max_by(|&i, &j| m[i][k].abs().total_cmp(&m[j][k].abs())).unwrap_or(k);
+                    if m[p][k] == 0.0 { d = 0.0; break; }
+                    if p != k { m.swap(p, k); d = -d; }
+                    d *= m[k][k];
+                    for i in k + 1..r { let q = m[i][k] / m[k][k]; let row = m[k].clone(); for (x, y) in m[i][k..].iter_mut().zip(&row[k..]) { *x -= q * y; } }
+                }
+                Val::num(d, units::pow(&a[0].dim, r.min(60) as i8))
+            }
+        }
+        "lsolve" => {
+            want(2)?;
+            let ((r, c), (rb, cb)) = (a[0].shape(), a[1].shape());
+            if !a[0].mat() || r != c { return fail("lsolve(A, b) needs a square matrix A.".into()); }
+            if !a[1].vec || cb != 1 || rb != r { return fail(format!("lsolve(A, b) needs a vector b of {r} values.")); }
+            let rows: Vec<Vec<f64>> = (0..r).map(|i| a[0].v[i * r..(i + 1) * r].to_vec()).collect();
+            let x = crate::solve::linear(rows, a[1].v.clone()).ok_or_else(|| Error { msg: "The system has no single solution (the matrix is singular).".into(), at })?;
+            Val { v: x, dim: units::div(&a[1].dim, &a[0].dim), vec: true, ..Default::default() }
+        }
+        "identity" => {
+            want(1)?;
+            plain(&a[0])?;
+            let n = a[0].x();
+            if n.fract() != 0.0 || !(1.0..=100.0).contains(&n) { return fail("identity(n) needs a whole number n from 1 to 100.".into()); }
+            let n = n as usize;
+            mat_val(n, n, (0..n * n).map(|k| if k / n == k % n { 1.0 } else { 0.0 }).collect(), NONE)
+        }
+        "dot" | "cross" => {
+            want(2)?;
+            if a[0].mat() || a[1].mat() || !a[0].vec || !a[1].vec || a[0].v.len() != a[1].v.len() { return fail(format!("{f} needs two vectors of the same length.")); }
+            let dim = units::mul(&a[0].dim, &a[1].dim);
+            if f == "dot" { Val::num(a[0].v.iter().zip(&a[1].v).map(|(x, y)| x * y).sum(), dim) } else {
+                if a[0].v.len() != 3 { return fail("cross needs two vectors of 3 values.".into()); }
+                let (x, y) = (&a[0].v, &a[1].v);
+                Val { v: vec![x[1] * y[2] - x[2] * y[1], x[2] * y[0] - x[0] * y[2], x[0] * y[1] - x[1] * y[0]], dim, vec: true, ..Default::default() }
+            }
+        }
+        "norm" => { want(1)?; Val::num(a[0].v.iter().map(|x| x * x).sum::<f64>().sqrt(), a[0].dim) }
         "interp" => {
             want(3)?;
             let (x, xs, ys) = (&a[0], &a[1], &a[2]);
@@ -663,7 +816,15 @@ pub fn show_val(v: &Val, want: &str, f: &Fmt) -> (String, String, String, String
     let dim = if v.nm && v.dim[7] == 0 && want.trim().is_empty() { let mut d = v.dim; d[7] = -1; d } else { shown_dim(v) };
     let (k, off, label) = units::display(big, &dim, v.abs, want, f.us);
     let one = |(x, y): (f64, f64)| if v.cx() { fmt_cx((x - off) / k, y / k, f) } else { fmt_val((x - off) / k, f) };
-    let (text, tex) = if v.vec {
+    let (text, tex) = if v.mat() {
+        // A matrix in brackets, up to 12 rows and columns shown (… for the rest).
+        let (r, c) = v.shape();
+        let (sr, sc) = (r.min(12), c.min(12));
+        let cell = |i: usize, j: usize| one(v.at(i * c + j));
+        let t = (0..sr).map(|i| format!("[{}{}]", (0..sc).map(|j| cell(i, j).0).collect::<Vec<_>>().join(", "), if sc < c { ", …" } else { "" })).collect::<Vec<_>>().join(", ");
+        let x = (0..sr).map(|i| format!("{}{}", (0..sc).map(|j| cell(i, j).1).collect::<Vec<_>>().join(" & "), if sc < c { " & \\cdots" } else { "" })).collect::<Vec<_>>().join(" \\\\ ");
+        (format!("[{t}{}]", if sr < r { ", …" } else { "" }), format!("\\begin{{bmatrix}} {x}{} \\end{{bmatrix}}", if sr < r { " \\\\ \\vdots" } else { "" }))
+    } else if v.vec {
         let n = v.v.len();
         let pick: Vec<usize> = if n <= 6 { (0..n).collect() } else { vec![0, 1, 2, n - 1] };
         let parts: Vec<(String, String)> = pick.iter().map(|i| one(v.at(*i))).collect();

@@ -30,6 +30,7 @@
     "Checks with PASS or FAIL and the utilisation ratio.",
     "Solve for the value that makes an equation zero within a range, plot functions such as a pump curve against the system curve, and tables with units per column.",
     "Solve one equation in a range, or several equations together for several unknowns, with units.",
+    "Vectors and matrices with units: a stiffness matrix in kN/m and loads in kN give displacements in m; multiply, transpose, inverse, determinant and linear systems.",
     "Twenty-six ready calc packs, each with its reference and a test against a worked example.",
     "Complex numbers for AC circuits in the frequency domain: impedances such as (8 + 9.42j) Ω, phasors as 230 V∠-30°, impedances in parallel, complex power, and Bode plots on a log frequency axis.",
     "Each equation can be shown again with its numbers put in, as on a hand calculation.",
@@ -44,21 +45,20 @@
   ],
   "roadmap": [
     {
-      "v": "0.2.4",
-      "title": "Vectors and matrices",
+      "v": "0.2.5",
+      "title": "Programs in a region",
       "when": "Next",
       "items": [
-        "Matrices with units",
-        "Multiply, transpose, inverse, determinant",
-        "Linear systems"
+        "if/else in a region",
+        "for and while loops, with limits",
+        "Results used by the lines below"
       ]
     },
     {
-      "v": "0.2.5–0.2.7",
-      "title": "Programs, thermophysical data, data in",
+      "v": "0.2.6–0.2.7",
+      "title": "Thermophysical data, data in",
       "when": "Soon",
       "items": [
-        "if/else and loops in a region",
         "Water, steam, air and gas properties",
         "Paste or import CSV into tables; curve fitting"
       ]

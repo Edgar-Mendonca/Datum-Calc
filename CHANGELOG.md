@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.2.4 — 2026-11-18
+
+Vectors and matrices with units.
+
+**Matrices**
+- Write a vector as [10, 0] kN and a matrix as [[2, -1], [-1, 2]] kN/m, with one unit for all its entries. It is shown in brackets, as on paper.
+- K*u multiplies matrices, K + M and 2*K work entry by entry, K^2 and K^-1 are powers and the inverse, and K[1, 2] picks an entry (counting from 1).
+- New functions: lsolve(A, b) for a linear system, inv, det, transpose, identity(n), dot, cross, norm, rows and cols.
+- Units follow the algebra: lsolve of a stiffness in kN/m and loads in kN gives displacements in m; the determinant of a 2 × 2 in kN/m is in N²/m².
+- It says what is wrong: different shapes, rows of different lengths, an index out of range, a singular matrix, or entries in different units.
+
+**Fixes**
+- Several equations solved together (0.2.3) now cope with unknowns of very different sizes, such as a modulus in GPa beside a strain, and guesses far from the answer.
+
+**Checks**
+- 77 engine tests (products, inverse, determinant, linear systems with units, indexing, what it says when it cannot), 100 UI tests (a matrix draws in brackets); the random-sheet test writes matrices too. Every earlier pack prints as before.
+
 ## 0.2.3 — 2026-11-18
 
 Several equations solved together.

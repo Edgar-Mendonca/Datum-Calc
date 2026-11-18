@@ -46,12 +46,12 @@ fn main() {
     // The RC filter pack: Bode plots on a log frequency axis (0.1.11).
     let rc = datum_core::packs::sheet("rc-filter").expect("the RC pack opens");
     let rc = serde_json::json!({ "sheet": rc, "calc": eval::run(&rc), "path": null, "dirty": false, "undo": false, "redo": false, "rev": 1 });
-    // Exact maths with View › Fractions on (0.2.0).
+    // Exact maths with View › Fractions on (0.2.0), and a matrix (0.2.4).
     let mut alg = Sheet::new("Algebra");
-    for (k, t) in ["expand((x+1)^2)", "factor(2*x^2 - x - 1)", "y = expand((x+1)^3)", "factor(y)", "a = 1/3", "simplify((x^2 - 1)/(x - 1))"].iter().enumerate() {
+    for (k, t) in ["expand((x+1)^2)", "factor(2*x^2 - x - 1)", "y = expand((x+1)^3)", "factor(y)", "a = 1/3", "simplify((x^2 - 1)/(x - 1))", "K = [[2, -1], [-1, 2]] kN/m", "u = lsolve(K, [10, 0] kN)"].iter().enumerate() {
         alg.regions.push(datum_core::Region { id: k as u32 + 1, kind: Kind::Math, text: t.to_string(), ..Default::default() });
     }
-    alg.next_id = 7;
+    alg.next_id = 9;
     alg.exact = true;
     let alg = serde_json::json!({ "sheet": alg, "calc": eval::run(&alg), "path": null, "dirty": false, "undo": false, "redo": false, "rev": 1 });
     // A material region (0.2.1): S355 as "steel", used by the lines below.

@@ -268,6 +268,7 @@ pub fn from_node(n: &Node, look: &dyn Fn(&str) -> Look) -> R<RatF> {
         E::Num(x, None) => fraction(*x, 1_000_000).map(|q| RatF::poly(Poly::constant(q))).ok_or_else(|| format!("{x} is not a fraction exact maths can keep.")),
         E::Num(_, Some(_)) | E::Unit(..) => not("units"),
         E::Im(..) => not("complex numbers"),
+        E::Mat(..) | E::Index(..) => not("vectors or matrices"),
         E::Var(v) => match look(v) {
             Look::Value(q) => Ok(RatF::poly(Poly::constant(q))),
             Look::Expr(r) => Ok(r),

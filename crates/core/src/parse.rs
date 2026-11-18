@@ -51,7 +51,7 @@ pub fn lex(s: &str) -> Result<Vec<(Tok, Span)>, Error> {
         let op: &'static str = match two.as_str() {
             "<=" => "<=", ">=" => ">=", "==" => "==", "!=" => "!=", ".." => "..", "**" => "^", "/_" => "∠",
             _ => match ch {
-                '+' => "+", '-' | '−' => "-", '*' | '·' | '×' | '⋅' => "*", '/' | '÷' => "/", '^' => "^", '(' => "(", ')' => ")", ',' => ",", '=' => "=",
+                '+' => "+", '-' | '−' => "-", '*' | '·' | '×' | '⋅' => "*", '/' | '÷' => "/", '^' => "^", '(' => "(", ')' => ")", '[' => "[", ']' => "]", ',' => ",", '=' => "=",
                 '⁴' | '⁵' | '⁶' | '⁷' | '⁸' | '⁹' | '¹' | '⁰' => {
                     // A superscript digit is a power: m⁴ is m^4 (labels such as kg/s⁴ can be typed back).
                     out.push((Tok::Op("^"), (start, i + 1)));
@@ -80,6 +80,10 @@ pub enum E {
     Call(String, Vec<Node>),
     /// Brackets the user typed (kept so the maths shows them).
     Group(Box<Node>),
+    /// A vector `[1, 2, 3]` (one list) or a matrix `[[1, 2], [3, 4]]` (a list of rows).
+    Mat(bool, Vec<Vec<Node>>),
+    /// An entry of a vector or matrix, counted from 1: `v[2]`, `M[1, 2]`.
+    Index(Box<Node>, Vec<Node>),
     /// An imaginary number typed as `4j` or `4i` (with its unit, `4j Ω`): the letter and the number.
     Im(char, Box<Node>),
     /// Brackets followed by a unit: `(3 + 4j) Ω`.
@@ -198,9 +202,18 @@ impl P<'_> {
                 }
                 break;
             };
-            let (bp, right) = match op { "<" | "<=" | ">" | ">=" | "==" | "!=" => (1, 2), "+" | "-" => (3, 4), "*" | "/" => (5, 6), "∠" => (6, 7), "^" => (8, 7), "²" | "³" => (9, 0), _ => break };
+            let (bp, right) = match op { "<" | "<=" | ">" | ">=" | "==" | "!=" => (1, 2), "+" | "-" => (3, 4), "*" | "/" => (5, 6), "∠" => (6, 7), "^" => (8, 7), "²" | "³" => (9, 0), "[" => (10, 0), _ => break };
             if bp < min { break; }
             self.i += 1;
+            // An entry: v[2], M[1, 2].
+            if op == "[" {
+                let mut idx = vec![self.expr(1)?];
+                while self.is(",") { self.i += 1; idx.push(self.expr(1)?); }
+                let close = self.eat("]")?;
+                let at = (lhs.at.0, close.1);
+                lhs = Node { e: E::Index(Box::new(lhs), idx), at };
+                continue;
+            }
             if op == "²" || op == "³" {
                 let at = (lhs.at.0, self.t[self.i - 1].1 .1);
                 lhs = Node { e: E::Bin("^", Box::new(lhs), Box::new(Node { e: E::Num(if op == "²" { 2.0 } else { 3.0 }, None), at })), at };
@@ -274,6 +287,35 @@ impl P<'_> {
                     _ => Ok(g),
                 }
             }
+            Some((Tok::Op("["), at)) => {
+                // [1, 2, 3] is a vector; [[1, 2], [3, 4]] a matrix, a list of rows. A unit after it applies to all.
+                self.i += 1;
+                let matrix = self.is("[");
+                let mut rows: Vec<Vec<Node>> = vec![];
+                let list = |p: &mut Self| -> Result<Vec<Node>, Error> {
+                    let mut v = vec![];
+                    if p.is("]") { return Ok(v); }
+                    loop { v.push(p.expr(1)?); if p.is(",") { p.i += 1; } else { break; } }
+                    Ok(v)
+                };
+                if matrix {
+                    loop {
+                        self.eat("[")?;
+                        rows.push(list(self)?);
+                        self.eat("]")?;
+                        if self.is(",") { self.i += 1; } else { break; }
+                    }
+                } else { rows.push(list(self)?); }
+                let close = self.eat("]")?;
+                if rows.iter().all(|r| r.is_empty()) { return err("A vector or matrix needs at least one value.", (at.0, close.1)); }
+                if matrix && rows.iter().any(|r| r.len() != rows[0].len()) { return err("Every row of a matrix needs the same number of values.", (at.0, close.1)); }
+                let m = Node { e: E::Mat(matrix, rows), at: (at.0, close.1) };
+                let mut up = UnitParser { toks: &self.t, i: self.i, known: self.known };
+                match up.expr_inner(false) {
+                    Some(u) if u.offset == 0.0 => { let end = self.t[up.i - 1].1 .1; self.i = up.i; Ok(Node { e: E::Unit(Box::new(m), u), at: (at.0, end) }) }
+                    _ => Ok(m),
+                }
+            }
             Some((Tok::Op(o), _)) => err(format!("“{o}” cannot start a value here."), a),
             None => err("Something is missing at the end.", a),
         }
@@ -315,6 +357,8 @@ pub fn depth(n: &Node) -> usize {
             E::Neg(a) | E::Group(a) | E::Im(_, a) | E::Unit(a, _) => stack.push((a, d + 1)),
             E::Bin(_, a, b) => { stack.push((a, d + 1)); stack.push((b, d + 1)); }
             E::Call(_, args) => stack.extend(args.iter().map(|a| (a, d + 1))),
+            E::Mat(_, rows) => stack.extend(rows.iter().flatten().map(|a| (a, d + 1))),
+            E::Index(a, idx) => { stack.push((a, d + 1)); stack.extend(idx.iter().map(|x| (x, d + 1))); }
             _ => {}
         }
     }

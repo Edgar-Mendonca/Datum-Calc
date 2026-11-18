@@ -1259,3 +1259,42 @@ fn several_equations_solved_together() {
     assert!(error(&["solve x^2 + 1 = 0 for x = 1", "x + 1"]).contains("has an error on its own line"));
     assert_eq!(result(&["x = 7", "solve x^2 + 1 = 0 for x = 1", "x + 1 ="]), "8");
 }
+
+#[test]
+fn vectors_and_matrices() {
+    // A = [[2, 1], [1, 3]]: det 5, inverse [[0.6, −0.2], [−0.2, 0.4]], A x = [3, 5] → x = [0.8, 1.4]; A² = [[5, 5], [5, 10]].
+    let a = "A = [[2, 1], [1, 3]]";
+    assert_eq!(result(&[a, "det(A)"]), "5");
+    assert_eq!(result(&[a, "inv(A)"]), "[[0.6, -0.2], [-0.2, 0.4]]");
+    assert_eq!(result(&[a, "A^-1"]), "[[0.6, -0.2], [-0.2, 0.4]]");
+    assert_eq!(result(&[a, "lsolve(A, [3, 5])"]), "[0.8, 1.4]");
+    assert_eq!(result(&[a, "A*lsolve(A, [3, 5])"]), "[3, 5]", "multiplies back");
+    assert_eq!(result(&[a, "A^2"]), "[[5, 5], [5, 10]]");
+    assert_eq!(result(&[a, "A*[[1, 2, 3], [4, 5, 6]]"]), "[[6, 9, 12], [13, 17, 21]]");
+    assert_eq!(result(&[a, "transpose([[1, 2, 3], [4, 5, 6]])"]), "[[1, 4], [2, 5], [3, 6]]");
+    assert_eq!(result(&[a, "A[1, 2] + A[2, 2]"]), "4");
+    assert_eq!(result(&["v = [3, 4] m", "norm(v)"]), "5 m");
+    assert_eq!(result(&["cross([1, 0, 0], [0, 1, 0])"]), "[0, 0, 1]");
+    assert_eq!(result(&["dot([1, 2, 3], [4, 5, 6])"]), "32");
+    assert_eq!(result(&["identity(2)*3"]), "[[3, 0], [0, 3]]");
+    // Units follow the algebra: two springs, K u = F → u = [6.667, 3.333] m; det K in N²/m².
+    let k = ["K = [[2, -1], [-1, 2]] kN/m", "F = [10, 0] kN"];
+    assert_eq!(result(&[k[0], k[1], "u = lsolve(K, F)"]), "[6.667, 3.333] m");
+    assert_eq!(result(&[k[0], "det(K)"]), "3×10⁶ N²/m²");
+    let o = run(&[k[0], k[1], "u = lsolve(K, F)", "u_2 = u[2]"]);
+    assert_eq!(o.regions[3].result, "3.333 m");
+    assert!(o.regions[0].result_tex.contains("\\begin{bmatrix}") && o.regions[0].latex.contains("\\begin{bmatrix}"));
+    // What it says when it cannot.
+    for (lines, msg) in [
+        (&[a, "A + [1, 2]"][..], "These have different shapes (2×2 and 2×1)."),
+        (&["[[1, 2], [3]]"][..], "Every row of a matrix needs the same number of values."),
+        (&[a, "A[3, 1]"][..], "Out of range: this has 2 rows and 2 columns."),
+        (&["[1 m, 2 s]"][..], "Every entry needs the same units"),
+        (&["inv([[1, 2], [2, 4]])"][..], "This matrix has no inverse (it is singular)."),
+        (&[a, "A*[[1, 2, 3]]"][..], "A 2×2 times a 1×3"),
+        (&[a, "A/A"][..], "To divide by a matrix, multiply by its inverse"),
+        (&["det([[1, 2, 3], [4, 5, 6]])"][..], "det needs a square matrix."),
+        (&[a, "A[1]"][..], "A matrix entry needs a row and a column"),
+        (&["[20 °C, 30 °C]"][..], "A matrix cannot hold absolute temperatures"),
+    ] { assert!(error(lines).starts_with(msg), "{lines:?}: {}", error(lines)); }
+}

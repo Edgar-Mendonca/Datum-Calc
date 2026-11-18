@@ -162,15 +162,17 @@ fn evaluation_speed_gate() {
 fn random_expr(r: &mut Rng, depth: u32) -> String {
     const UNITS: [&str; 14] = ["m", "mm", "kg", "s", "N", "kN*m", "m^3/h", "MPa", "°C", "°F", "K", "rpm", "W/(m^2*K)", "%"];
     const NUMS: [&str; 10] = ["0", "1", "2.5", "-3", "1e-9", "1e9", "1e300", "1e-300", "0.0001", "42"];
-    const FUNCS: [&str; 27] = ["sqrt", "sin", "cos", "ln", "log", "exp", "abs", "min", "max", "round", "sum", "mean", "len", "if", "hypot", "f", "re", "im", "arg", "conj", "polar", "par", "db", "cosh", "simplify", "expand", "factor"];
+    const FUNCS: [&str; 36] = ["transpose", "inv", "det", "norm", "rows", "cols", "lsolve", "dot", "cross", "sqrt", "sin", "cos", "ln", "log", "exp", "abs", "min", "max", "round", "sum", "mean", "len", "if", "hypot", "f", "re", "im", "arg", "conj", "polar", "par", "db", "cosh", "simplify", "expand", "factor"];
     // Complex values and units after brackets (0.1.8).
     const CX: [&str; 13] = ["4j", "-2.5j V", "(1 + 2j) Ω", "j", "1e300j", "(a) m", "0j", "2i kN*m", "(b - 1j) mA", "10 Ω∠30°", "5/_-45 deg", "2*pi*50 Hz", "a∠a"];
+    // Vectors and matrices (0.2.4), well and badly formed.
+    const MAT: [&str; 12] = ["[1, 2]", "[[1, 2], [3, 4]]", "[[2, 1], [1, 3]] kN/m", "M", "M[1, 2]", "M[2]", "[[1], [2, 3]]", "[a, 2 m]", "[]", "identity(3)", "M^-1", "[[1e300, 0], [0, 1e-300]]"];
     if depth == 0 || r.below(4) == 0 {
-        return match r.below(5) { 4 => CX[r.below(13)].into(), 0 => NUMS[r.below(10)].into(), 1 => format!("{} {}", NUMS[r.below(10)], UNITS[r.below(14)]), 2 => ["a", "b", "v", "g", "pi", "zz"][r.below(6)].into(), _ => format!("({})", random_expr(r, depth.saturating_sub(1))) };
+        return match r.below(6) { 5 => MAT[r.below(12)].into(), 4 => CX[r.below(13)].into(), 0 => NUMS[r.below(10)].into(), 1 => format!("{} {}", NUMS[r.below(10)], UNITS[r.below(14)]), 2 => ["a", "b", "v", "g", "pi", "zz"][r.below(6)].into(), _ => format!("({})", random_expr(r, depth.saturating_sub(1))) };
     }
     match r.below(4) {
         0 | 1 => format!("{} {} {}", random_expr(r, depth - 1), ["+", "-", "*", "/", "^", "<=", ">"][r.below(7)], random_expr(r, depth - 1)),
-        2 => { let f = FUNCS[r.below(27)]; let n = if f == "if" { 3 } else if matches!(f, "min" | "max" | "round" | "hypot" | "polar" | "par") { 2 } else { 1 }; format!("{f}({})", (0..n).map(|_| random_expr(r, depth - 1)).collect::<Vec<_>>().join(", ")) }
+        2 => { let f = FUNCS[r.below(36)]; let n = if f == "if" { 3 } else if matches!(f, "min" | "max" | "round" | "hypot" | "polar" | "par" | "lsolve" | "dot" | "cross") { 2 } else { 1 }; format!("{f}({})", (0..n).map(|_| random_expr(r, depth - 1)).collect::<Vec<_>>().join(", ")) }
         _ => format!("-{}", random_expr(r, depth - 1)),
     }
 }
@@ -185,6 +187,7 @@ fn random_expressions_never_panic() {
         push(Kind::Math, "b = 3".into(), json!(null));
         push(Kind::Math, "v = 0, 0.5 .. 3".into(), json!(null));
         push(Kind::Math, "f(x) = x^2 + b".into(), json!(null));
+        push(Kind::Math, "M = [[4, -1], [-1, 4]] kN/m".into(), json!(null));
         if round % 5 == 0 {
             let cell = |r: &mut Rng| [json!("1"), json!("2 m"), json!(""), json!("x"), json!(3), json!(null), json!("1e400")][r.below(7)].clone();
             let rows: Vec<serde_json::Value> = (0..r.below(5)).map(|_| json!([cell(&mut r), cell(&mut r)])).collect();

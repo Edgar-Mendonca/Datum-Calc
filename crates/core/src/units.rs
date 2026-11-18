@@ -287,7 +287,7 @@ fn named(dim: &Dim) -> Option<String> {
     type Key = (usize, u8, bool, usize, i8);
     let mut best: Option<(Key, String)> = None;
     for (rank, (sym, dd)) in std::iter::once(("", NONE)).chain(DERIVED).enumerate() {
-        for p in if sym.is_empty() { vec![0i8] } else { vec![1, -1] } {
+        for p in if sym.is_empty() { vec![0i8] } else { vec![1, -1, 2, -2] } {
             let rest: [i8; 7] = std::array::from_fn(|i| target[i] - dd[i] * p);
             let base: Vec<(usize, i8)> = BASE.iter().map(|b| (b.1, rest[b.1])).filter(|x| x.1 != 0).collect();
             if rest[6] != 0 || base.len() > 3 || base.iter().any(|x| x.1.abs() > 4) { continue; }
