@@ -9,12 +9,13 @@ Small programs in a region.
 - Run once, every name the program sets is defined for the lines below and shown as its result (total = 60 kN, n = 10).
 - With a first line such as f_D(Re, k) = it is a function that returns a value: return 64/Re for laminar flow, or iterate the Colebrook equation and return f. Use it on any line, in a plot or in solve.
 - for i in 1 .. 10, for x in 0, 0.5 m .. 3 m, or for F_i in F (each value of a vector).
-- Drawn as maths, line by line, with the keywords in bold. Enter starts a new line and Tab indents.
-- It says what is wrong and on which line: a block without end, an else without if, a loop that never ends (stopped after 100,000 rounds), units that do not match.
+- Drawn as maths, line by line, with the keywords in bold. Enter starts a new line; Tab indents the selected lines, Shift+Tab takes the indent away, and Ctrl+Z undoes either.
+- It says what is wrong and on which line: a block without end, an else without if, a loop that never ends (stopped after 100,000 rounds), units that do not match. A plot or solve that calls a slow program function stops after 1,000,000 rounds on that line and says so.
+- A function's working names are its own: names and expressions on the sheet with the same spelling are left as they were. A program that fails part way changes nothing on the sheet.
 - New calc pack (27 in all): pipe flow in any regime, with the friction factor as a program and checked against a hand calculation.
 
 **Checks**
-- 80 engine tests (functions, loops, branches, break, recursion, errors and where they point, the new pack), 102 UI tests (a program draws, Insert › Program); the random-sheet test writes programs too. Every earlier pack prints as before.
+- 81 engine tests (functions, loops, branches, break, recursion, errors and where they point, the limits on a plot or solve, the new pack), 103 UI tests (a program draws, Insert › Program, Tab and Shift+Tab); the random-sheet test writes programs too. Every earlier pack prints as before.
 
 ## 0.2.4 — 2026-11-18
 

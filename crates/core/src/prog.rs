@@ -11,6 +11,17 @@ fn fail<T>(msg: impl Into<String>, at: Span) -> R<T> { Err(Error { msg: msg.into
 
 /// How many times the loops of one run may go round before the program is stopped.
 pub const MAX_STEPS: u32 = 100_000;
+/// How many rounds all the programs on one line may make together (a plot or solve calls a function many times).
+pub const MAX_LINE: u64 = 1_000_000;
+pub const LINE_MSG: &str = "The programs on this line went round more than 1,000,000 times in all: check their loops.";
+
+/// One more round of a loop: within this run's limit and the line's.
+fn tick(env: &mut Env, steps: &mut u32, at: Span) -> R<()> {
+    *steps += 1;
+    if *steps > MAX_STEPS { return fail("The loops went round more than 100,000 times: check that this one ends.", at); }
+    if env.tick() > MAX_LINE { return fail(LINE_MSG, at); }
+    Ok(())
+}
 
 pub enum Line {
     Set(String, Node),
@@ -62,7 +73,7 @@ fn header(s: &str) -> Option<Head> {
 /// The first word of a line and the rest after it.
 fn word(s: &str) -> (&str, &str) {
     let s = s.trim_start();
-    let n = s.find(|c: char| !(c.is_alphanumeric() || c == '_')).unwrap_or(s.len());
+    let n = s.find(|c: char| !(c.is_alphanumeric() || matches!(c, '_' | '\'' | '°' | 'µ' | 'Ω' | 'Δ'))).unwrap_or(s.len());
     (&s[..n], &s[n..])
 }
 
@@ -108,8 +119,9 @@ pub fn parse(t: &str, known: &[String]) -> R<Prog> {
         let (w, rest) = word(l);
         // The expression after a keyword, at its place in the text.
         let after = |n: usize| -> R<Node> {
-            let off = start + lead + n;
-            match parse::statement(&padded(off, &l.trim_start()[n..]), &kn)? {
+            let t = l.trim_start();
+            let off = start + lead + t[..n].chars().count();
+            match parse::statement(&padded(off, &t[n..]), &kn)? {
                 Stmt::Show { e } => Ok(e),
                 _ => fail(format!("After {w} comes a value or a condition."), at),
             }
@@ -152,12 +164,12 @@ pub fn parse(t: &str, known: &[String]) -> R<Prog> {
                 // for x in … reads as the line x = …: a range, or a vector to go through.
                 let (n, r2) = word(rest);
                 let r3 = r2.trim_start();
-                if n.is_empty() || !r3.starts_with("in ") { return fail("Write a loop as for x in 1 .. 10, or for x in v.", at); }
+                if n.is_empty() || !r3.starts_with("in") || !r3[2..].starts_with(char::is_whitespace) { return fail("Write a loop as for x in 1 .. 10, or for x in v.", at); }
                 let off = start + l.chars().count() - r3.chars().count();
                 // x = … with the text after "in" at its own place.
-                let at_rest = off + 3;
-                let lhs = format!("{n} = ");
-                let each = match parse::statement(&padded(at_rest.saturating_sub(lhs.chars().count()), &format!("{lhs}{}", &r3[3..])), &kn)? {
+                let at_rest = off + 2;
+                let lhs = format!("{n} =");
+                let each = match parse::statement(&padded(at_rest.saturating_sub(lhs.chars().count()), &format!("{lhs}{}", &r3[2..])), &kn)? {
                     Stmt::Range { start: a, next, end, .. } => Each::Range(a, next, end),
                     Stmt::Assign { e, .. } => Each::Vals(e),
                     _ => return fail("Write a loop as for x in 1 .. 10, or for x in v.", at),
@@ -216,8 +228,7 @@ pub fn exec(env: &mut Env, lines: &[Line], steps: &mut u32) -> R<Flow> {
             Line::While(c, b, at) => {
                 let mut f = Flow::Next;
                 while truth(env, c)? {
-                    *steps += 1;
-                    if *steps > MAX_STEPS { return fail("The loops went round more than 100,000 times: check that this one ends.", *at); }
+                    tick(env, steps, *at)?;
                     match exec(env, b, steps)? { Flow::Break => break, Flow::Return(v) => { f = Flow::Return(v); break; } Flow::Next => {} }
                 }
                 f
@@ -229,8 +240,7 @@ pub fn exec(env: &mut Env, lines: &[Line], steps: &mut u32) -> R<Flow> {
                 let mut f = Flow::Next;
                 for i in 0..count {
                     let x = Val { v: vec![all.v[i]], im: all.im.get(i).map(|x| vec![*x]).unwrap_or_default(), dim: all.dim, abs: all.abs, nm: all.nm, ..Default::default() };
-                    *steps += 1;
-                    if *steps > MAX_STEPS { return fail("The loops went round more than 100,000 times: check that this one ends.", *at); }
+                    tick(env, steps, *at)?;
                     env.vars.insert(canon(n), x);
                     match exec(env, b, steps)? { Flow::Break => break, Flow::Return(v) => { f = Flow::Return(v); break; } Flow::Next => {} }
                 }

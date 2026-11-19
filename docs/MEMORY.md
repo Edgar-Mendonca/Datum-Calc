@@ -338,6 +338,7 @@ tests_ui/run.cjs               Playwright UI tests against ui/dist with a mocked
 
 ### 2026-11-19: Session 1, continued (0.2.5)
 - 0.2.4 released after the review fixes; the earlier CI failure was a macOS runner GitHub never assigned (re-run once, green).
+- 0.2.5 review fixes: every loop round counts into `Env.steps` for the line (plot and solve stop at 1,000,000 and the line shows the error); `f(x) = …` replaces a program function; function locals restore `exprs` too; names with primes; a failed top-level program restores what it set; `Env.unset` for names set only on a path not taken; character offsets after keywords; Tab/Shift+Tab on selected lines with undo.
 - Programs: `prog.rs` (parse and run), `Kind::Program`, program functions in `Env.progs`, `range_vals` shared with range lines; ribbon Insert › Program, Tab indents, Enter is a new line; help and glossary; pipe-regimes pack (friction factor by regime, hand values); fuzz writes programs.
 
 ## 5. Known limits and next steps

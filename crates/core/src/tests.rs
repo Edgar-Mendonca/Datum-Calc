@@ -1377,3 +1377,32 @@ fn programs() {
     assert!(error(&["g(a) =\n  return a + 1 m", "g(3)"]).starts_with("In g: Cannot add"));
     assert!(error(&["sqrt(a) =\n  return a"]).starts_with("sqrt is a built-in function"));
 }
+
+#[test]
+fn programs_review() {
+    // The rounds of every program on a line count together, so a plot or solve that calls a slow function stops
+    // quickly and says so, rather than running for minutes or drawing half a curve.
+    let f = "f(x) =\n  i = 0\n  while i < 50000\n    i = i + 1\n  end\n  return i + x";
+    let t = std::time::Instant::now();
+    assert!(error(&[f, "plot f(x) for x in 0 .. 100"]).starts_with("The programs on this line went round more than 1,000,000 times"));
+    assert!(error(&[f, "solve f(x) = 50010 for x in 0 .. 100"]).contains("went round more than 1,000,000 times"));
+    assert!(error(&["f(n) =\n  i = 0\n  while i < 99000\n    i = i + 1\n  end\n  if n <= 0\n    return 0\n  end\n  return f(n - 1)", "z = f(39)"]).contains("1,000,000"));
+    assert!(t.elapsed().as_secs_f64() < if cfg!(debug_assertions) { 60.0 } else { 6.0 }, "{:?}", t.elapsed());
+    assert_eq!(result(&[f, "z = f(3)"]), "50\u{2009}000", "a single call is well within the budget");
+    // A line f(x) = … below a program function replaces it.
+    assert_eq!(result(&["f(x) =\n  return x + 1", "f(x) = x^2", "z = f(3)"]), "9");
+    // A function's names are its own: a sheet expression or a primed name of the same spelling stays as it was.
+    assert_eq!(result(&["q = expand((x+1)^2)", "g(x) =\n  q = x\n  return q", "z = g(3)", "factor(q)"]), "(x + 1)²");
+    assert_eq!(result(&["x' = 7", "f(a) =\n  x' = a\n  return x'", "z = f(1)", "w = x'"]), "7");
+    assert_eq!(result(&["x' = 3\ny = x' + 1"]), "x' = 3, y = 4");
+    // A program that fails part way changes nothing on the sheet.
+    assert!(error(&["b = 10", "a = 1\nb = b + 1\nc = qq", "y = a + b"]).starts_with("a has an error on its own line."));
+    assert_eq!(result(&["b = 10", "a = 1\nb = b + 1\nc = qq", "y2 = b"]), "10");
+    // A name set only on a path that did not run says so.
+    assert!(error(&["a = 1\nif a > 5\n  b = 1\nend", "z = b"]).starts_with("b is set by the program above only on a path it did not take"));
+    // Tabs and non-breaking spaces after keywords; error positions in characters.
+    assert_eq!(result(&["s = 0\nfor\tk in\t1 .. 3\n  s = s + k\nend"]), "s = 6");
+    let o = run(&["a = 1\nif a > 5\n  b = 1\nelse\u{a0}if σ < qq\n  b = 2\nend"]);
+    let e = o.regions[0].error.clone().unwrap();
+    assert!(e.msg.starts_with("σ is not defined") && (e.from, e.to) == (31, 32), "{e:?}");
+}

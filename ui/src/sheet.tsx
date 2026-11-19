@@ -20,13 +20,22 @@ const Editor = (p: { r: Region }) => {
   let sent = p.r.text;
   const commit = () => { if (el.value !== sent) { sent = el.value; act({ Set: { id: p.r.id, field: "text", value: el.value } }); } };
   onMount(() => { el.value = p.r.text; fit(); setField(el); el.focus(); el.selectionStart = el.selectionEnd = el.value.length; });
+  // Tab in a program: two spaces at the caret, or before each selected line; Shift+Tab takes up to two away.
+  // The text goes in as typed text, so Ctrl+Z undoes it.
+  const indent = (out: boolean) => {
+    const v = el.value, a = el.selectionStart, z = el.selectionEnd;
+    if (!out && a === z) { document.execCommand("insertText", false, "  ") || el.setRangeText("  ", a, z, "end"); fit(); return; }
+    const from = v.lastIndexOf("\n", a - 1) + 1, to = z > a && v[z - 1] === "\n" ? z - 1 : (v.indexOf("\n", z) + 1 || v.length + 1) - 1;
+    const lines = v.slice(from, to).split("\n");
+    const next = lines.map(l => out ? l.replace(/^ {1,2}/, "") : "  " + l).join("\n");
+    el.setSelectionRange(from, to);
+    if (!document.execCommand("insertText", false, next)) el.setRangeText(next, from, to, "end");
+    el.setSelectionRange(from, from + next.length); fit();
+  };
   const key = (e: KeyboardEvent) => {
     e.stopPropagation();
     if (e.key === "Escape") { e.preventDefault(); commit(); setEditId(0); }
-    else if (e.key === "Tab" && p.r.kind === "program") {
-      // Tab indents a program line by two spaces.
-      e.preventDefault(); const a = el.selectionStart; el.setRangeText("  ", a, el.selectionEnd, "end"); fit();
-    } else if (e.key === "Enter" && !["text", "image", "program"].includes(p.r.kind) && !e.shiftKey) {
+    else if (e.key === "Tab" && p.r.kind === "program") { e.preventDefault(); indent(e.shiftKey); } else if (e.key === "Enter" && !["text", "image", "program"].includes(p.r.kind) && !e.shiftKey) {
       // Enter ends an equation and starts the next one below it.
       e.preventDefault(); commit(); setEditId(0); C.insert(p.r.kind === "check" ? "check" : "math");
     } else if (e.key === "Enter" && e.ctrlKey) { e.preventDefault(); commit(); setEditId(0); }

@@ -100,15 +100,21 @@ pub struct Env {
     pub exprs: HashMap<String, crate::sym::RatF>,
     /// Functions written as programs (0.2.5).
     pub progs: HashMap<String, std::sync::Arc<crate::prog::Prog>>,
-    /// Times round the loops of program functions on the current line (a plot calls them once per point).
+    /// Times round the loops of programs on the current line (a plot calls a function once per point).
     steps: u64,
+    /// Names a program sets only on some paths, not set on this run.
+    unset: std::collections::HashSet<String>,
     /// Names that are defined further down the sheet, or whose own line has an error.
     later: HashMap<String, bool>,
     depth: u32,
 }
 
 impl Env {
-    pub fn new() -> Self { Self { vars: HashMap::new(), funcs: HashMap::new(), shown: HashMap::new(), exprs: HashMap::new(), progs: HashMap::new(), steps: 0, later: HashMap::new(), depth: 0 } }
+    /// One more round of a program's loop on this line; the count so far.
+    pub(crate) fn tick(&mut self) -> u64 { self.steps += 1; self.steps }
+    pub(crate) fn steps(&self) -> u64 { self.steps }
+
+    pub fn new() -> Self { Self { vars: HashMap::new(), funcs: HashMap::new(), shown: HashMap::new(), exprs: HashMap::new(), progs: HashMap::new(), steps: 0, unset: Default::default(), later: HashMap::new(), depth: 0 } }
 
     /// What a name is for exact maths: a plain number (as a fraction), a kept expression, or a symbol.
     fn look(&self, v: &str) -> crate::sym::Look {
@@ -139,6 +145,7 @@ impl Env {
         if let Some(v) = self.vars.get(&k) { return Ok(v.clone()); }
         if self.exprs.contains_key(&k) { return fail(format!("{k} is an expression, not a value: use it inside simplify, expand or factor, such as factor({k})."), at); }
         if let Some(v) = constant(&k) { return Ok(v); }
+        if self.unset.contains(&k) { return fail(format!("{} is set by the program above only on a path it did not take this time.", show(&k)), at); }
         match self.later.get(&k) {
             Some(true) => fail(format!("{} has an error on its own line.", show(&k)), at),
             Some(false) => fail(format!("{} is defined further down: move its line above this one.", show(&k)), at),
@@ -201,6 +208,7 @@ impl Env {
     fn call(&mut self, f: &str, args: &[Node], at: Span) -> R<Val> {
         let k = canon(f);
         if let Some(p) = self.progs.get(&k).cloned() {
+            if self.steps > crate::prog::MAX_LINE { return fail(crate::prog::LINE_MSG, at); }
             let params = &p.head.as_ref().expect("a function program").1;
             if params.len() != args.len() { return fail(format!("{f} takes {} value{}.", params.len(), if params.len() == 1 { "" } else { "s" }), at); }
             if self.depth > 40 { return fail(format!("{f} calls itself too deeply."), at); }
@@ -209,14 +217,14 @@ impl Env {
             let mut keys: Vec<String> = params.iter().chain(&p.sets).map(|n| canon(n)).collect();
             keys.dedup();
             let saved: Vec<(String, Option<Val>)> = keys.iter().map(|k| (k.clone(), self.vars.get(k).cloned())).collect();
+            let saved_x: Vec<(String, crate::sym::RatF)> = keys.iter().filter_map(|k| self.exprs.get(k).map(|x| (k.clone(), x.clone()))).collect();
             for (n, v) in params.iter().zip(vals) { self.vars.insert(canon(n), v); }
             self.depth += 1;
             let mut steps = 0;
             let r = crate::prog::exec(self, &p.body, &mut steps);
             self.depth -= 1;
             for (k, v) in saved { match v { Some(v) => { self.vars.insert(k, v); } None => { self.vars.remove(&k); } } }
-            self.steps += u64::from(steps) + 1;
-            if self.steps > 1_000_000 { return fail(format!("{f} ran more than 1,000,000 steps on this line: check its loops."), at); }
+            self.exprs.extend(saved_x);
             return match r {
                 Ok(crate::prog::Flow::Return(v)) => Ok(v),
                 Ok(_) => fail(format!("{f} ended without return: give it a return line."), at),
@@ -976,7 +984,8 @@ fn run_here(s: &Sheet, f: &Fmt) -> (SheetOut, Env) {
     let mut out = SheetOut::default();
     let mut known: Vec<String> = vec![];
     for r in &s.regions {
-        let o = region(&mut env, r, f, &mut known, s.subst);
+        let mut o = region(&mut env, r, f, &mut known, s.subst);
+        if o.error.is_none() && env.steps() > crate::prog::MAX_LINE { o.error = Some(ErrOut { msg: crate::prog::LINE_MSG.into(), from: 0, to: r.text.chars().count() }); }
         if let Some(c) = &o.check { out.checks += 1; if !c.pass { out.failed += 1; } }
         if o.error.is_some() {
             out.errors += 1;
@@ -1019,13 +1028,18 @@ fn program(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>, o: &mut 
         known.push(name.clone());
         return;
     }
-    let loops: Vec<(String, Option<Val>)> = p.loops.iter().map(|n| (canon(n), env.vars.get(&canon(n)).cloned())).collect();
+    let before: Vec<(String, Option<Val>, Option<crate::sym::RatF>)> = p.sets.iter().map(|n| { let k = canon(n); (k.clone(), env.vars.get(&k).cloned(), env.exprs.get(&k).cloned()) }).collect();
     let mut steps = 0;
     let res = crate::prog::exec(env, &p.body, &mut steps);
-    for (k, v) in loops { match v { Some(v) => { env.vars.insert(k, v); } None => { env.vars.remove(&k); } } }
+    let put_back = |env: &mut Env, k: &str, v: &Option<Val>, x: &Option<crate::sym::RatF>| {
+        match v { Some(v) => { env.vars.insert(k.to_string(), v.clone()); } None => { env.vars.remove(k); } }
+        if let Some(x) = x { env.exprs.insert(k.to_string(), x.clone()); }
+    };
+    for (k, v, x) in before.iter().filter(|b| res.is_err() || p.loops.iter().any(|n| canon(n) == b.0)) { put_back(env, k, v, x); }
     match res {
         Err(e) => { o.error = Some(ErrOut { msg: e.msg, from: e.at.0, to: e.at.1 }); }
         Ok(_) => {
+            for n in p.sets.iter().filter(|n| !p.loops.contains(n) && !env.vars.contains_key(&canon(n))) { env.unset.insert(canon(n)); }
             let (mut texts, mut texes) = (vec![], vec![]);
             for name in p.sets.iter().filter(|n| !p.loops.contains(n)) {
                 let k = canon(name);
@@ -1181,6 +1195,7 @@ fn region(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>, subst: bo
             Stmt::Func { name, params, e } => {
                 o.name = canon(name);
                 env.exprs.remove(&canon(name));
+                env.progs.remove(&canon(name));
                 env.funcs.insert(canon(name), (params.clone(), e.clone()));
                 known.push(name.clone());
             }

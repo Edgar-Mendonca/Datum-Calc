@@ -275,6 +275,17 @@ const check = (name, ok, info = "") => { console.log(`${ok ? "ok  " : "FAIL"} ${
   check("a fraction draws as a fraction", (await p7.$$(".cpage .katex .mfrac")).length >= 2);
   check("a matrix draws in brackets with its unit", (await p7.$$(".cpage .katex .mtable")).length >= 3 && algText.includes("kN/m"), algText.slice(-200));
   check("a program draws line by line with its keywords and result", (await p7.$$(".cpage .k-program .katex")).length >= 1 && algText.includes("for") && algText.includes("break") && algText.includes("s=10"), algText.slice(-160));
+  // Editing a program: Tab indents the selected lines, Shift+Tab takes the indent away, Ctrl+Z undoes (0.2.5).
+  await p7.locator(".cpage .k-program").dblclick(); await p7.waitForTimeout(150);
+  const ed = p7.locator(".cpage .k-program textarea.redit");
+  await ed.evaluate(t => t.setSelectionRange(0, t.value.indexOf("\n", 6)));
+  await p7.keyboard.press("Tab");
+  const tabbed = await ed.inputValue();
+  await p7.keyboard.press("Shift+Tab");
+  const back = await ed.inputValue();
+  await p7.keyboard.press("Tab"); await p7.keyboard.press("Control+z");
+  check("Tab indents selected program lines, Shift+Tab outdents, Ctrl+Z undoes", tabbed.startsWith("  s = 0\n  for i in 1 .. 10\n") && back.startsWith("s = 0\nfor i in") && (await ed.inputValue()) === back, JSON.stringify([tabbed.slice(0, 40), back.slice(0, 30)]));
+  await p7.keyboard.press("Escape"); await p7.waitForTimeout(100);
   await p7.click(".tabs > button:text-is('Math')"); await p7.waitForTimeout(100);
   check("the Math tab has the Algebra keys", (await p7.$$eval(".ribbon .rb.key", bs => bs.map(b => b.textContent))).filter(t => ["simplify", "expand", "factor"].includes(t)).length === 3);
   await p7.click(".tabs > button:text-is('View')"); await p7.waitForTimeout(100);
