@@ -31,7 +31,9 @@ pub fn escape_text(s: &str) -> String { format!("\\text{{{}}}", s.replace('\\', 
 pub fn unit(label: &str) -> String {
     if label.is_empty() { return String::new(); }
     let mut s = String::new();
+    let mut sup = false;
     for c in label.chars() {
+        let was = std::mem::replace(&mut sup, false);
         match c {
             '·' => s.push_str("\\cdot "),
             '°' => s.push_str("{^\\circ}"),
@@ -42,7 +44,9 @@ pub fn unit(label: &str) -> String {
             '⁻' => s.push_str("^{-"),
             '¹' | '²' | '³' | '⁴' | '⁵' | '⁶' | '⁷' | '⁸' | '⁹' | '⁰' => {
                 let d = "⁰¹²³⁴⁵⁶⁷⁸⁹".chars().position(|x| x == c).unwrap_or(0);
-                if s.ends_with("^{-") { s.push_str(&format!("{d}}}")); } else { s.push_str(&format!("^{{{d}}}")); }
+                // Digits after a superscript join it: m¹² is m^{12}, not m^{1}^{2}.
+                if s.ends_with("^{-") { s.push_str(&format!("{d}}}")); } else if was { s.pop(); s.push_str(&format!("{d}}}")); } else { s.push_str(&format!("^{{{d}}}")); }
+                sup = true;
             }
             '_' => s.push_str("\\_"),
             c => s.push(c),

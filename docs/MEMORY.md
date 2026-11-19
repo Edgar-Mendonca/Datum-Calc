@@ -332,6 +332,7 @@ tests_ui/run.cjs               Playwright UI tests against ui/dist with a mocked
 
 ### 2026-11-18: Session 1, continued (0.2.4)
 - 0.2.3 review: two solver defects fixed before its release (unknowns of very different sizes rejected; an equation zero at the guess held to one SI unit). Relative unknowns, per-step term scaling, column-relative pivots.
+- 0.2.4 review: outer products capped at 10,000 values; one row-equilibrated LU (`solve::Lu`) for lsolve, inv, det and the equation solver (singular judged per column after row scaling, det 0 when singular); det refuses unit powers over 60; m¹² draws as one superscript; solve refuses vector sides; matrix functions refuse absolute temperatures; a number is a 1 × 1 matrix.
 - Vectors and matrices with units: literals with a unit after, indexing, product, powers, inverse, det, lsolve, transpose, identity, dot, cross, norm, rows, cols; bmatrix display; `units::named` tries powers ±1, ±2 of named units so det of kN/m reads N²/m². Fuzz grammar writes matrices; a UI test checks a matrix draws.
 
 ## 5. Known limits and next steps

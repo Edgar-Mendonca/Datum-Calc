@@ -166,9 +166,9 @@ fn random_expr(r: &mut Rng, depth: u32) -> String {
     // Complex values and units after brackets (0.1.8).
     const CX: [&str; 13] = ["4j", "-2.5j V", "(1 + 2j) Ω", "j", "1e300j", "(a) m", "0j", "2i kN*m", "(b - 1j) mA", "10 Ω∠30°", "5/_-45 deg", "2*pi*50 Hz", "a∠a"];
     // Vectors and matrices (0.2.4), well and badly formed.
-    const MAT: [&str; 12] = ["[1, 2]", "[[1, 2], [3, 4]]", "[[2, 1], [1, 3]] kN/m", "M", "M[1, 2]", "M[2]", "[[1], [2, 3]]", "[a, 2 m]", "[]", "identity(3)", "M^-1", "[[1e300, 0], [0, 1e-300]]"];
+    const MAT: [&str; 14] = ["det(identity(50)*1 W)", "transpose(v)*v", "[1, 2]", "[[1, 2], [3, 4]]", "[[2, 1], [1, 3]] kN/m", "M", "M[1, 2]", "M[2]", "[[1], [2, 3]]", "[a, 2 m]", "[]", "identity(3)", "M^-1", "[[1e300, 0], [0, 1e-300]]"];
     if depth == 0 || r.below(4) == 0 {
-        return match r.below(6) { 5 => MAT[r.below(12)].into(), 4 => CX[r.below(13)].into(), 0 => NUMS[r.below(10)].into(), 1 => format!("{} {}", NUMS[r.below(10)], UNITS[r.below(14)]), 2 => ["a", "b", "v", "g", "pi", "zz"][r.below(6)].into(), _ => format!("({})", random_expr(r, depth.saturating_sub(1))) };
+        return match r.below(6) { 5 => MAT[r.below(14)].into(), 4 => CX[r.below(13)].into(), 0 => NUMS[r.below(10)].into(), 1 => format!("{} {}", NUMS[r.below(10)], UNITS[r.below(14)]), 2 => ["a", "b", "v", "g", "pi", "zz"][r.below(6)].into(), _ => format!("({})", random_expr(r, depth.saturating_sub(1))) };
     }
     match r.below(4) {
         0 | 1 => format!("{} {} {}", random_expr(r, depth - 1), ["+", "-", "*", "/", "^", "<=", ">"][r.below(7)], random_expr(r, depth - 1)),

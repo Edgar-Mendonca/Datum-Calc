@@ -1298,3 +1298,28 @@ fn vectors_and_matrices() {
         (&["[20 °C, 30 °C]"][..], "A matrix cannot hold absolute temperatures"),
     ] { assert!(error(lines).starts_with(msg), "{lines:?}: {}", error(lines)); }
 }
+
+#[test]
+fn matrices_review() {
+    // Limits: an outer product of a long range is refused rather than filling memory; units of det stay in range.
+    assert!(error(&["v = 1, 2 .. 100000", "W = v*transpose(v)"]).starts_with("A 100000×100000 result: a matrix holds at most 10,000 values."));
+    assert!(error(&["det(identity(50)*1 W)"]).starts_with("The determinant of this 50 × 50 matrix"));
+    assert_eq!(result(&["det(identity(5)*1 kN/m)"]), "1×10¹⁵ kg⁵/s¹⁰");
+    assert!(run(&["det(identity(5)*1 kN/m)"]).regions[0].result_tex.contains("s^{10}"), "two-digit powers draw as one superscript");
+    // Singular means singular, judged row by row: det 0; a badly scaled but regular system solves.
+    assert_eq!(result(&["det([[1, 2, 3], [4, 5, 6], [7, 8, 9]])"]), "0");
+    assert_eq!(result(&["lsolve([[1, 1], [1e-14, 2e-14]], [2, 3e-14])"]), "[1, 1]");
+    assert_eq!(result(&["det([[2, -1], [-1, 2]] kN/m)"]), "3×10⁶ N²/m²");
+    // A number is a 1 × 1 matrix; norm does not overflow.
+    assert_eq!(result(&["det([[2]] m)"]), "2 m");
+    assert_eq!(result(&["lsolve(2 m, 4 m^2)"]), "2 m");
+    assert_eq!(result(&["norm([1e200, 1e200])"]), "141.4×10¹⁹⁸");
+    for (lines, msg) in [
+        (&["solve [[1, 2], [3, 4]]*[x, 1] = [3, 4] for x in -10 .. 10"][..], "solve needs an equation between single values"),
+        (&["M = [[1, 2], [3, 4]] K", "M + 20 °C"][..], "A matrix cannot hold absolute temperatures"),
+        (&["T = 20 °C, 30 °C .. 40 °C", "norm(T)"][..], "A matrix cannot hold absolute temperatures"),
+        (&["T = 20 °C", "T*identity(2)"][..], "A matrix cannot hold absolute temperatures"),
+        (&["x = 3", "x[1]"][..], "Only a vector or a matrix has entries."),
+        (&["[1, 2][1 + 1j]"][..], "An index is a whole number from 1."),
+    ] { assert!(error(lines).starts_with(msg), "{lines:?}: {}", error(lines)); }
+}

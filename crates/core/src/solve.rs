@@ -47,27 +47,50 @@ pub fn root(f: &mut dyn FnMut(f64) -> f64, a: f64, b: f64) -> Result<f64, String
     Ok(b)
 }
 
-/// x with A x = b, by Gaussian elimination with partial pivoting; None when A is singular (a pivot is
-/// negligible beside the largest entry of its column).
-pub fn linear(mut a: Vec<Vec<f64>>, mut b: Vec<f64>) -> Option<Vec<f64>> {
-    let n = b.len();
-    if a.len() != n || a.iter().any(|r| r.len() != n) { return None; }
-    let col: Vec<f64> = (0..n).map(|k| a.iter().fold(0.0f64, |m, r| m.max(r[k].abs()))).collect();
-    if !col.iter().all(|c| c.is_finite() && *c > 0.0) { return None; }
-    for k in 0..n {
-        let p = (k..n).max_by(|&i, &j| a[i][k].abs().total_cmp(&a[j][k].abs()))?;
-        if a[p][k].abs() <= 1e-13 * col[k] { return None; }
-        a.swap(k, p);
-        b.swap(k, p);
-        for i in k + 1..n {
-            let f = a[i][k] / a[k][k];
-            if f == 0.0 { continue; }
-            let (top, rest) = a.split_at_mut(i);
-            for (x, y) in rest[0][k..].iter_mut().zip(&top[k][k..]) { *x -= f * y; }
-            b[i] -= f * b[k];
+/// An LU factorisation with partial pivoting of A with each row scaled to its largest entry, so a pivot is
+/// judged beside its column whatever the sizes of the rows (rows 1 m apart from rows 1 µm apart).
+pub struct Lu { m: Vec<Vec<f64>>, s: Vec<f64>, p: Vec<usize>, sign: f64 }
+
+impl Lu {
+    /// None when A is singular: a pivot negligible beside the largest entry of its column.
+    pub fn new(mut a: Vec<Vec<f64>>) -> Option<Lu> {
+        let n = a.len();
+        if a.iter().any(|r| r.len() != n || r.iter().any(|v| !v.is_finite())) { return None; }
+        let s: Vec<f64> = a.iter().map(|r| r.iter().fold(0.0f64, |m, v| m.max(v.abs()))).collect();
+        if s.contains(&0.0) { return None; }
+        for (r, k) in a.iter_mut().zip(&s) { r.iter_mut().for_each(|v| *v /= k); }
+        let col: Vec<f64> = (0..n).map(|k| a.iter().fold(0.0f64, |m, r| m.max(r[k].abs()))).collect();
+        let (mut p, mut sign): (Vec<usize>, f64) = ((0..n).collect(), 1.0);
+        for k in 0..n {
+            let q = (k..n).max_by(|&i, &j| a[i][k].abs().total_cmp(&a[j][k].abs()))?;
+            if a[q][k].abs() <= 1e-13 * col[k] { return None; }
+            if q != k { a.swap(k, q); p.swap(k, q); sign = -sign; }
+            for i in k + 1..n {
+                let f = a[i][k] / a[k][k];
+                a[i][k] = f;
+                if f == 0.0 { continue; }
+                let (top, rest) = a.split_at_mut(i);
+                for (x, y) in rest[0][k + 1..].iter_mut().zip(&top[k][k + 1..]) { *x -= f * y; }
+            }
         }
+        Some(Lu { m: a, s, p, sign })
     }
-    let mut x = vec![0.0; n];
-    for i in (0..n).rev() { x[i] = (b[i] - (i + 1..n).map(|j| a[i][j] * x[j]).sum::<f64>()) / a[i][i]; }
-    x.iter().all(|v| v.is_finite()).then_some(x)
+
+    /// x with A x = b; None if it is not finite.
+    pub fn solve(&self, b: &[f64]) -> Option<Vec<f64>> {
+        let n = self.m.len();
+        let mut x: Vec<f64> = self.p.iter().map(|&i| b[i] / self.s[i]).collect();
+        for i in 0..n { for j in 0..i { x[i] -= self.m[i][j] * x[j]; } }
+        for i in (0..n).rev() { for j in i + 1..n { x[i] -= self.m[i][j] * x[j]; } x[i] /= self.m[i][i]; }
+        x.iter().all(|v| v.is_finite()).then_some(x)
+    }
+
+    /// The determinant: the pivots, a sign per row swap, and the row scales put back.
+    pub fn det(&self) -> f64 { (0..self.m.len()).fold(self.sign, |d, i| d * self.m[i][i] * self.s[self.p[i]]) }
+}
+
+/// x with A x = b; None when A is singular.
+pub fn linear(a: Vec<Vec<f64>>, b: Vec<f64>) -> Option<Vec<f64>> {
+    if a.len() != b.len() { return None; }
+    Lu::new(a)?.solve(&b)
 }
