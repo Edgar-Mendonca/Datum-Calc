@@ -4,6 +4,7 @@ pub mod latex;
 pub mod materials;
 pub mod packs;
 pub mod parse;
+pub mod prog;
 pub mod sheet;
 pub mod solve;
 pub mod sym;

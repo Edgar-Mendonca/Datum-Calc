@@ -581,7 +581,7 @@ tr.behind td { background: var(--err-bg); }
 .rtag { position: absolute; right: 100%; top: 6px; margin-right: 10px; font: 600 9px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: #8D9AAB; opacity: 0; white-space: nowrap; }
 .region.sel .rtag, .region:hover .rtag { opacity: 1; }
 .rtxt { white-space: pre-wrap; word-break: break-word; font-size: 13px; line-height: 1.5; }
-.k-math .rtxt, .k-check .rtxt, .redit { font: 13px/1.5 var(--mono); }
+.k-math .rtxt, .k-check .rtxt, .k-program .rtxt, .redit { font: 13px/1.5 var(--mono); }
 .k-text .redit { font: 13px/1.5 var(--sans); }
 .redit { width: 100%; border: 0 !important; outline: none !important; resize: none; background: transparent !important; padding: 0 !important; color: #1B2733; overflow: hidden; display: block; }
 .s-input { background: #FFF6DD; }

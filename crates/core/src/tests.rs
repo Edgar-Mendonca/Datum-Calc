@@ -92,7 +92,7 @@ fn unit_expressions() {
 fn sheet(lines: &[&str]) -> Sheet {
     let mut s = Sheet::new("t");
     for (i, l) in lines.iter().enumerate() {
-        let kind = if l.starts_with("check") { Kind::Check } else { Kind::Math };
+        let kind = if l.starts_with("check") { Kind::Check } else if l.contains('\n') { Kind::Program } else { Kind::Math };
         s.regions.push(Region { id: i as u32 + 1, kind, text: l.to_string(), ..Default::default() });
     }
     s
@@ -491,7 +491,7 @@ mod packs {
     #[test]
     fn all_packs_open_and_list() {
         let cards = crate::packs::cards();
-        assert_eq!(cards.len(), 26);
+        assert_eq!(cards.len(), 27);
         for c in &cards { assert!(!c.name.is_empty() && !c.desc.is_empty() && !c.field.is_empty() && c.checks > 0, "{}", c.id); }
     }
 
@@ -720,6 +720,18 @@ mod packs {
         assert!(close(v(&e, "Q_1") * 3600.0, 58.099_058_17, 1e-8) && close(v(&e, "Q_2") * 3600.0, 41.900_941_83, 1e-8));
         assert!(close(v(&e, "dp_12"), 21_069.487_2, 1e-8) && close(v(&e, "v_2"), 2.315_535_421, 1e-8));
         assert!(o.regions.iter().any(|r| r.result == "Q_1 = 58.1 m³/h, Q_2 = 41.9 m³/h") && checks(&o)[0].0);
+    }
+
+    #[test]
+    fn pipe_regimes() {
+        // A = π 0.0266²/4 = 5.5572e-4 m²; Q_1 = 0.05 m³/h: v = 0.024993 m/s, Re = 663.48 (laminar), f = 64/Re = 0.096461,
+        // Δp = f L/D ρ v²/2 = 22.606 Pa. Q_2 = 3 m³/h: v = 1.49957 m/s, Re = 39 808.7, Colebrook with ε/D = 0.0016917 gives
+        // f = 0.0264692 (Haaland 0.0262), Δp = 22 331.7 Pa ≤ 30 kPa.
+        let (o, e) = run("pipe-regimes");
+        assert!(close(v(&e, "Re_1"), 663.478_000_02, 1e-8) && close(v(&e, "f_1"), 0.096_461_374_75, 1e-8));
+        assert!(close(v(&e, "f_2"), 0.026_469_227_09, 1e-8) && close(v(&e, "dp_1"), 22.606_381_36, 1e-8));
+        assert!(close(v(&e, "dp_2"), 22_331.678_32, 1e-8) && checks(&o)[0].0);
+        assert!(o.regions.iter().all(|r| r.error.is_none()) && o.regions.iter().any(|r| r.plot.as_ref().is_some_and(|p| p.series[0].ys.iter().all(|y| y.is_finite()))));
     }
 
     #[test]
@@ -1322,4 +1334,46 @@ fn matrices_review() {
         (&["x = 3", "x[1]"][..], "Only a vector or a matrix has entries."),
         (&["[1, 2][1 + 1j]"][..], "An index is a whole number from 1."),
     ] { assert!(error(lines).starts_with(msg), "{lines:?}: {}", error(lines)); }
+}
+
+#[test]
+fn programs() {
+    // A function as a program: laminar 64/Re, else the Colebrook equation by fixed-point iteration. At Re = 10⁵ and
+    // k/D = 0.001 the friction factor is 0.0222 (Moody chart); at Re = 1000 it is 64/1000 = 0.064.
+    let fd = "f_D(Re, k) =\n  if Re < 2300\n    return 64/Re\n  end\n  f = 0.02\n  for i in 1 .. 50\n    f = (-2*log(k/3.7 + 2.51/(Re*sqrt(f))))^-2\n  end\n  return f";
+    assert_eq!(result(&[fd, "f_D(1000, 0.001)"]), "0.064");
+    assert_eq!(result(&[fd, "f_D(1e5, 0.001)"]), "0.02217");
+    // Run once: every name it sets is defined below, with units; the loop's own name is not.
+    let p = "total = 0 kN\nF = [10, 20, 30] kN\nfor x in F\n  total = total + x\nend\nn = 0\nwhile 2^n < 1000\n  n = n + 1\nend";
+    assert_eq!(result(&[p]), "total = 60 kN, F = [10, 20, 30] kN, n = 10");
+    assert_eq!(result(&[p, "total*2 + n*1 kN"]), "130 kN");
+    assert!(error(&[p, "x"]).contains("not defined") || result(&[p, "x"]).starts_with("ERR"), "the loop name stays local");
+    assert_eq!(result(&["L = 6 m\nif L > 5 m\n  c = 1\nelse if L > 2 m\n  c = 2\nelse\n  c = 3\nend"]), "L = 6 m, c = 1");
+    assert_eq!(result(&["L = 3 m\nif L > 5 m\n  c = 1\nelse if L > 2 m\n  c = 2\nelse\n  c = 3\nend"]), "L = 3 m, c = 2");
+    assert_eq!(result(&["s = 0\nfor i in 1, 3 .. 9\n  s = s + i\nend"]), "s = 25");
+    assert_eq!(result(&["s = 0\nfor i in 1 .. 10\n  if i > 4\n    break\n  end\n  s = s + i\nend"]), "s = 10");
+    assert_eq!(result(&["h(n) =\n  if n <= 1\n    return 1\n  end\n  return n*h(n - 1)", "h(5)"]), "120");
+    // Names that read as units (m, s) are the program's own names.
+    assert_eq!(result(&["m = 2\ns = m*3 kg"]), "m = 2, s = 6 kg");
+    // Drawn as maths, keywords in bold, one line each.
+    let o = run(&[fd]);
+    assert!(o.regions[0].latex.starts_with("\\begin{array}{l} f_{D}\\left(\\mathrm{Re}, k\\right) =") && o.regions[0].latex.contains("\\textbf{for}"), "{}", o.regions[0].latex);
+    // What it says, and where.
+    for (lines, msg, at) in [
+        (&["x = 1\nwhile x > 0\n  x = x + 1\nend"][..], "The loops went round more than 100,000 times", (6, 17)),
+        (&["if 1\n  y = 2"][..], "This block needs an end below it.", (0, 4)),
+        (&["a = 1\nreturn a"][..], "return is for a program that is a function", (6, 14)),
+        (&["z = 5 m\nq = z + 2 s"][..], "Cannot add a length and a time", (12, 19)),
+        (&["a = 1\nend"][..], "This end has no if, for or while to close.", (6, 9)),
+        (&["a = 1\nelse"][..], "This else has no if above it.", (6, 10)),
+        (&["a = 1\nbreak"][..], "break is for leaving a for or while loop.", (6, 11)),
+        (&["a = 1\nplot a for a in 0 .. 1"][..], "A program line sets a name", (6, 28)),
+    ] {
+        let o = run(lines);
+        let e = o.regions.last().unwrap().error.clone().unwrap_or_else(|| panic!("{lines:?}"));
+        assert!(e.msg.starts_with(msg) && (e.from, e.to) == at, "{lines:?}: {} {:?}", e.msg, (e.from, e.to));
+    }
+    assert!(error(&["g(a) =\n  b = a*2", "g(3)"]).starts_with("g ended without return"));
+    assert!(error(&["g(a) =\n  return a + 1 m", "g(3)"]).starts_with("In g: Cannot add"));
+    assert!(error(&["sqrt(a) =\n  return a"]).starts_with("sqrt is a built-in function"));
 }

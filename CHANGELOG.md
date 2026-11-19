@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.2.5 — 2026-11-19
+
+Small programs in a region.
+
+**Programs**
+- New region: Insert › Program. A few lines that decide and repeat, with units on every line: if, else if, else, for, while and break, each block closed by end.
+- Run once, every name the program sets is defined for the lines below and shown as its result (total = 60 kN, n = 10).
+- With a first line such as f_D(Re, k) = it is a function that returns a value: return 64/Re for laminar flow, or iterate the Colebrook equation and return f. Use it on any line, in a plot or in solve.
+- for i in 1 .. 10, for x in 0, 0.5 m .. 3 m, or for F_i in F (each value of a vector).
+- Drawn as maths, line by line, with the keywords in bold. Enter starts a new line and Tab indents.
+- It says what is wrong and on which line: a block without end, an else without if, a loop that never ends (stopped after 100,000 rounds), units that do not match.
+- New calc pack (27 in all): pipe flow in any regime, with the friction factor as a program and checked against a hand calculation.
+
+**Checks**
+- 80 engine tests (functions, loops, branches, break, recursion, errors and where they point, the new pack), 102 UI tests (a program draws, Insert › Program); the random-sheet test writes programs too. Every earlier pack prints as before.
+
 ## 0.2.4 — 2026-11-18
 
 Vectors and matrices with units.

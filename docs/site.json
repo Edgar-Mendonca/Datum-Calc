@@ -31,7 +31,8 @@
     "Solve for the value that makes an equation zero within a range, plot functions such as a pump curve against the system curve, and tables with units per column.",
     "Solve one equation in a range, or several equations together for several unknowns, with units.",
     "Vectors and matrices with units: a stiffness matrix in kN/m and loads in kN give displacements in m; multiply, transpose, inverse, determinant and linear systems.",
-    "Twenty-six ready calc packs, each with its reference and a test against a worked example.",
+    "Small programs in a region: if, else, for, while and break with units, or a function that returns a value, such as a friction factor for any flow regime.",
+    "Twenty-seven ready calc packs, each with its reference and a test against a worked example.",
     "Complex numbers for AC circuits in the frequency domain: impedances such as (8 + 9.42j) Ω, phasors as 230 V∠-30°, impedances in parallel, complex power, and Bode plots on a log frequency axis.",
     "Each equation can be shown again with its numbers put in, as on a hand calculation.",
     "Exact maths: fractions that stay fractions, and simplify, expand and factor on expressions.",
@@ -45,22 +46,22 @@
   ],
   "roadmap": [
     {
-      "v": "0.2.5",
-      "title": "Programs in a region",
+      "v": "0.2.6",
+      "title": "Thermophysical data",
       "when": "Next",
       "items": [
-        "if/else in a region",
-        "for and while loops, with limits",
-        "Results used by the lines below"
+        "Water and steam properties",
+        "Air and common gases",
+        "A steam calc pack"
       ]
     },
     {
-      "v": "0.2.6–0.2.7",
-      "title": "Thermophysical data, data in",
+      "v": "0.2.7",
+      "title": "Data in and curve fitting",
       "when": "Soon",
       "items": [
-        "Water, steam, air and gas properties",
-        "Paste or import CSV into tables; curve fitting"
+        "Paste or import CSV into tables",
+        "Linear, polynomial and exponential fits"
       ]
     },
     {

@@ -1,0 +1,245 @@
+{
+  "format": 1,
+  "name": "Pipe flow in any regime",
+  "title": {
+    "project": "",
+    "number": "PACK-27",
+    "title": "Pipe flow in any regime",
+    "by": "",
+    "checked": "",
+    "date": "",
+    "rev": "A",
+    "company": "",
+    "client": "",
+    "logo": ""
+  },
+  "page": {
+    "paper": "A4",
+    "margins": [
+      15.0,
+      15.0,
+      15.0,
+      20.0
+    ]
+  },
+  "units": "SI",
+  "digits": 4,
+  "regions": [
+    {
+      "id": 1,
+      "kind": "text",
+      "text": "Pipe flow in any regime",
+      "unit": "",
+      "style": "heading",
+      "data": null
+    },
+    {
+      "id": 2,
+      "kind": "text",
+      "text": "Water in a 1 in schedule 40 steel pipe, at a trickle and at its design flow. The Darcy friction factor is a program: laminar flow (Re < 2300) gives 64/Re; otherwise the Colebrook equation is iterated until it stops changing. Transitional flow (2300 to 4000) is uncertain and is taken as turbulent here.",
+      "unit": "",
+      "style": "note",
+      "data": null
+    },
+    {
+      "id": 3,
+      "kind": "text",
+      "text": "Inputs",
+      "unit": "",
+      "style": "subheading",
+      "data": null
+    },
+    {
+      "id": 4,
+      "kind": "math",
+      "text": "D = 26.6 mm  # inside diameter (1 in schedule 40)",
+      "unit": "",
+      "style": "input",
+      "data": null
+    },
+    {
+      "id": 5,
+      "kind": "math",
+      "text": "L = 20 m  # pipe length",
+      "unit": "",
+      "style": "input",
+      "data": null
+    },
+    {
+      "id": 6,
+      "kind": "math",
+      "text": "eps = 0.045 mm  # roughness of commercial steel",
+      "unit": "",
+      "style": "input",
+      "data": null
+    },
+    {
+      "id": 7,
+      "kind": "math",
+      "text": "rho = 998 kg/m^3  # water at 20 °C",
+      "unit": "",
+      "style": "input",
+      "data": null
+    },
+    {
+      "id": 8,
+      "kind": "math",
+      "text": "mu = 1 cP  # viscosity of water at 20 °C",
+      "unit": "",
+      "style": "input",
+      "data": null
+    },
+    {
+      "id": 9,
+      "kind": "math",
+      "text": "Q_1 = 0.05 m^3/h  # a trickle",
+      "unit": "",
+      "style": "input",
+      "data": null
+    },
+    {
+      "id": 10,
+      "kind": "math",
+      "text": "Q_2 = 3 m^3/h  # design flow",
+      "unit": "",
+      "style": "input",
+      "data": null
+    },
+    {
+      "id": 11,
+      "kind": "math",
+      "text": "dp_max = 30 kPa  # allowed pressure drop",
+      "unit": "",
+      "style": "input",
+      "data": null
+    },
+    {
+      "id": 12,
+      "kind": "text",
+      "text": "Friction factor",
+      "unit": "",
+      "style": "subheading",
+      "data": null
+    },
+    {
+      "id": 13,
+      "kind": "program",
+      "text": "f_D(Re, r) =\n  if Re < 2300\n    return 64/Re\n  end\n  f = 0.02\n  for n in 1 .. 100\n    f_new = (-2*log(r/3.7 + 2.51/(Re*sqrt(f))))^-2\n    if abs(f_new - f) < 1e-12*f\n      return f_new\n    end\n    f = f_new\n  end\n  return f",
+      "unit": "",
+      "style": "",
+      "data": null
+    },
+    {
+      "id": 14,
+      "kind": "math",
+      "text": "A = pi*D^2/4",
+      "unit": "",
+      "style": "",
+      "data": null
+    },
+    {
+      "id": 15,
+      "kind": "math",
+      "text": "dp(Q) = f_D(rho*Q/A*D/mu, eps/D)*L/D*rho*(Q/A)^2/2  # pressure drop at a flow Q",
+      "unit": "",
+      "style": "",
+      "data": null
+    },
+    {
+      "id": 16,
+      "kind": "text",
+      "text": "Results",
+      "unit": "",
+      "style": "subheading",
+      "data": null
+    },
+    {
+      "id": 17,
+      "kind": "math",
+      "text": "Re_1 = rho*Q_1/A*D/mu  # laminar",
+      "unit": "",
+      "style": "",
+      "data": null
+    },
+    {
+      "id": 18,
+      "kind": "math",
+      "text": "Re_2 = rho*Q_2/A*D/mu  # turbulent",
+      "unit": "",
+      "style": "",
+      "data": null
+    },
+    {
+      "id": 19,
+      "kind": "math",
+      "text": "f_1 = f_D(Re_1, eps/D)",
+      "unit": "",
+      "style": "",
+      "data": null
+    },
+    {
+      "id": 20,
+      "kind": "math",
+      "text": "f_2 = f_D(Re_2, eps/D)",
+      "unit": "",
+      "style": "",
+      "data": null
+    },
+    {
+      "id": 21,
+      "kind": "math",
+      "text": "dp_1 = dp(Q_1)",
+      "unit": "",
+      "style": "",
+      "data": null
+    },
+    {
+      "id": 22,
+      "kind": "math",
+      "text": "dp_2 = dp(Q_2)",
+      "unit": "",
+      "style": "",
+      "data": null
+    },
+    {
+      "id": 23,
+      "kind": "check",
+      "text": "check dp_2 <= dp_max",
+      "unit": "",
+      "style": "",
+      "data": null
+    },
+    {
+      "id": 24,
+      "kind": "plot",
+      "text": "plot dp(Q) for Q in 0.02 m^3/h .. 4 m^3/h log",
+      "unit": "",
+      "style": "",
+      "data": null
+    },
+    {
+      "id": 25,
+      "kind": "text",
+      "text": "Ref: C. F. Colebrook, J. Inst. Civil Eng. 11 (1939) 133–156: the friction factor equation.",
+      "unit": "",
+      "style": "ref",
+      "data": null
+    },
+    {
+      "id": 26,
+      "kind": "text",
+      "text": "Ref: F. M. White, Fluid Mechanics, 8th ed., §6.4 (laminar f = 64/Re), §6.7–6.8 (Colebrook, roughness of commercial steel).",
+      "unit": "",
+      "style": "ref",
+      "data": null
+    }
+  ],
+  "next_id": 27,
+  "ui": {
+    "pack": {
+      "id": "pipe-regimes",
+      "field": "Process",
+      "desc": "One friction factor for laminar and turbulent flow, written as a small program (64/Re below Re = 2300, else the Colebrook equation iterated), then the pressure drop at a low and a design flow."
+    }
+  }
+}

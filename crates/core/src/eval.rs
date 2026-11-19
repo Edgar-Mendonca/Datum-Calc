@@ -98,13 +98,17 @@ pub struct Env {
     pub shown: HashMap<String, String>,
     /// Names that hold an exact expression from simplify, expand or factor (y = expand((x+1)^2)).
     pub exprs: HashMap<String, crate::sym::RatF>,
+    /// Functions written as programs (0.2.5).
+    pub progs: HashMap<String, std::sync::Arc<crate::prog::Prog>>,
+    /// Times round the loops of program functions on the current line (a plot calls them once per point).
+    steps: u64,
     /// Names that are defined further down the sheet, or whose own line has an error.
     later: HashMap<String, bool>,
     depth: u32,
 }
 
 impl Env {
-    pub fn new() -> Self { Self { vars: HashMap::new(), funcs: HashMap::new(), shown: HashMap::new(), exprs: HashMap::new(), later: HashMap::new(), depth: 0 } }
+    pub fn new() -> Self { Self { vars: HashMap::new(), funcs: HashMap::new(), shown: HashMap::new(), exprs: HashMap::new(), progs: HashMap::new(), steps: 0, later: HashMap::new(), depth: 0 } }
 
     /// What a name is for exact maths: a plain number (as a fraction), a kept expression, or a symbol.
     fn look(&self, v: &str) -> crate::sym::Look {
@@ -113,7 +117,7 @@ impl Env {
         if let Some(r) = self.exprs.get(&k) { return Look::Expr(r.clone()); }
         // A name the sheet would refuse on a numeric line is refused here too, rather than taken for a symbol.
         if !self.vars.contains_key(&k) {
-            if self.funcs.contains_key(&k) || FUNCTIONS.iter().any(|f| f.0.split('(').next() == Some(k.as_str())) { return Look::Refuse(format!("{k} is a function; exact maths works on names and numbers.")); }
+            if self.funcs.contains_key(&k) || self.progs.contains_key(&k) || FUNCTIONS.iter().any(|f| f.0.split('(').next() == Some(k.as_str())) { return Look::Refuse(format!("{k} is a function; exact maths works on names and numbers.")); }
             match self.later.get(&k) {
                 Some(true) => return Look::Refuse(format!("{k} has an error on its own line.")),
                 Some(false) => return Look::Refuse(format!("{k} is defined further down: move its line above this one.")),
@@ -196,6 +200,29 @@ impl Env {
 
     fn call(&mut self, f: &str, args: &[Node], at: Span) -> R<Val> {
         let k = canon(f);
+        if let Some(p) = self.progs.get(&k).cloned() {
+            let params = &p.head.as_ref().expect("a function program").1;
+            if params.len() != args.len() { return fail(format!("{f} takes {} value{}.", params.len(), if params.len() == 1 { "" } else { "s" }), at); }
+            if self.depth > 40 { return fail(format!("{f} calls itself too deeply."), at); }
+            let vals = args.iter().map(|a| self.eval(a)).collect::<R<Vec<_>>>()?;
+            // Its parameters and the names it sets are its own: put back afterwards.
+            let mut keys: Vec<String> = params.iter().chain(&p.sets).map(|n| canon(n)).collect();
+            keys.dedup();
+            let saved: Vec<(String, Option<Val>)> = keys.iter().map(|k| (k.clone(), self.vars.get(k).cloned())).collect();
+            for (n, v) in params.iter().zip(vals) { self.vars.insert(canon(n), v); }
+            self.depth += 1;
+            let mut steps = 0;
+            let r = crate::prog::exec(self, &p.body, &mut steps);
+            self.depth -= 1;
+            for (k, v) in saved { match v { Some(v) => { self.vars.insert(k, v); } None => { self.vars.remove(&k); } } }
+            self.steps += u64::from(steps) + 1;
+            if self.steps > 1_000_000 { return fail(format!("{f} ran more than 1,000,000 steps on this line: check its loops."), at); }
+            return match r {
+                Ok(crate::prog::Flow::Return(v)) => Ok(v),
+                Ok(_) => fail(format!("{f} ended without return: give it a return line."), at),
+                Err(e) => fail(if e.msg.starts_with("In ") { e.msg } else { format!("In {f}: {}", e.msg) }, at),
+            };
+        }
         if let Some((params, body)) = self.funcs.get(&k).cloned() {
             if params.len() != args.len() { return fail(format!("{f} takes {} value{}.", params.len(), if params.len() == 1 { "" } else { "s" }), at); }
             if self.depth > 40 { return fail(format!("{f} calls itself too deeply."), at); }
@@ -349,6 +376,24 @@ fn mat_bin(op: &str, a: &Val, b: &Val, at: Span, rat: Span) -> R<Val> {
         }
         _ => { same_or(a, b, "compare", at)?; let mut v = each(&|x, y| { let t = |x: f64, y: f64| (x - y).abs() <= 1e-12 * x.abs().max(y.abs()); (match op { "<" => x < y, "<=" => x <= y || t(x, y), ">" => x > y, ">=" => x >= y || t(x, y), "==" => t(x, y), _ => !t(x, y) }) as u8 as f64 }, NONE)?; v.logic = true; Ok(v) }
     }
+}
+
+/// The values of a range `a .. b` or `a, next .. b` (a range line, or a program's for loop).
+pub(crate) fn range_vals(env: &mut Env, start: &Node, next: Option<&Node>, end: &Node) -> R<Val> {
+    let (a, b) = (env.eval(start)?, env.eval(end)?);
+    real(&a, "A range", start.at)?;
+    real(&b, "A range", end.at)?;
+    if a.vec || b.vec { return fail("A range goes between single values.", (start.at.0, end.at.1)); }
+    // A bare 0 at the start takes the unit of the rest: L = 0, 1 m .. 3 m.
+    let a = if a.x() == 0.0 && units::is_none(&a.dim) { Val { dim: b.dim, ..a } } else { a };
+    let st = match next { Some(n) => { let c = env.eval(n)?; real(&c, "A range", n.at)?; same_or(&a, &c, "use", n.at)?; bin("-", c, a.clone(), n.at, n.at)? } None => Val::num(1.0, a.dim) };
+    let st = if units::is_none(&st.dim) && !units::is_none(&b.dim) && next.is_none() { return fail("Give the step with its unit: x = 0, 10 m .. 100 m.", end.at) } else { st };
+    same_or(&a, &b, "use", end.at)?;
+    if st.x() == 0.0 || (b.x() - a.x()) / st.x() < 0.0 { return fail("The step must go from the first value towards the last.", end.at); }
+    let count = ((b.x() - a.x()) / st.x() + 1e-9).floor() + 1.0;
+    if !(1.0..=100_000.0).contains(&count) { return fail("A range holds at most 100,000 values.", end.at); }
+    let n = count as usize;
+    Ok(Val { abs: a.abs, ..Val::vector((0..n).map(|i| a.x() + st.x() * i as f64).collect(), a.dim) })
 }
 
 /// The units of a value to a power: whole exponents only (x^2, x^0.5 of an area); the angle tag is soft.
@@ -926,7 +971,7 @@ fn run_here(s: &Sheet, f: &Fmt) -> (SheetOut, Env) {
             if let Some(m) = d.mat.as_ref().or_else(|| crate::materials::find(&d.id)) { for k in crate::materials::KEYS.iter().filter(|k| m.props.contains_key(k.0)) { env.later.insert(canon(&format!("{}_{}", k.1, d.name)), false); } }
         } else if r.kind == Kind::Table {
             for c in serde_json::from_value::<TableData>(r.data.clone()).unwrap_or_default().cols { if !c.name.trim().is_empty() { env.later.insert(canon(c.name.trim()), false); } }
-        } else { for n in defined_names(split_note(&r.text).0) { env.later.insert(canon(&n), false); } }
+        } else { for n in region_names(r) { env.later.insert(canon(&n), false); } }
     }
     let mut out = SheetOut::default();
     let mut known: Vec<String> = vec![];
@@ -936,7 +981,7 @@ fn run_here(s: &Sheet, f: &Fmt) -> (SheetOut, Env) {
         if o.error.is_some() {
             out.errors += 1;
             if !o.name.is_empty() { env.later.insert(canon(&o.name), true); }
-            if r.kind != Kind::Table && r.kind != Kind::Material { for n in defined_names(split_note(&r.text).0) { env.later.insert(canon(&n), true); } }
+            if r.kind != Kind::Table && r.kind != Kind::Material { for n in region_names(r) { env.later.insert(canon(&n), true); } }
         }
         for v in &o.defs { out.vars.retain(|x| x.name != v.name); out.vars.push(v.clone()); }
         if let Some(t) = &o.table { for c in t.cols.iter().filter(|c| !c.error.is_empty() && !c.name.is_empty()) { env.later.insert(canon(&c.name), true); } }
@@ -949,6 +994,53 @@ fn run_here(s: &Sheet, f: &Fmt) -> (SheetOut, Env) {
         out.regions.push(o);
     }
     (out, env)
+}
+
+/// Every name a region of text defines: a program's function or the names it sets, else its line's.
+fn region_names(r: &Region) -> Vec<String> {
+    if r.kind != Kind::Program { return defined_names(split_note(&r.text).0); }
+    match crate::prog::names(&r.text) { (Some((n, _)), ..) => vec![n], (None, sets, loops) => sets.into_iter().filter(|n| !loops.contains(n)).collect() }
+}
+
+/// A program region: a function for the lines below, or lines run once whose names are defined below.
+fn program(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>, o: &mut RegionOut) {
+    if r.text.trim().is_empty() { return; }
+    let p = match crate::prog::parse(&r.text, known) {
+        Ok(p) => p,
+        Err(e) => { o.error = Some(ErrOut { msg: e.msg, from: e.at.0, to: e.at.1 }); o.latex = latex::escape_text(r.text.lines().next().unwrap_or("")); return; }
+    };
+    o.latex = p.tex.clone();
+    if let Some((name, _)) = p.head.clone() {
+        let k = canon(&name);
+        if FUNCTIONS.iter().any(|x| x.0.split('(').next() == Some(k.as_str())) { o.error = Some(ErrOut { msg: format!("{name} is a built-in function: choose another name."), from: 0, to: name.chars().count() }); return; }
+        o.name = k.clone();
+        env.funcs.remove(&k);
+        env.progs.insert(k, std::sync::Arc::new(p));
+        known.push(name.clone());
+        return;
+    }
+    let loops: Vec<(String, Option<Val>)> = p.loops.iter().map(|n| (canon(n), env.vars.get(&canon(n)).cloned())).collect();
+    let mut steps = 0;
+    let res = crate::prog::exec(env, &p.body, &mut steps);
+    for (k, v) in loops { match v { Some(v) => { env.vars.insert(k, v); } None => { env.vars.remove(&k); } } }
+    match res {
+        Err(e) => { o.error = Some(ErrOut { msg: e.msg, from: e.at.0, to: e.at.1 }); }
+        Ok(_) => {
+            let (mut texts, mut texes) = (vec![], vec![]);
+            for name in p.sets.iter().filter(|n| !p.loops.contains(n)) {
+                let k = canon(name);
+                let Some(v) = env.vars.get(&k).cloned() else { continue };
+                let (t, tx, value, unit) = show_val(&v, "", f);
+                texts.push(format!("{k} = {t}"));
+                texes.push(format!("{} = {tx}", latex::name(name)));
+                o.defs.push(VarOut { name: k.clone(), tex: latex::name(name), value, unit: unit.clone(), id: r.id });
+                if !unit.is_empty() { env.shown.insert(k.clone(), unit); }
+                known.push(name.clone());
+            }
+            o.result = texts.join(", ");
+            o.result_tex = if texes.is_empty() { String::new() } else { format!("\\Rightarrow\\; {}", texes.join(",\\; ")) };
+        }
+    }
 }
 
 /// Every name a line defines: one, or the unknowns of `solve … for x = g, y = g`.
@@ -1013,8 +1105,10 @@ fn substituted(env: &Env, e: &Node, f: &Fmt) -> String {
 
 fn region(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>, subst: bool) -> RegionOut {
     let mut o = RegionOut { id: r.id, ..Default::default() };
+    env.steps = 0;
     if r.kind == Kind::Table { table(env, r, f, known, &mut o); return o; }
     if r.kind == Kind::Material { material(env, r, f, known, &mut o); return o; }
+    if r.kind == Kind::Program { program(env, r, f, known, &mut o); return o; }
     if !matches!(r.kind, Kind::Math | Kind::Check | Kind::Solve | Kind::Plot) || r.text.trim().is_empty() { return o; }
     // Text after # describes the line: `Q = 120 m^3/h  # design flow`.
     let (code, note) = split_note(&r.text);
@@ -1092,19 +1186,7 @@ fn region(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>, subst: bo
             }
             Stmt::Range { name, start, next, end, .. } => {
                 o.name = canon(name);
-                let (a, b) = (env.eval(start)?, env.eval(end)?);
-                real(&a, "A range", start.at)?;
-                real(&b, "A range", end.at)?;
-                // A bare 0 at the start takes the unit of the rest: L = 0, 1 m .. 3 m.
-                let a = if a.x() == 0.0 && units::is_none(&a.dim) { Val { dim: b.dim, ..a } } else { a };
-                let st = match next { Some(n) => { let c = env.eval(n)?; real(&c, "A range", n.at)?; same_or(&a, &c, "use", n.at)?; bin("-", c, a.clone(), n.at, n.at)? } None => Val::num(1.0, a.dim) };
-                let st = if units::is_none(&st.dim) && !units::is_none(&b.dim) && next.is_none() { return fail("Give the step with its unit: x = 0, 10 m .. 100 m.", end.at) } else { st };
-                same_or(&a, &b, "use", end.at)?;
-                if st.x() == 0.0 || (b.x() - a.x()) / st.x() < 0.0 { return fail("The step must go from the first value towards the last.", end.at); }
-                let count = ((b.x() - a.x()) / st.x() + 1e-9).floor() + 1.0;
-                if !(1.0..=100_000.0).contains(&count) { return fail("A range holds at most 100,000 values.", end.at); }
-                let n = count as usize;
-                let v = Val { abs: a.abs, ..Val::vector((0..n).map(|i| a.x() + st.x() * i as f64).collect(), a.dim) };
+                let v = range_vals(env, start, next.as_ref(), end)?;
                 set_result(&mut o, &v, r, f);
                 env.exprs.remove(&canon(name)); env.vars.insert(canon(name), v);
                 known.push(name.clone());

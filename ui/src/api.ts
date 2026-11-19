@@ -7,7 +7,7 @@ export const invoke = <T = any>(cmd: string, args?: object): Promise<T> =>
   window.__TAURI__ ? window.__TAURI__.core.invoke(cmd, args) : Promise.reject("Datum Calc must run inside its desktop window.");
 export const listen = (e: string, f: (p: any) => void) => window.__TAURI__?.event.listen(e, x => f(x.payload));
 
-export type Kind = "math" | "text" | "check" | "solve" | "plot" | "table" | "image" | "material";
+export type Kind = "math" | "text" | "check" | "solve" | "plot" | "table" | "image" | "material" | "program";
 export interface Region { id: number; kind: Kind; text: string; unit: string; style: string; data: any }
 export interface TitleBlock { project: string; number: string; title: string; by: string; checked: string; date: string; rev: string; company: string; client: string; logo: string }
 export interface Sheet {

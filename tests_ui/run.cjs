@@ -35,7 +35,7 @@ const check = (name, ok, info = "") => { console.log(`${ok ? "ok  " : "FAIL"} ${
   check("File page offers a blank sheet", (await p.textContent(".tiles")).includes("Blank Sheet"));
   // 1b. File › New lists the ten calc packs by field; a click opens one (0.1.3).
   await p.click(".bs aside button:has-text('New')"); await p.waitForTimeout(200);
-  check("New lists the twenty-six calc packs", (await p.$$(".tiles.packs .tile")).length === 26 && (await p.$$eval("h3.packf", h => h.map(x => x.textContent))).join() === "Rotating equipment,Process,Mechanical,Electrical");
+  check("New lists the twenty-seven calc packs", (await p.$$(".tiles.packs .tile")).length === 27 && (await p.$$eval("h3.packf", h => h.map(x => x.textContent))).join() === "Rotating equipment,Process,Mechanical,Electrical");
   await p.click(".tiles.packs .tile:has-text('Pump power')"); await p.waitForTimeout(200);
   check("a pack tile opens that pack", JSON.stringify(await p.evaluate(() => window.__calls.filter(c => c[0] === "new_from_pack").pop())).includes("pump-power"));
   await p.click(".tabs .file").catch(() => {}); await p.waitForTimeout(100);
@@ -274,6 +274,7 @@ const check = (name, ok, info = "") => { console.log(`${ok ? "ok  " : "FAIL"} ${
   check("algebra results draw as maths", algText.includes("x2+2x+1") && algText.includes("(2x+1)(x−1)") && algText.includes("(x+1)3") && (await p7.$$(".cpage .katex-error")).length === 0 && (await p7.$$(".cpage .rerr")).length === 0, algText.slice(0, 300));
   check("a fraction draws as a fraction", (await p7.$$(".cpage .katex .mfrac")).length >= 2);
   check("a matrix draws in brackets with its unit", (await p7.$$(".cpage .katex .mtable")).length >= 3 && algText.includes("kN/m"), algText.slice(-200));
+  check("a program draws line by line with its keywords and result", (await p7.$$(".cpage .k-program .katex")).length >= 1 && algText.includes("for") && algText.includes("break") && algText.includes("s=10"), algText.slice(-160));
   await p7.click(".tabs > button:text-is('Math')"); await p7.waitForTimeout(100);
   check("the Math tab has the Algebra keys", (await p7.$$eval(".ribbon .rb.key", bs => bs.map(b => b.textContent))).filter(t => ["simplify", "expand", "factor"].includes(t)).length === 3);
   await p7.click(".tabs > button:text-is('View')"); await p7.waitForTimeout(100);
@@ -307,6 +308,7 @@ const check = (name, ok, info = "") => { console.log(`${ok ? "ok  " : "FAIL"} ${
   await p8.click(".matedit .btn.pri"); await p8.waitForTimeout(150);
   await p8.click(".tabs > button:text-is('Insert')"); await p8.waitForTimeout(100);
   check("Insert has a Material button", (await p8.$$(".ribbon button:has-text('Material')")).length === 1);
+  check("Insert has a Program button", (await p8.$$(".ribbon button:has-text('Program')")).length === 1);
   await p8.close();
 
   // 14. Recovery: Discard removes the kept copy; × only closes, so the copy is offered again next time (0.1.9).

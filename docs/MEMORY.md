@@ -173,6 +173,7 @@ tests_ui/run.cjs               Playwright UI tests against ui/dist with a mocked
 | 0.2.2 | Substituted angles are put in as radians | e^(0.3·162.7°) reads as e^48.8; radians are right everywhere, also inside sin() |
 | 0.2.3 | Roadmap from 0.2.3 on (agreed with the user, 18 Nov): close the gaps a calc-sheet tool is expected to cover (systems, matrices, programs, thermophysical data, data in and fitting, ODEs, custom units and templates, export), then engineering modules. The browser version and the school-maths ideas are dropped for now. Comparisons with other products are made only in conversation, never in any file (FAMILY §13) | The user compared Calc with other calc-sheet tools and chose to make it stronger rather than broader |
 | 0.2.3 | `solve eq1, eq2 … for x = guess, y = guess`: damped Newton with a forward-difference Jacobian (step √ε of the value), each unknown solved for relative to its size and each equation measured against the size of its terms (larger side, or the sum of |∂/∂ ln x| over the unknowns) at every step, after the 0.2.3 review found GPa beside a strain rejected; a singular Jacobian at the guess means the equations do not fix the unknowns, later it means no solution from there | Works with units (each unknown takes its guess's unit) and needs no ranges; the bracketed one-equation form stays |
+| 0.2.5 | Programs are their own region kind (`Kind::Program`, `prog.rs`): one statement per line, blocks closed by `end`, `x = …` assignments (drawn as ←), `if`/`else if`/`else`, `for x in a .. b` / `a, next .. b` / a vector, `while`, `break`, `return`. A first line `f(a, b) =` makes it a function (kept in `Env.progs`, its names local); otherwise it runs once and every name it sets, except loop names, is defined below. Each line is parsed by the ordinary statement parser, padded so error positions are positions in the region. Limits: 100,000 rounds per run, 1,000,000 per line for program functions (a plot calls them per point), 300 lines | Keeps the expression engine as is and gives engineers the if/loop they expect; `end` rather than indentation so a pasted program cannot change meaning |
 | 0.2.4 | A matrix is a `Val` with `rows` set (entries row by row in `v`, one unit for all); a vector is a column (rows = 0). `*` is the matrix product, `/` only by a scalar, `^n` up to 64 and `^-1` the inverse; `inv`/`det`/`lsolve` by Gaussian elimination with partial pivoting (`solve::linear`), singular when a pivot is negligible beside its column. Limits: 10,000 entries, det up to 60 × 60, shown up to 12 × 12 | One unit per matrix covers stiffness, flexibility and most engineering matrices and keeps the unit algebra exact (det → uⁿ, inv → 1/u); mixed-unit matrices can wait |
 | 0.2.2 | Each new pack gets an independent engineering check (equations, data, references) before release | It found two wrong section numbers and a note that quoted results which would go stale |
 
@@ -204,8 +205,8 @@ tests_ui/run.cjs               Playwright UI tests against ui/dist with a mocked
 | 0.2.2 | Packs 21–25: bolted flange, tank heating time, three-phase power-factor correction, helical spring, flat belt drive; angles put in as radians | ✅ |
 | 0.2.3 | Several equations solved together (Newton from guesses, with units); parallel-pipes pack (26) | ✅ |
 | 0.2.4 | Vectors and matrices with units: multiply, transpose, inverse, determinant, linear systems | ✅ |
-| 0.2.5 | Small programs in a region: if/else, for, while, with limits | 🔜 |
-| 0.2.6 | Thermophysical data: water and steam (IAPWS-IF97), air and common gases as functions of T and p; a steam pack | ⬜ |
+| 0.2.5 | Small programs in a region: if/else, for, while, with limits; pipe-regimes pack (27) | ✅ |
+| 0.2.6 | Thermophysical data: water and steam (IAPWS-IF97), air and common gases as functions of T and p; a steam pack | 🔜 |
 | 0.2.7 | Data in: paste or import CSV into tables; curve fitting (linear, polynomial, exponential) | ⬜ |
 | 0.2.8 | Differential equations with units, plotted over time | ⬜ |
 | 0.2.9 | Custom units, sheet templates, a saved company title block | ⬜ |
@@ -334,6 +335,10 @@ tests_ui/run.cjs               Playwright UI tests against ui/dist with a mocked
 - 0.2.3 review: two solver defects fixed before its release (unknowns of very different sizes rejected; an equation zero at the guess held to one SI unit). Relative unknowns, per-step term scaling, column-relative pivots.
 - 0.2.4 review: outer products capped at 10,000 values; one row-equilibrated LU (`solve::Lu`) for lsolve, inv, det and the equation solver (singular judged per column after row scaling, det 0 when singular); det refuses unit powers over 60; m¹² draws as one superscript; solve refuses vector sides; matrix functions refuse absolute temperatures; a number is a 1 × 1 matrix.
 - Vectors and matrices with units: literals with a unit after, indexing, product, powers, inverse, det, lsolve, transpose, identity, dot, cross, norm, rows, cols; bmatrix display; `units::named` tries powers ±1, ±2 of named units so det of kN/m reads N²/m². Fuzz grammar writes matrices; a UI test checks a matrix draws.
+
+### 2026-11-19: Session 1, continued (0.2.5)
+- 0.2.4 released after the review fixes; the earlier CI failure was a macOS runner GitHub never assigned (re-run once, green).
+- Programs: `prog.rs` (parse and run), `Kind::Program`, program functions in `Env.progs`, `range_vals` shared with range lines; ribbon Insert › Program, Tab indents, Enter is a new line; help and glossary; pipe-regimes pack (friction factor by regime, hand values); fuzz writes programs.
 
 ## 5. Known limits and next steps
 

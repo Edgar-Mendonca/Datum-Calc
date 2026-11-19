@@ -24,12 +24,17 @@ pub enum Line {
 /// What a `for` runs over: a range like a range line (`a .. b`, `a, next .. b`), or each value of a vector.
 pub enum Each { Range(Node, Option<Node>, Node), Vals(Node) }
 
+/// A function program's name and parameters.
+pub type Head = (String, Vec<String>);
+
 pub struct Prog {
     /// `name(a, b) =` on the first line: the program is a function.
-    pub head: Option<(String, Vec<String>)>,
+    pub head: Option<Head>,
     pub body: Vec<Line>,
     /// Every name the program sets, in order (loop names included), so a function can put them back.
     pub sets: Vec<String>,
+    /// The names of its loops: local, put back after the program has run.
+    pub loops: Vec<String>,
     pub tex: String,
 }
 
@@ -43,7 +48,7 @@ fn lines(t: &str) -> Vec<(usize, &str)> {
 fn padded(start: usize, s: &str) -> String { format!("{}{s}", " ".repeat(start)) }
 
 /// `name(a, b) =` and nothing else.
-fn header(s: &str) -> Option<(String, Vec<String>)> {
+fn header(s: &str) -> Option<Head> {
     let t = parse::lex(s).ok()?;
     let ids = |i: usize| match t.get(i).map(|x| &x.0) { Some(Tok::Id(n)) => Some(n.clone()), _ => None };
     let name = ids(0)?;
@@ -62,23 +67,27 @@ fn word(s: &str) -> (&str, &str) {
 }
 
 /// The names a program sets (and its function name and parameters), read from its text without parsing it fully.
-pub fn names(t: &str) -> (Option<(String, Vec<String>)>, Vec<String>) {
+pub fn names(t: &str) -> (Option<Head>, Vec<String>, Vec<String>) {
     let ls = lines(t);
     let first = ls.iter().position(|l| !l.1.trim().is_empty());
     let head = first.and_then(|i| header(ls[i].1));
-    let mut sets: Vec<String> = vec![];
+    let (mut sets, mut loops): (Vec<String>, Vec<String>) = (vec![], vec![]);
     for (k, (_, l)) in ls.iter().enumerate() {
         if head.is_some() && Some(k) == first { continue; }
         let (w, rest) = word(l);
         let n = if w == "for" { word(rest).0 } else if rest.trim_start().starts_with('=') && !rest.trim_start().starts_with("==") { w } else { "" };
-        if !n.is_empty() && !matches!(n, "if" | "else" | "while" | "end" | "break" | "return") && !sets.contains(&n.to_string()) { sets.push(n.to_string()); }
+        if n.is_empty() || matches!(n, "if" | "else" | "while" | "end" | "break" | "return") { continue; }
+        if w == "for" && !loops.contains(&n.to_string()) { loops.push(n.to_string()); }
+        if !sets.contains(&n.to_string()) { sets.push(n.to_string()); }
     }
-    (head, sets)
+    // A name set outside a loop header is the program's result, even if a loop also uses it.
+    loops.retain(|n| !ls.iter().any(|(_, l)| { let (w, rest) = word(l); w == n && rest.trim_start().starts_with('=') && !rest.trim_start().starts_with("==") }));
+    (head, sets, loops)
 }
 
 /// Reads a program. `known` holds the names defined above; the program's own names and parameters are added.
 pub fn parse(t: &str, known: &[String]) -> R<Prog> {
-    let (head, sets) = names(t);
+    let (head, sets, loops) = names(t);
     let mut kn: Vec<String> = known.to_vec();
     kn.extend(sets.iter().cloned());
     if let Some((_, ps)) = &head { kn.extend(ps.iter().cloned()); }
@@ -180,9 +189,10 @@ pub fn parse(t: &str, known: &[String]) -> R<Prog> {
     if stack.len() > 1 { let s = stack.last().expect("open").2; return fail("This block needs an end below it.", s); }
     let body = stack.pop().expect("top").1;
     if body.is_empty() { return fail("This program has no lines.", (0, t.chars().count())); }
-    Ok(Prog { head, body, sets, tex: format!("\\begin{{array}}{{l}} {} \\end{{array}}", tex.join(" \\\\ ")) })
+    Ok(Prog { head, body, sets, loops, tex: format!("\\begin{{array}}{{l}} {} \\end{{array}}", tex.join(" \\\\ ")) })
 }
 
+/// How a run of lines ended.
 pub enum Flow { Next, Break, Return(Val) }
 
 /// A condition: one real value, true when not zero.
@@ -207,23 +217,20 @@ pub fn exec(env: &mut Env, lines: &[Line], steps: &mut u32) -> R<Flow> {
                 let mut f = Flow::Next;
                 while truth(env, c)? {
                     *steps += 1;
-                    if *steps > MAX_STEPS { return fail(format!("The loops went round more than {MAX_STEPS} times: check that this one ends."), *at); }
+                    if *steps > MAX_STEPS { return fail("The loops went round more than 100,000 times: check that this one ends.", *at); }
                     match exec(env, b, steps)? { Flow::Break => break, Flow::Return(v) => { f = Flow::Return(v); break; } Flow::Next => {} }
                 }
                 f
             }
             Line::For(n, each, b, at) => {
-                let vals: Vec<Val> = match each {
-                    Each::Range(a, nx, z) => { let v = crate::eval::range_vals(env, a, nx.as_ref(), z)?; (0..v.v.len()).map(|i| Val { v: vec![v.v[i]], vec: false, ..v.clone() }).collect() }
-                    Each::Vals(e) => {
-                        let v = env.eval(e)?;
-                        if !v.vec { vec![v] } else { (0..v.v.len()).map(|i| Val { v: vec![v.v[i]], im: v.im.get(i).map(|x| vec![*x]).unwrap_or_default(), vec: false, rows: 0, ..v.clone() }).collect() }
-                    }
-                };
+                // The values one at a time: each entry with the units of the whole.
+                let all = match each { Each::Range(a, nx, z) => crate::eval::range_vals(env, a, nx.as_ref(), z)?, Each::Vals(e) => env.eval(e)? };
+                let count = if all.vec { all.v.len() } else { 1 };
                 let mut f = Flow::Next;
-                for x in vals {
+                for i in 0..count {
+                    let x = Val { v: vec![all.v[i]], im: all.im.get(i).map(|x| vec![*x]).unwrap_or_default(), dim: all.dim, abs: all.abs, nm: all.nm, ..Default::default() };
                     *steps += 1;
-                    if *steps > MAX_STEPS { return fail(format!("The loops went round more than {MAX_STEPS} times: check that this one ends."), *at); }
+                    if *steps > MAX_STEPS { return fail("The loops went round more than 100,000 times: check that this one ends.", *at); }
                     env.vars.insert(canon(n), x);
                     match exec(env, b, steps)? { Flow::Break => break, Flow::Return(v) => { f = Flow::Return(v); break; } Flow::Next => {} }
                 }

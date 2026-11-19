@@ -10,8 +10,8 @@ import { PAPERS } from "./print";
 import { MathView, ImageView, outs } from "./calc";
 
 const MM = 96 / 25.4;
-const PH: Record<string, string> = { math: "Q = 120 m^3/h", check: "check sigma <= sigma_allow", solve: "solve x^2 = 2 for x in 0 .. 10", plot: "plot f(x) for x in 0 .. 10", image: "Caption, such as Free-body diagram of the bracket" };
-const KIND: Record<string, string> = { math: "Math", text: "Text", check: "Check", solve: "Solve", plot: "Plot", table: "Table", image: "Picture", material: "Material" };
+const PH: Record<string, string> = { math: "Q = 120 m^3/h", check: "check sigma <= sigma_allow", solve: "solve x^2 = 2 for x in 0 .. 10", plot: "plot f(x) for x in 0 .. 10", image: "Caption, such as Free-body diagram of the bracket", program: "f(x) =\n  if x < 0\n    return 0\n  end\n  return x" };
+const KIND: Record<string, string> = { math: "Math", text: "Text", check: "Check", solve: "Solve", plot: "Plot", table: "Table", image: "Picture", material: "Material", program: "Program" };
 
 /** The region editor: a textarea that grows with its text and saves when it loses focus. */
 const Editor = (p: { r: Region }) => {
@@ -23,7 +23,10 @@ const Editor = (p: { r: Region }) => {
   const key = (e: KeyboardEvent) => {
     e.stopPropagation();
     if (e.key === "Escape") { e.preventDefault(); commit(); setEditId(0); }
-    else if (e.key === "Enter" && !["text", "image"].includes(p.r.kind) && !e.shiftKey) {
+    else if (e.key === "Tab" && p.r.kind === "program") {
+      // Tab indents a program line by two spaces.
+      e.preventDefault(); const a = el.selectionStart; el.setRangeText("  ", a, el.selectionEnd, "end"); fit();
+    } else if (e.key === "Enter" && !["text", "image", "program"].includes(p.r.kind) && !e.shiftKey) {
       // Enter ends an equation and starts the next one below it.
       e.preventDefault(); commit(); setEditId(0); C.insert(p.r.kind === "check" ? "check" : "math");
     } else if (e.key === "Enter" && e.ctrlKey) { e.preventDefault(); commit(); setEditId(0); }

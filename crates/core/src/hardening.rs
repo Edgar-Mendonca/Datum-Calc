@@ -193,6 +193,28 @@ fn random_expressions_never_panic() {
             let rows: Vec<serde_json::Value> = (0..r.below(5)).map(|_| json!([cell(&mut r), cell(&mut r)])).collect();
             push(Kind::Table, String::new(), json!({ "cols": [{ "name": "c1", "unit": (["", "m", "zz", "°C"][r.below(4)]) }, { "name": "c2", "formula": (["", "c1*2", "c1 +", "sum(c1)"][r.below(4)]) }], "rows": rows }));
         }
+        // A program (0.2.5): random lines, blocks sometimes left open or closed twice, a function sometimes.
+        if round % 2 == 0 {
+            let mut t = String::from(["", "pf(x) =\n", "pg(x, y) =\n"][r.below(3)]);
+            for _ in 0..r.below(9) {
+                let line = match r.below(10) {
+                    0 => format!("if {} > {}", random_expr(&mut r, 2), random_expr(&mut r, 1)),
+                    1 => format!("for k in {} .. {}", random_expr(&mut r, 1), random_expr(&mut r, 1)),
+                    2 => format!("while {} < {}", random_expr(&mut r, 2), random_expr(&mut r, 1)),
+                    3 => "else".into(),
+                    4 => "end".into(),
+                    5 => "break".into(),
+                    6 => format!("return {}", random_expr(&mut r, 2)),
+                    7 => format!("for k in {}", random_expr(&mut r, 1)),
+                    _ => format!("p{} = {}", r.below(3), random_expr(&mut r, 3)),
+                };
+                t.push_str(&format!("{}{line}\n", " ".repeat(r.below(3))));
+            }
+            if r.below(2) == 0 { t.push_str("end"); }
+            if !t.contains('\n') { t.push('\n'); }
+            push(Kind::Program, t, json!(null));
+            push(Kind::Math, format!("pf({}) + pg(1, 2) + p0", random_expr(&mut r, 1)), json!(null));
+        }
         for _ in 0..8 {
             let e = random_expr(&mut r, 4);
             let text = match r.below(6) {

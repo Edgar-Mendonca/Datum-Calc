@@ -27,6 +27,8 @@ pub enum Kind {
     Image,
     /// A material from the library: its properties become names with units.
     Material,
+    /// A small program: if, for, while, over several lines (0.2.5).
+    Program,
 }
 
 /// One region of the sheet. `text` is what the user types (an equation, a paragraph, a check);
