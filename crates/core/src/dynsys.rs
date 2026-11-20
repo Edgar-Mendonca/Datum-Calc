@@ -274,7 +274,10 @@ fn roots(c: &[f64]) -> Vec<C> {
             _ => items.push(vec![z[i]]),
         }
     }
-    items.sort_by(|a, b| cabs(a[0]).total_cmp(&cabs(b[0])).then(b[0].0.total_cmp(&a[0].0)));
+    // Sizes equal to round-off (a Butterworth filter's poles) are a tie, settled by the one nearest the imaginary
+    // axis first, so the order is the same on every machine.
+    let key = |z: C| { let m = cabs(z); if m == 0.0 { 0.0 } else { let e = 10f64.powi(m.log10().floor() as i32 - 8); (m / e).round() * e } };
+    items.sort_by(|a, b| key(a[0]).total_cmp(&key(b[0])).then(b[0].0.total_cmp(&a[0].0)));
     out.extend(items.into_iter().flatten());
     out
 }
