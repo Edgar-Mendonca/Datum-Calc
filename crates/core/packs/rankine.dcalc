@@ -1,0 +1,285 @@
+{
+  "format": 1,
+  "name": "Steam turbine: Rankine cycle",
+  "title": {
+    "project": "",
+    "number": "PACK-28",
+    "title": "Steam turbine: Rankine cycle",
+    "by": "",
+    "checked": "",
+    "date": "",
+    "rev": "A",
+    "company": "",
+    "client": "",
+    "logo": ""
+  },
+  "page": {
+    "paper": "A4",
+    "margins": [
+      15.0,
+      15.0,
+      15.0,
+      20.0
+    ]
+  },
+  "units": "SI",
+  "digits": 4,
+  "regions": [
+    {
+      "id": 1,
+      "kind": "text",
+      "text": "Steam turbine: Rankine cycle",
+      "unit": "",
+      "style": "heading",
+      "data": null
+    },
+    {
+      "id": 2,
+      "kind": "text",
+      "text": "Superheated steam expands in a turbine to the condenser pressure; the condensate is pumped back to the boiler. Each state comes from the water and steam functions (IAPWS-IF97): water_h(T, p) for the turbine inlet, water_h(p, s) for the ideal expansion, water_x(p, h) for the wetness at the exhaust.",
+      "unit": "",
+      "style": "note",
+      "data": null
+    },
+    {
+      "id": 3,
+      "kind": "text",
+      "text": "Inputs",
+      "unit": "",
+      "style": "subheading",
+      "data": null
+    },
+    {
+      "id": 4,
+      "kind": "math",
+      "text": "p_b = 40 bar  # boiler pressure",
+      "unit": "",
+      "style": "input",
+      "data": null
+    },
+    {
+      "id": 5,
+      "kind": "math",
+      "text": "T_1 = 400 °C  # turbine inlet temperature",
+      "unit": "",
+      "style": "input",
+      "data": null
+    },
+    {
+      "id": 6,
+      "kind": "math",
+      "text": "p_c = 0.1 bar  # condenser pressure",
+      "unit": "",
+      "style": "input",
+      "data": null
+    },
+    {
+      "id": 7,
+      "kind": "math",
+      "text": "eta_t = 0.85  # turbine isentropic efficiency",
+      "unit": "",
+      "style": "input",
+      "data": null
+    },
+    {
+      "id": 8,
+      "kind": "math",
+      "text": "eta_p = 0.75  # pump efficiency",
+      "unit": "",
+      "style": "input",
+      "data": null
+    },
+    {
+      "id": 9,
+      "kind": "math",
+      "text": "m = 20 kg/s  # steam flow",
+      "unit": "",
+      "style": "input",
+      "data": null
+    },
+    {
+      "id": 10,
+      "kind": "math",
+      "text": "x_min = 0.88  # least dryness at the turbine exhaust (blade erosion)",
+      "unit": "",
+      "style": "input",
+      "data": null
+    },
+    {
+      "id": 11,
+      "kind": "text",
+      "text": "Turbine",
+      "unit": "",
+      "style": "subheading",
+      "data": null
+    },
+    {
+      "id": 12,
+      "kind": "math",
+      "text": "h_1 = water_h(T_1, p_b)  # turbine inlet",
+      "unit": "",
+      "style": "",
+      "data": null
+    },
+    {
+      "id": 13,
+      "kind": "math",
+      "text": "s_1 = water_s(T_1, p_b)",
+      "unit": "",
+      "style": "",
+      "data": null
+    },
+    {
+      "id": 14,
+      "kind": "math",
+      "text": "h_2s = water_h(p_c, s_1)  # ideal (isentropic) expansion",
+      "unit": "",
+      "style": "",
+      "data": null
+    },
+    {
+      "id": 15,
+      "kind": "math",
+      "text": "h_2 = h_1 - eta_t*(h_1 - h_2s)  # actual exhaust",
+      "unit": "",
+      "style": "",
+      "data": null
+    },
+    {
+      "id": 16,
+      "kind": "math",
+      "text": "x_2 = water_x(p_c, h_2)  # dryness at the exhaust",
+      "unit": "",
+      "style": "",
+      "data": null
+    },
+    {
+      "id": 17,
+      "kind": "math",
+      "text": "T_2 = water_T(p_c, h_2)",
+      "unit": "",
+      "style": "",
+      "data": null
+    },
+    {
+      "id": 18,
+      "kind": "text",
+      "text": "Pump",
+      "unit": "",
+      "style": "subheading",
+      "data": null
+    },
+    {
+      "id": 19,
+      "kind": "math",
+      "text": "h_3 = water_h(p_c, 0)  # saturated liquid from the condenser",
+      "unit": "",
+      "style": "",
+      "data": null
+    },
+    {
+      "id": 20,
+      "kind": "math",
+      "text": "v_3 = water_v(p_c, 0)",
+      "unit": "",
+      "style": "",
+      "data": null
+    },
+    {
+      "id": 21,
+      "kind": "math",
+      "text": "w_p = v_3*(p_b - p_c)/eta_p  # pump work",
+      "unit": "",
+      "style": "",
+      "data": null
+    },
+    {
+      "id": 22,
+      "kind": "math",
+      "text": "h_4 = h_3 + w_p",
+      "unit": "",
+      "style": "",
+      "data": null
+    },
+    {
+      "id": 23,
+      "kind": "text",
+      "text": "Cycle",
+      "unit": "",
+      "style": "subheading",
+      "data": null
+    },
+    {
+      "id": 24,
+      "kind": "math",
+      "text": "w_t = h_1 - h_2  # turbine work",
+      "unit": "",
+      "style": "",
+      "data": null
+    },
+    {
+      "id": 25,
+      "kind": "math",
+      "text": "q_in = h_1 - h_4  # heat added in the boiler",
+      "unit": "",
+      "style": "",
+      "data": null
+    },
+    {
+      "id": 26,
+      "kind": "math",
+      "text": "eta_th = (w_t - w_p)/q_in  # thermal efficiency",
+      "unit": "",
+      "style": "",
+      "data": null
+    },
+    {
+      "id": 27,
+      "kind": "math",
+      "text": "P_net = m*(w_t - w_p)",
+      "unit": "MW",
+      "style": "",
+      "data": null
+    },
+    {
+      "id": 28,
+      "kind": "math",
+      "text": "Q_cond = m*(h_2 - h_3)  # heat to the condenser",
+      "unit": "MW",
+      "style": "",
+      "data": null
+    },
+    {
+      "id": 29,
+      "kind": "check",
+      "text": "check x_2 >= x_min",
+      "unit": "",
+      "style": "",
+      "data": null
+    },
+    {
+      "id": 30,
+      "kind": "text",
+      "text": "Ref: IAPWS R7-97(2012), Revised Release on the IAPWS Industrial Formulation 1997 for the Thermodynamic Properties of Water and Steam.",
+      "unit": "",
+      "style": "ref",
+      "data": null
+    },
+    {
+      "id": 31,
+      "kind": "text",
+      "text": "Ref: Y. A. Çengel and M. A. Boles, Thermodynamics: An Engineering Approach, ch. 10 (the Rankine cycle, isentropic efficiencies).",
+      "unit": "",
+      "style": "ref",
+      "data": null
+    }
+  ],
+  "next_id": 32,
+  "ui": {
+    "pack": {
+      "id": "rankine",
+      "field": "Process",
+      "desc": "A simple steam power cycle with water and steam properties (IAPWS-IF97): turbine expansion with its isentropic efficiency, wetness at the exhaust, pump work, net power and thermal efficiency."
+    }
+  }
+}

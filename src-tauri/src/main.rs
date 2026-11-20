@@ -416,7 +416,7 @@ struct Lists { units: Vec<(&'static str, &'static str, &'static str, String)>, c
 
 #[tauri::command]
 fn lists() -> Lists {
-    Lists { units: datum_core::units::list(), constants: eval::CONSTANTS.to_vec(), functions: eval::FUNCTIONS.to_vec() }
+    Lists { units: datum_core::units::list(), constants: eval::CONSTANTS.to_vec(), functions: eval::FUNCTIONS.iter().chain(eval::FLUID_FUNCTIONS.iter()).copied().collect() }
 }
 
 #[tauri::command]

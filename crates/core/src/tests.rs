@@ -491,7 +491,7 @@ mod packs {
     #[test]
     fn all_packs_open_and_list() {
         let cards = crate::packs::cards();
-        assert_eq!(cards.len(), 27);
+        assert_eq!(cards.len(), 28);
         for c in &cards { assert!(!c.name.is_empty() && !c.desc.is_empty() && !c.field.is_empty() && c.checks > 0, "{}", c.id); }
     }
 
@@ -720,6 +720,21 @@ mod packs {
         assert!(close(v(&e, "Q_1") * 3600.0, 58.099_058_17, 1e-8) && close(v(&e, "Q_2") * 3600.0, 41.900_941_83, 1e-8));
         assert!(close(v(&e, "dp_12"), 21_069.487_2, 1e-8) && close(v(&e, "v_2"), 2.315_535_421, 1e-8));
         assert!(o.regions.iter().any(|r| r.result == "Q_1 = 58.1 m³/h, Q_2 = 41.9 m³/h") && checks(&o)[0].0);
+    }
+
+    #[test]
+    fn rankine() {
+        // Independent IAPWS-IF97 values (another implementation): h₁ = 3214.374 kJ/kg, s₁ = 6.771192 kJ/(kg·K) at 40 bar,
+        // 400 °C; h₂s = 2144.459; h₂ = h₁ − 0.85 (h₁ − h₂s) = 2304.946, x₂ = 0.883390, 45.81 °C; h₃ = 191.812,
+        // v₃ = 1.010261 L/kg; w_p = v₃ Δp/0.75 = 5.37459; q_in = 3017.187; η = (909.427 − 5.375)/3017.187 = 0.299634;
+        // P = 20 × 904.05 = 18.081 MW; Q_cond = 42.263 MW. Steam tables give 3213.6 kJ/kg and 6.7690 at 40 bar, 400 °C.
+        let (o, e) = run("rankine");
+        assert!(close(v(&e, "h_1"), 3_214_373.508_87, 1e-9) && close(v(&e, "s_1"), 6_771.191_993_87, 1e-9));
+        assert!(close(v(&e, "h_2s"), 2_144_459.331_47, 1e-8) && close(v(&e, "x_2"), 0.883_389_726_14, 1e-8));
+        assert!(close(v(&e, "T_2"), 318.957_548_207, 1e-9) && close(v(&e, "h_3"), 191_812.295_194, 1e-8));
+        assert!(close(v(&e, "eta_th"), 0.299_634_254_08, 1e-8) && close(v(&e, "P_net"), 18_081_049.29, 1e-8));
+        assert!(close(v(&e, "Q_cond"), 42_262_683.26, 1e-8) && checks(&o)[0].0);
+        assert!(o.regions.iter().all(|r| r.error.is_none()) && o.regions.iter().any(|r| r.result == "18.08 MW"));
     }
 
     #[test]
@@ -1405,4 +1420,74 @@ fn programs_review() {
     let o = run(&["a = 1\nif a > 5\n  b = 1\nelse\u{a0}if σ < qq\n  b = 2\nend"]);
     let e = o.regions[0].error.clone().unwrap();
     assert!(e.msg.starts_with("σ is not defined") && (e.from, e.to) == (31, 32), "{e:?}");
+}
+
+#[test]
+fn iapws_if97_verification_tables() {
+    use crate::fluids;
+    // The computer-program verification values printed in IAPWS R7-97(2012): tables 5 (region 1), 15 (region 2),
+    // 33 (region 3, from density), 35 and 36 (saturation), 42 (region 5). v in m³/kg, h in kJ/kg, s and cp in kJ/(kg·K).
+    let rel = |a: f64, b: f64| ((a - b) / b).abs() < 6e-9;
+    for (t, p, v, h, s, cp, w) in [
+        (300.0, 3e6, 0.100215168e-2, 0.115331273e3, 0.392294792, 0.417301218e1, 0.150773921e4),
+        (300.0, 80e6, 0.971180894e-3, 0.184142828e3, 0.368563852, 0.401008987e1, 0.163469054e4),
+        (500.0, 3e6, 0.120241800e-2, 0.975542239e3, 0.258041912e1, 0.465580682e1, 0.124071337e4),
+        (300.0, 0.0035e6, 0.394913866e2, 0.254991145e4, 0.852238967e1, 0.191300162e1, 0.427920172e3),
+        (700.0, 0.0035e6, 0.923015898e2, 0.333568375e4, 0.101749996e2, 0.208141274e1, 0.644289068e3),
+        (700.0, 30e6, 0.542946619e-2, 0.263149474e4, 0.517540298e1, 0.103505092e2, 0.480386523e3),
+        (1500.0, 0.5e6, 0.138455090e1, 0.521976855e4, 0.965408875e1, 0.261609445e1, 0.917068690e3),
+        (1500.0, 30e6, 0.230761299e-1, 0.516723514e4, 0.772970133e1, 0.272724317e1, 0.928548002e3),
+        (2000.0, 30e6, 0.311385219e-1, 0.657122604e4, 0.853640523e1, 0.288569882e1, 0.106736948e4),
+    ] {
+        let st = fluids::tp(t, p).unwrap();
+        assert!(rel(1.0 / st.rho, v) && rel(st.h / 1e3, h) && rel(st.s / 1e3, s) && rel(st.cp / 1e3, cp) && rel(st.w, w), "{t} K {p} Pa: {st:?}");
+    }
+    // Region 3 from (T, p) must land on the tabled density (table 33 gives p from ρ = 500 and 200 kg/m³).
+    for (rho, t, p, h, s) in [(500.0, 650.0, 0.255837018e2, 0.186343019e4, 0.405427273e1), (200.0, 650.0, 0.222930643e2, 0.237512401e4, 0.485438792e1), (500.0, 750.0, 0.783095639e2, 0.225868845e4, 0.446971906e1)] {
+        let st = fluids::tp(t, p * 1e6).unwrap();
+        assert!(((st.rho - rho) / rho).abs() < 1e-7 && ((st.h / 1e3 - h) / h).abs() < 1e-7 && ((st.s / 1e3 - s) / s).abs() < 1e-7, "{st:?}");
+    }
+    for (t, p) in [(300.0, 0.353658941e-2), (500.0, 0.263889776e1), (600.0, 0.123443146e2)] { assert!(rel(fluids::psat(t).unwrap() / 1e6, p)); }
+    for (p, t) in [(0.1, 0.372755919e3), (1.0, 0.453035632e3), (10.0, 0.584149488e3)] { assert!(rel(fluids::tsat(p * 1e6).unwrap(), t)); }
+    // Viscosity (IAPWS R12-08, table 4, µPa·s, at the tabled densities).
+    for (t, rho, mu) in [(298.15, 998.0, 889.735100), (298.15, 1200.0, 1437.649467), (373.15, 1000.0, 307.883622), (433.15, 1.0, 14.538324), (433.15, 1000.0, 217.685358), (873.15, 1.0, 32.619287), (873.15, 100.0, 35.802262), (873.15, 600.0, 77.430195), (1173.15, 1.0, 44.217245), (1173.15, 100.0, 47.640433), (1173.15, 400.0, 64.154608)] {
+        assert!((fluids::mu(rho, t) * 1e6 - mu).abs() < 5e-7, "{t} {rho}: {}", fluids::mu(rho, t) * 1e6);
+    }
+    // Out of range says so; (p, h) and (p, s) give back the temperature.
+    assert!(fluids::tp(250.0, 1e5).is_err() && fluids::tp(1200.0, 60e6).is_err() && fluids::psat(700.0).is_err());
+    for (t, p) in [(300.0, 1e5), (450.0, 1e6), (700.0, 30e6), (650.0, 25e6), (1500.0, 1e6)] {
+        let st = fluids::tp(t, p).unwrap();
+        assert!((fluids::p_and(p, st.h, 0).unwrap().t - t).abs() < 1e-7 && (fluids::p_and(p, st.s, 1).unwrap().t - t).abs() < 1e-7);
+    }
+}
+
+#[test]
+fn water_and_gas_properties_on_a_sheet() {
+    // Steam tables: 40 bar, 400 °C: h = 3214 kJ/kg, s = 6.771 kJ/(kg·K); 1 atm boils at 99.97 °C; water at 20 °C,
+    // 1 bar: ρ = 998.2 kg/m³, μ = 1.002 mPa·s, k = 0.598 W/(m·K), Pr = 7.01, σ = 72.74 mN/m.
+    assert_eq!(result(&["water_h(400 °C, 40 bar)"]), "3214 kJ/kg");
+    assert_eq!(result(&["water_s(40 bar, 400 °C)"]), "6.771 kJ/(kg·K)", "either order");
+    assert_eq!(result(&["water_Tsat(1 atm)"]), "99.97 °C");
+    assert_eq!(result(&["water_rho(20 °C, 1 bar)"]), "998.2 kg/m³");
+    assert_eq!(result(&["water_k(20 °C, 1 bar)"]), "0.598 W/(m·K)");
+    assert_eq!(result(&["water_Pr(20 °C, 1 bar)"]), "7.009");
+    assert_eq!(result(&["water_sigma(20 °C)"]), "0.07274 N/m");
+    // Wet steam from a pressure and an enthalpy; a vector of temperatures gives a vector (100 °C at 1 bar is steam).
+    assert_eq!(result(&["water_x(0.1 bar, 2144 kJ/kg)"]), "0.8161");
+    assert_eq!(result(&["T = 20 °C, 40 °C .. 100 °C", "water_rho(T, 1 bar)"]), "[998.2, 992.2, 983.2, 971.8, 0.5896] kg/m³");
+    // Gases (ideal gas; air 20 °C, 1 atm: 1.204 kg/m³; γ = 1.40; Pr = 0.705).
+    assert_eq!(result(&["gas_rho(air, 20 °C, 1 atm)"]), "1.204 kg/m³");
+    assert_eq!(result(&["gas_gamma(air, 300 K)"]), "1.401");
+    assert_eq!(result(&["gas_Pr(air, 300 K)"]), "0.7053");
+    assert_eq!(result(&["gas_M(CH4)"]), "0.01604 kg/mol");
+    assert!(run(&["gas_cp(CO2, 500 K)"]).regions[0].latex.contains("c_{p,\\mathrm{CO_2}}"));
+    for (lines, msg) in [
+        (&["water_h(180 °C, 10)"][..], "A value without a unit is read as a vapour fraction x"),
+        (&["water_cp(0.1 bar, 0.5)"][..], "cp is not defined for wet steam"),
+        (&["water_h(1 m, 2 s)"][..], "water_h takes two of: a temperature, a pressure"),
+        (&["water_h(-10 °C, 1 bar)"][..], "Water and steam properties are given from 0 °C"),
+        (&["gas_cp(steam, 300 K)"][..], "gas_cp needs a gas first: air, N2, O2, Ar, CO2, H2, He, CH4."),
+        (&["gas_mu(CH4, 800 K)"][..], "Methane: viscosity and conductivity are given from 200 K to 625 K"),
+        (&["gas_rho(air, 300 K)"][..], "gas_rho takes the gas, a temperature and a pressure."),
+    ] { assert!(error(lines).starts_with(msg), "{lines:?}: {}", error(lines)); }
 }

@@ -9,4 +9,10 @@ The materials library (crates/core/data/materials.json) is built from Datum Atla
 https://github.com/Edgar-Mendonca/Datum-Atlas) by tools/materials.py. Every value names its source;
 those sources keep their own terms.
 
+Water and steam properties (crates/core/src/fluids.rs) follow the IAPWS releases R7-97(2012) (IF97), R12-08
+(viscosity), R15-11 (thermal conductivity) and R1-76(2014) (surface tension), published by the International
+Association for the Properties of Water and Steam (http://www.iapws.org). Gas heat capacities use the NASA
+7-coefficient polynomials (McBride, Gordon and Reno, NASA TM-4513) as distributed with GRI-Mech 3.0; gas viscosity
+and conductivity are fits to the reference correlations named in docs/MEMORY.md.
+
 Product and file-format names are trademarks of their owners and are used only to describe file compatibility.

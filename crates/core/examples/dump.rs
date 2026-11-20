@@ -46,13 +46,15 @@ fn main() {
     // The RC filter pack: Bode plots on a log frequency axis (0.1.11).
     let rc = datum_core::packs::sheet("rc-filter").expect("the RC pack opens");
     let rc = serde_json::json!({ "sheet": rc, "calc": eval::run(&rc), "path": null, "dirty": false, "undo": false, "redo": false, "rev": 1 });
-    // Exact maths with View › Fractions on (0.2.0), a matrix (0.2.4) and a program (0.2.5).
+    // Exact maths with View › Fractions on (0.2.0), a matrix (0.2.4), a program (0.2.5) and properties (0.2.6).
     let mut alg = Sheet::new("Algebra");
     for (k, t) in ["expand((x+1)^2)", "factor(2*x^2 - x - 1)", "y = expand((x+1)^3)", "factor(y)", "a = 1/3", "simplify((x^2 - 1)/(x - 1))", "K = [[2, -1], [-1, 2]] kN/m", "u = lsolve(K, [10, 0] kN)"].iter().enumerate() {
         alg.regions.push(datum_core::Region { id: k as u32 + 1, kind: Kind::Math, text: t.to_string(), ..Default::default() });
     }
     alg.regions.push(datum_core::Region { id: 9, kind: Kind::Program, text: "s = 0\nfor i in 1 .. 10\n  if i > 4\n    break\n  end\n  s = s + i\nend".into(), ..Default::default() });
-    alg.next_id = 10;
+    alg.regions.push(datum_core::Region { id: 10, kind: Kind::Math, text: "h_1 = water_h(400 °C, 40 bar)".into(), ..Default::default() });
+    alg.regions.push(datum_core::Region { id: 11, kind: Kind::Math, text: "c_p = gas_cp(CO2, 500 K)".into(), ..Default::default() });
+    alg.next_id = 12;
     alg.exact = true;
     let alg = serde_json::json!({ "sheet": alg, "calc": eval::run(&alg), "path": null, "dirty": false, "undo": false, "redo": false, "rev": 1 });
     // A material region (0.2.1): S355 as "steel", used by the lines below.

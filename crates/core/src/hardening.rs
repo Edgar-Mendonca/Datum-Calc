@@ -166,9 +166,12 @@ fn random_expr(r: &mut Rng, depth: u32) -> String {
     // Complex values and units after brackets (0.1.8).
     const CX: [&str; 13] = ["4j", "-2.5j V", "(1 + 2j) Ω", "j", "1e300j", "(a) m", "0j", "2i kN*m", "(b - 1j) mA", "10 Ω∠30°", "5/_-45 deg", "2*pi*50 Hz", "a∠a"];
     // Vectors and matrices (0.2.4), well and badly formed.
+    // Water, steam and gas properties (0.2.6), with good, odd and missing arguments.
+    const FLUID: [&str; 12] = ["water_h(20 °C, 1 bar)", "water_T(1 bar, a)", "water_x(10 bar, 2000 kJ/kg)", "water_rho(a, b)", "water_cp(374 °C, 220.64 bar)", "water_psat(v)",
+        "gas_cp(air, a)", "gas_rho(CO2, 1e9 K, 1e-300 Pa)", "gas_mu(He, 1 K)", "water_s(1e-300 Pa, 1e300 kJ/kg)", "water_h(1 bar, 1e-9)", "gas_cp(zz, 300 K)"];
     const MAT: [&str; 14] = ["det(identity(50)*1 W)", "transpose(v)*v", "[1, 2]", "[[1, 2], [3, 4]]", "[[2, 1], [1, 3]] kN/m", "M", "M[1, 2]", "M[2]", "[[1], [2, 3]]", "[a, 2 m]", "[]", "identity(3)", "M^-1", "[[1e300, 0], [0, 1e-300]]"];
     if depth == 0 || r.below(4) == 0 {
-        return match r.below(6) { 5 => MAT[r.below(14)].into(), 4 => CX[r.below(13)].into(), 0 => NUMS[r.below(10)].into(), 1 => format!("{} {}", NUMS[r.below(10)], UNITS[r.below(14)]), 2 => ["a", "b", "v", "g", "pi", "zz"][r.below(6)].into(), _ => format!("({})", random_expr(r, depth.saturating_sub(1))) };
+        return match r.below(7) { 6 => FLUID[r.below(12)].into(), 5 => MAT[r.below(14)].into(), 4 => CX[r.below(13)].into(), 0 => NUMS[r.below(10)].into(), 1 => format!("{} {}", NUMS[r.below(10)], UNITS[r.below(14)]), 2 => ["a", "b", "v", "g", "pi", "zz"][r.below(6)].into(), _ => format!("({})", random_expr(r, depth.saturating_sub(1))) };
     }
     match r.below(4) {
         0 | 1 => format!("{} {} {}", random_expr(r, depth - 1), ["+", "-", "*", "/", "^", "<=", ">"][r.below(7)], random_expr(r, depth - 1)),
@@ -343,4 +346,26 @@ fn damaged_material_regions_never_panic() {
             assert_eq!(o.regions.len(), 2);
         }
     }
+}
+
+#[test]
+fn water_properties_never_panic_or_hang() {
+    // Random states, inside and far outside the formulation, through every entry: finite results or a message.
+    let mut r = Rng(0x57EA_0F1F_0097);
+    let pick = |r: &mut Rng, lo: f64, hi: f64| lo * (hi / lo).powf(r.below(10_001) as f64 / 10_000.0);
+    let t0 = std::time::Instant::now();
+    for _ in 0..4000 {
+        let (t, p) = (pick(&mut r, 100.0, 3000.0), pick(&mut r, 1.0, 2e8));
+        if let Ok(s) = crate::fluids::tp(t, p) {
+            assert!(s.rho.is_finite() && s.h.is_finite() && s.s.is_finite() && s.rho > 0.0, "{t} {p}");
+            if s.t <= 1173.15 { assert!(crate::fluids::mu(s.rho, s.t).is_finite() && crate::fluids::k(&s).is_finite(), "{t} {p}"); }
+        }
+        let h = [-1e6, 0.0, 1e5, 2e6, 3e6, 8e6, f64::NAN][r.below(7)] + r.below(1000) as f64 * 1e3;
+        let _ = crate::fluids::p_and(p, h, r.below(2));
+        let _ = crate::fluids::tx(t, r.below(13) as f64 / 10.0 - 0.1);
+        let _ = crate::fluids::px(p, 0.5);
+        let _ = crate::fluids::sat(t);
+    }
+    let limit = if cfg!(debug_assertions) { 30.0 } else { 3.0 };
+    assert!(t0.elapsed().as_secs_f64() < limit, "{:?}", t0.elapsed());
 }

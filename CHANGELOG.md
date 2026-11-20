@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.2.6 — 2026-11-20
+
+Water, steam and gas properties.
+
+**Water and steam**
+- Properties as functions with units, from any two of temperature, pressure, enthalpy, entropy or vapour fraction, in either order: water_h(400 °C, 40 bar), water_h(0.1 bar, s_1) after an expansion, water_x(0.1 bar, h_2) for the dryness, water_T(p, h).
+- Density, specific volume, enthalpy, internal energy, entropy, cp, cv, speed of sound, viscosity, kinematic viscosity, thermal conductivity and Prandtl number; water_Tsat(p), water_psat(T) and water_sigma(T) for surface tension.
+- IAPWS-IF97 from 0 °C to 800 °C up to 1000 bar and to 2000 °C up to 500 bar, near the critical point included; viscosity IAPWS 2008, conductivity IAPWS 2011, surface tension IAPWS 2014. Checked against the verification tables of the IAPWS releases.
+- Wet steam (inside the saturation dome) mixes density, enthalpy and entropy by the vapour fraction; it says so when a property such as cp is not defined there.
+
+**Gases**
+- Air, nitrogen, oxygen, argon, carbon dioxide, hydrogen, helium and methane as ideal gases: gas_cp(air, T), gas_cv, gas_gamma, gas_h, gas_s(air, T, p), gas_rho(air, T, p), gas_mu, gas_nu, gas_k, gas_Pr, gas_M, gas_R.
+- Heat capacity within about 1 % from 200 K to 3000 K; viscosity and conductivity within 0.2 % of reference correlations over each gas's range.
+
+**Also**
+- A range of temperatures or pressures gives a vector of properties, for a table or a plot.
+- Math › Properties keys, and a help card with the ranges and accuracy.
+- New calc pack (28 in all): a steam turbine Rankine cycle, checked against an independent IF97 calculation.
+
+**Checks**
+- 85 engine tests (the IAPWS verification tables, viscosity check values, properties on a sheet, what it says out of range, the new pack) and 104 UI tests; random states and random sheets with property calls never panic. Every earlier pack prints as before.
+
 ## 0.2.5 — 2026-11-19
 
 Small programs in a region.

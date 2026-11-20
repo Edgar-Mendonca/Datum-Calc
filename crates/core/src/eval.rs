@@ -74,6 +74,23 @@ pub const CONSTANTS: [(&str, &str); 9] = [("π", "pi, 3.14159…"), ("j", "the i
     ("σ_SB", "Stefan–Boltzmann constant, 5.670374419×10⁻⁸ W/(m²·K⁴)"), ("N_A", "Avogadro constant, 6.02214076×10²³ /mol"), ("k_B", "Boltzmann constant, 1.380649×10⁻²³ J/K"), ("c_0", "speed of light, 299792458 m/s")];
 
 /// Built-in functions: name, arguments, what it does (for help and the window's menus).
+/// Water, steam and gas properties (0.2.6); listed apart so the main list stays readable.
+pub const FLUID_FUNCTIONS: [(&str, &str); 27] = [
+    ("water_rho(T, p)", "density of water or steam (IAPWS-IF97); any two of T, p, h, s, x"), ("water_v(T, p)", "specific volume"),
+    ("water_h(T, p)", "specific enthalpy, also water_h(p, s) for an expansion"), ("water_u(T, p)", "specific internal energy"),
+    ("water_s(T, p)", "specific entropy"), ("water_cp(T, p)", "specific heat at constant pressure"), ("water_cv(T, p)", "specific heat at constant volume"),
+    ("water_w(T, p)", "speed of sound"), ("water_T(p, h)", "temperature, such as from a pressure and an enthalpy"), ("water_p(T, x)", "pressure"),
+    ("water_x(p, h)", "vapour fraction (thermodynamic quality outside the dome)"), ("water_mu(T, p)", "dynamic viscosity (IAPWS 2008)"),
+    ("water_nu(T, p)", "kinematic viscosity"), ("water_k(T, p)", "thermal conductivity (IAPWS 2011)"), ("water_Pr(T, p)", "Prandtl number"),
+    ("water_psat(T)", "saturation pressure at a temperature"), ("water_Tsat(p)", "saturation temperature at a pressure"), ("water_sigma(T)", "surface tension (IAPWS 2014)"),
+    ("gas_cp(air, T)", "specific heat of a gas: air, N2, O2, Ar, CO2, H2, He or CH4"), ("gas_cv(air, T)", "specific heat at constant volume"),
+    ("gas_gamma(air, T)", "ratio of specific heats cp/cv"), ("gas_h(air, T)", "enthalpy above 25 °C"), ("gas_s(air, T, p)", "entropy (ideal gas)"),
+    ("gas_rho(air, T, p)", "density (ideal gas)"), ("gas_mu(air, T)", "dynamic viscosity"), ("gas_k(air, T)", "thermal conductivity"), ("gas_Pr(air, T)", "Prandtl number"),
+];
+
+/// A built-in function's name (not one of the sheet's own).
+pub fn builtin_name(k: &str) -> bool { FUNCTIONS.iter().chain(FLUID_FUNCTIONS.iter()).any(|f| f.0.split('(').next() == Some(k)) || ["gas_M", "gas_R", "gas_nu"].contains(&k) }
+
 pub const FUNCTIONS: [(&str, &str); 47] = [
     ("sqrt(x)", "square root"), ("cbrt(x)", "cube root"), ("abs(x)", "absolute value"), ("exp(x)", "e to the power x"), ("ln(x)", "natural logarithm"), ("log(x)", "logarithm base 10"),
     ("sin(x)", "sine (x in rad, or with deg)"), ("cos(x)", "cosine"), ("tan(x)", "tangent"), ("asin(x)", "inverse sine (an angle)"), ("acos(x)", "inverse cosine"), ("atan(x)", "inverse tangent"),
@@ -123,7 +140,7 @@ impl Env {
         if let Some(r) = self.exprs.get(&k) { return Look::Expr(r.clone()); }
         // A name the sheet would refuse on a numeric line is refused here too, rather than taken for a symbol.
         if !self.vars.contains_key(&k) {
-            if self.funcs.contains_key(&k) || self.progs.contains_key(&k) || FUNCTIONS.iter().any(|f| f.0.split('(').next() == Some(k.as_str())) { return Look::Refuse(format!("{k} is a function; exact maths works on names and numbers.")); }
+            if self.funcs.contains_key(&k) || self.progs.contains_key(&k) || builtin_name(&k) { return Look::Refuse(format!("{k} is a function; exact maths works on names and numbers.")); }
             match self.later.get(&k) {
                 Some(true) => return Look::Refuse(format!("{k} has an error on its own line.")),
                 Some(false) => return Look::Refuse(format!("{k} is defined further down: move its line above this one.")),
@@ -242,6 +259,17 @@ impl Env {
             self.depth -= 1;
             for (p, v) in saved { match v { Some(v) => { self.vars.insert(p, v); } None => { self.vars.remove(&p); } } }
             return r.map_err(|e| if e.at.0 < body.at.0 || e.at.1 > body.at.1 { e } else { Error { msg: format!("In {f}: {}", e.msg), at } });
+        }
+        // Gas properties name the gas first: gas_cp(air, 300 K).
+        if let Some(prop) = f.strip_prefix("gas_").filter(|_| builtin_name(f)) {
+            let g = match args.first().map(|a| &a.e) { Some(E::Var(g)) => crate::fluids::gas(g), _ => None };
+            let Some(g) = g else { return fail(format!("{f} needs a gas first: {}.", crate::fluids::gas_ids().join(", ")), at) };
+            let vals = args[1..].iter().map(|a| self.eval(a)).collect::<R<Vec<_>>>()?;
+            return crate::propfn::gas(f, prop, g, &vals, at);
+        }
+        if let Some(prop) = f.strip_prefix("water_").filter(|_| builtin_name(f)) {
+            let vals = args.iter().map(|a| self.eval(a)).collect::<R<Vec<_>>>()?;
+            return crate::propfn::water(f, prop, &vals, at);
         }
         let n = args.len();
         let want = |m: usize| -> R<()> { if n == m { Ok(()) } else { fail(format!("{f} takes {m} value{}.", if m == 1 { "" } else { "s" }), at) } };
@@ -1021,7 +1049,7 @@ fn program(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>, o: &mut 
     o.latex = p.tex.clone();
     if let Some((name, _)) = p.head.clone() {
         let k = canon(&name);
-        if FUNCTIONS.iter().any(|x| x.0.split('(').next() == Some(k.as_str())) { o.error = Some(ErrOut { msg: format!("{name} is a built-in function: choose another name."), from: 0, to: name.chars().count() }); return; }
+        if builtin_name(&k) { o.error = Some(ErrOut { msg: format!("{name} is a built-in function: choose another name."), from: 0, to: name.chars().count() }); return; }
         o.name = k.clone();
         env.funcs.remove(&k);
         env.progs.insert(k, std::sync::Arc::new(p));
