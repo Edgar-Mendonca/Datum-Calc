@@ -205,6 +205,11 @@ tr.link:hover td { background: var(--pale); }
 .tile .pic small { position: absolute; right: 6px; top: 3px; font-size: 10px; color: var(--muted); }
 .tile b { font-size: 12.5px; }
 .tile span { font-size: 11.5px; color: var(--muted); margin-top: 3px; line-height: 1.35; }
+/* A region hidden in print is shown faint on the screen; a folded heading shows its arrow pointing right. */
+.region.hiddenp > *:not(.rtag) { opacity: .45; }
+.foldbtn { position: absolute; left: -22px; top: 4px; border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 13px; padding: 0 4px; }
+.foldbtn:hover { color: var(--blue); }
+.region.folded .rtxt::after { content: "  …"; color: var(--muted); }
 /* A template tile: the tile opens the template; Delete sits under it. */
 .tile.tpl { gap: 6px; }
 .tile.tpl .tplopen { all: unset; cursor: pointer; display: flex; flex-direction: column; }

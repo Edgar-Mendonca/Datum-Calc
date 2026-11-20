@@ -57,7 +57,7 @@ const TB_H = 124, FOOT_H = 26, GAP = 6;
 /** Packs measured regions into pages. References (style "ref") go to the end under their own heading. */
 const pack = (heights: Map<number, number>): PageOf[] => {
   const g = geom(), room = g.H - TB_H - FOOT_H - 12;
-  const body = [...(summaryOn() ? [SUMMARY] : []), ...S().regions.filter(r => r.style !== "ref")], refs = S().regions.filter(r => r.style === "ref");
+  const body = [...(summaryOn() ? [SUMMARY] : []), ...S().regions.filter(r => r.style !== "ref" && !r.hide)], refs = S().regions.filter(r => r.style === "ref" && !r.hide);
   const pages: PageOf[] = [{ regions: [], refs: false }];
   let used = 0;
   const put = (r: Region, refsPage: boolean) => {

@@ -146,6 +146,21 @@ fn new_from_pack(st: State<St>, id: String) -> R<Out> {
     Ok(out(&a))
 }
 
+/// File › Export › Word: the sheet as a .docx with Word equations; the window gives its plots as PNG pictures
+/// (region id, data URL, width, height).
+#[tauri::command]
+async fn export_docx(app: AppHandle, st: State<'_, St>, plots: Vec<(u32, String, u32, u32)>, name: String) -> R<Option<String>> {
+    let (s, o) = { let a = st.lock(); let s = a.doc.s.clone(); let o = datum_core::eval::run(&s); (s, o) };
+    let pics: std::collections::HashMap<u32, datum_core::docx::Picture> = plots.into_iter().filter_map(|(id, src, w, h)| {
+        let p = datum_core::docx::picture_from_data_url(&src)?;
+        Some((id, datum_core::docx::Picture { w: w.max(1), h: h.max(1), ..p }))
+    }).collect();
+    let bytes = datum_core::docx::document(&s, &o, &pics);
+    let Some(path) = app.dialog().file().add_filter("Word", &["docx"]).set_file_name(&name).blocking_save_file().and_then(|f| f.into_path().ok()).map(|p| with_ext(p, "docx")) else { return Ok(None) };
+    std::fs::write(&path, bytes).map_err(|e| format!("Could not save {}: {e}", path.display()))?;
+    Ok(Some(path.display().to_string()))
+}
+
 /// A template: a sheet saved for starting new ones (0.2.9), kept in the templates folder of the app's settings.
 #[derive(serde::Serialize)]
 struct Template { id: String, name: String, regions: usize }
@@ -589,7 +604,7 @@ fn main() {
             }
         })
         .invoke_handler(tauri::generate_handler![
-            state, apply, history, new_sheet, packs, new_from_pack, open, save, save_file, pick_image, table_text, import_table, templates, save_template, new_from_template, delete_template,
+            state, apply, history, new_sheet, packs, new_from_pack, open, save, save_file, export_docx, pick_image, table_text, import_table, templates, save_template, new_from_template, delete_template,
             lists, materials, options, set_options, autosave, recovery, recover, recent, startup_file, version, open_url, quit, check_update, install_update
         ])
         .run(tauri::generate_context!())

@@ -372,6 +372,27 @@ const check = (name, ok, info = "") => { console.log(`${ok ? "ok  " : "FAIL"} ${
   check("Delete asks before removing a template", del0 === 0 && askedDel.includes("Delete the template") && del1 === 1, `${del0} ${del1} ${askedDel}`);
   await pt.close();
 
+  // 13h. Folding, hiding and export (0.2.10): a folded heading hides its section on the screen; a region hidden
+  // in print is shown faint and tagged; Export › Word sends the drawn plots; Export › Web page leaves hidden regions out.
+  const px = await b.newPage({ viewport: { width: 1440, height: 1000 } });
+  px.on("pageerror", e => errors.push(String(e)));
+  await px.addInitScript(st => { window.__calls = []; window.__TAURI__ = { core: { invoke: async (c, a) => { window.__calls.push([c, a]); return c === "state" || c === "apply" ? st : c === "options" ? { theme: "light", autosave: 0, units: "SI", digits: 4, paper: "A4", number: "auto" } : c === "recent" || c === "packs" || c === "templates" ? [] : null; } }, event: { listen: async () => () => {} } }; }, fix.ex);
+  await px.goto(url); await px.waitForTimeout(500); await px.click(".bs aside .back"); await px.waitForTimeout(500);
+  const exText = await px.textContent(".cpage");
+  check("a folded heading hides its section on the screen", !exText.includes("fold") && exText.includes("Shown part") && exText.includes("Folded part"), exText.slice(0, 200));
+  check("a region hidden in print is shown faint and tagged", (await px.$$(".cpage .region.hiddenp")).length === 1 && exText.includes("hidden in print"));
+  await px.click(".cpage .region.folded .foldbtn"); await px.waitForTimeout(150);
+  const unfold = await px.evaluate(() => JSON.stringify(window.__calls.filter(c => c[0] === "apply").pop() ?? null));
+  check("the fold arrow unfolds the section", unfold.includes('"field":"fold"') && unfold.includes('"value":false'), unfold);
+  await px.click("button.file"); await px.waitForTimeout(300); await px.click(".bs aside button:has-text('Export')"); await px.waitForTimeout(300);
+  await px.click(".tile:has-text('Word')"); await px.waitForTimeout(300);
+  const word = await px.evaluate(() => JSON.stringify(window.__calls.filter(c => c[0] === "export_docx").pop() ?? null));
+  check("Export › Word sends the sheet's plots as pictures", word.includes('"name":"Export.docx"') && word.includes("data:image/png;base64,"), word.slice(0, 200));
+  await px.click(".tile:has-text('Web page')"); await px.waitForTimeout(300);
+  const web = await px.evaluate(() => (window.__calls.filter(c => c[0] === "save_file").pop() ?? [null, {}])[1]);
+  check("Export › Web page writes the maths as MathML and leaves hidden regions out", web.name === "Export.html" && web.data.includes("<math") && web.data.includes("Folded part") && !web.data.includes("secret") && web.data.includes("data:image/png"), (web.data ?? "").slice(0, 200));
+  await px.close();
+
   // 14. Recovery: Discard removes the kept copy; × only closes, so the copy is offered again next time (0.1.9).
   for (const [how, sel, want] of [["Discard", ".dlg footer .btn:not(.pri)", true], ["×", ".dlg header .x", false]]) {
     const p4 = await b.newPage({ viewport: { width: 1440, height: 900 } });

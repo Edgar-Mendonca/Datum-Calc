@@ -43,6 +43,12 @@ pub struct Region {
     pub unit: String,
     pub style: String,
     pub data: serde_json::Value,
+    /// Kept out of print and exports, still worked out (0.2.10).
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub hide: bool,
+    /// A heading whose section is folded away on the screen; it still prints (0.2.10).
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub fold: bool,
 }
 
 /// The block printed at the top of every calc sheet.
@@ -197,6 +203,8 @@ fn exec(s: &mut Sheet, op: Op) -> Result<(), String> {
                 "text" => { let t = text()?; if t.len() > MAX_TEXT { return Err("A region holds at most 20,000 characters.".into()); } r.text = t; }
                 "unit" => r.unit = text()?,
                 "style" => r.style = text()?,
+                "hide" => r.hide = value.as_bool().ok_or("hide is true or false.")?,
+                "fold" => r.fold = value.as_bool().ok_or("fold is true or false.")?,
                 "kind" => r.kind = serde_json::from_value(value.clone()).map_err(|_| "Unknown region kind.")?,
                 "data" => {
                     if value.get("src").and_then(|v| v.as_str()).is_some_and(|v| v.len() > MAX_PICTURE) { return Err("Choose a picture smaller than 6 MB.".into()); }

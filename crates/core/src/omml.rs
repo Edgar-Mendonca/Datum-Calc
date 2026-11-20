@@ -8,8 +8,9 @@ pub fn esc(s: &str) -> String { s.replace('&', "&amp;").replace('<', "&lt;").rep
 
 /// A run of maths (italic for one letter, as Word sets variables).
 fn r(t: &str) -> String { format!("<m:r><m:t xml:space=\"preserve\">{}</m:t></m:r>", esc(t)) }
-/// A run set upright: words, units, function names.
-pub fn rp(t: &str) -> String { format!("<m:r><m:rPr><m:sty m:val=\"p\"/></m:rPr><m:t xml:space=\"preserve\">{}</m:t></m:r>", esc(t)) }
+/// A run set upright as normal text: words, units, function names (normal text also keeps a unit such as bar from
+/// being read as a command by other editors).
+pub fn rp(t: &str) -> String { format!("<m:r><m:rPr><m:nor/><m:sty m:val=\"p\"/></m:rPr><m:t xml:space=\"preserve\">{}</m:t></m:r>", esc(t)) }
 fn sub(b: &str, s: &str) -> String { format!("<m:sSub><m:e>{b}</m:e><m:sub>{s}</m:sub></m:sSub>") }
 fn sup(b: &str, s: &str) -> String { format!("<m:sSup><m:e>{b}</m:e><m:sup>{s}</m:sup></m:sSup>") }
 fn frac(a: &str, b: &str) -> String { format!("<m:f><m:num>{a}</m:num><m:den>{b}</m:den></m:f>") }
@@ -87,11 +88,29 @@ pub fn node(n: &Node) -> String {
                 "abs" if a.len() == 1 => delim("|", "|", &a[0]),
                 "exp" if a.len() == 1 => sup(&r("e"), &a[0]),
                 "log" if a.len() == 1 => format!("<m:func><m:fName>{}</m:fName><m:e>{}</m:e></m:func>", sub(&rp("log"), &r("10")), paren(&a[0])),
+                f if (f.starts_with("water_") || f.starts_with("gas_")) && crate::eval::builtin_name(f) => fluid(f, args, &a),
                 f if f.chars().count() > 1 && (crate::eval::builtin_name(f) || matches!(f, "sin" | "cos" | "tan" | "ln")) => func(f, &list),
                 f => format!("{}{}", name(f), paren(&list)),
             }
         }
     }
+}
+
+/// A property function as a symbol with the fluid below, as on the sheet: h_water(T, p), c_p,CO₂(T).
+fn fluid(f: &str, args: &[Node], a: &[String]) -> String {
+    let (kind, prop) = f.split_once('_').unwrap_or(("", f));
+    let (sym, inner) = match prop {
+        "rho" => ("ρ", ""), "mu" => ("μ", ""), "nu" => ("ν", ""), "sigma" => ("σ", ""), "gamma" => ("γ", ""), "cp" => ("c", "p"), "cv" => ("c", "v"),
+        "psat" => ("p", "sat"), "Tsat" => ("T", "sat"), "Pr" => ("Pr", ""), p => (p, ""),
+    };
+    let (who, rest) = if kind == "gas" {
+        let g = match args.first().map(|x| &x.e) { Some(E::Var(g)) => crate::fluids::gas(g).map(|g| g.id.to_string()).unwrap_or_else(|| g.clone()), _ => String::new() };
+        (g.chars().map(|c| match c { '2' => '₂', '4' => '₄', c => c }).collect::<String>(), &a[1.min(a.len())..])
+    } else { ("water".to_string(), a) };
+    let base = if sym.chars().count() == 1 { r(sym) } else { rp(sym) };
+    let low = if inner.is_empty() { rp(&who) } else { format!("{}{}", rp(inner), rp(&format!(",{who}"))) };
+    let s = sub(&base, &low);
+    if rest.is_empty() { s } else { format!("{s}{}", paren(&rest.join(&r(", ")))) }
 }
 
 /// A line as an equation, when it is one that reads as an equation (an assignment, a function, a check, a value);

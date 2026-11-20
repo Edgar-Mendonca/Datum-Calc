@@ -1779,3 +1779,51 @@ fn units_of_the_sheets_own_review() {
     s.regions[0].unit = "zz".into();
     assert!(eval::run(&s).regions[0].warn.starts_with("zz is a unit defined further down"));
 }
+
+#[test]
+fn word_export() {
+    // The parts of a .docx, read back from our own zip: names, sizes and CRC-32 as stored.
+    fn parts(z: &[u8]) -> Vec<(String, Vec<u8>)> {
+        let e = (0..z.len() - 21).rev().find(|&i| z[i..i + 4] == [0x50, 0x4b, 0x05, 0x06]).expect("end of the central directory");
+        let n = u16::from_le_bytes([z[e + 10], z[e + 11]]) as usize;
+        let mut at = u32::from_le_bytes(z[e + 16..e + 20].try_into().unwrap()) as usize;
+        let crc_table: Vec<u32> = (0..256u32).map(|n| (0..8).fold(n, |c, _| if c & 1 != 0 { 0xEDB8_8320 ^ (c >> 1) } else { c >> 1 })).collect();
+        (0..n).map(|_| {
+            assert_eq!(z[at..at + 4], [0x50, 0x4b, 0x01, 0x02]);
+            let (crc, size) = (u32::from_le_bytes(z[at + 16..at + 20].try_into().unwrap()), u32::from_le_bytes(z[at + 24..at + 28].try_into().unwrap()) as usize);
+            let nl = u16::from_le_bytes([z[at + 28], z[at + 29]]) as usize;
+            let off = u32::from_le_bytes(z[at + 42..at + 46].try_into().unwrap()) as usize;
+            let name = String::from_utf8(z[at + 46..at + 46 + nl].to_vec()).unwrap();
+            assert_eq!(z[off..off + 4], [0x50, 0x4b, 0x03, 0x04]);
+            let data = z[off + 30 + nl..off + 30 + nl + size].to_vec();
+            assert_eq!(!data.iter().fold(!0u32, |c, x| crc_table[((c ^ *x as u32) & 0xFF) as usize] ^ (c >> 8)), crc, "{name}");
+            at += 46 + nl;
+            (name, data)
+        }).collect()
+    }
+    let mut s = crate::packs::sheet("rankine").unwrap();
+    s.regions[4].hide = true; // T_1 = 400 °C, left out of the export
+    let o = eval::run(&s);
+    let z = crate::docx::document(&s, &o, &Default::default());
+    let p = parts(&z);
+    let names: Vec<&str> = p.iter().map(|x| x.0.as_str()).collect();
+    assert_eq!(names, ["[Content_Types].xml", "_rels/.rels", "word/document.xml", "word/_rels/document.xml.rels", "word/styles.xml"]);
+    let doc = String::from_utf8(p[2].1.clone()).unwrap();
+    assert!(doc.contains("<m:oMath>") && doc.contains("PASS") && doc.contains(">3214 kJ/kg<") && doc.contains(">water<"), "equations, results and checks");
+    assert!(!doc.contains("turbine inlet temperature"), "a region hidden in print is left out");
+    assert_eq!(doc.matches("<w:p>").count() + doc.matches("<w:p/>").count(), doc.matches("</w:p>").count() + doc.matches("<w:p/>").count(), "paragraphs close");
+    // Every pack exports, with pictures from picture regions where there are some.
+    for c in crate::packs::cards() {
+        let s = crate::packs::sheet(c.id).unwrap();
+        let z = crate::docx::document(&s, &eval::run(&s), &Default::default());
+        assert!(parts(&z).len() >= 5, "{}", c.id);
+    }
+    // A region hidden or folded is kept in the file; hidden is false by default and not written.
+    let mut d = crate::sheet::Doc::new(crate::sheet::Sheet::new("x"));
+    d.apply(crate::sheet::Op::Insert { at: 0, kind: Kind::Math, text: "a = 1".into(), data: Default::default() }).unwrap();
+    let id = d.s.regions[0].id;
+    assert!(!d.s.json().contains("\"hide\""));
+    d.apply(crate::sheet::Op::Set { id, field: "hide".into(), value: serde_json::json!(true) }).unwrap();
+    assert!(d.s.regions[0].hide && d.s.json().contains("\"hide\": true"));
+    assert!(d.apply(crate::sheet::Op::Set { id, field: "fold".into(), value: serde_json::json!("yes") }).is_err());
+}

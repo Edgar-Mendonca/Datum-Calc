@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.2.10 — 2026-11-20
+
+Export to Word and to a web page; hide and fold regions.
+
+**Export**
+- File › Export › Word writes the calc sheet as a .docx: the title block, headings, notes, every equation as a Word equation you can edit, with its result, checks with PASS or FAIL and the utilisation, tables, plots and pictures.
+- File › Export › Web page writes one .html file that any browser shows, maths included, without the internet: to share or to put on an intranet.
+
+**Hide and fold**
+- Hide in Print (right-click a region, or Home) keeps a region out of print and exports; it is still worked out and shown faint on the screen, tagged as hidden.
+- The arrow beside a heading folds its section away on the screen while you work elsewhere; folded sections still print.
+
+**Checks**
+- 98 engine tests (the Word package read back: its parts and their checksums, equations, results, checks, a hidden region left out; every pack exports) and 118 UI tests (folding, hiding, both exports). Every earlier pack prints as before.
+
 ## 0.2.9 — 2026-11-20
 
 Units of your own, templates and your company's title block.

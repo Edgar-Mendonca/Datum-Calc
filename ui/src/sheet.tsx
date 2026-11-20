@@ -171,11 +171,24 @@ const MaterialEditor = (p: { r: Region }) => {
 /** Picture size choices for the Format tab. */
 export const pickPicture = async (id: number) => { const src = await call<string | null>("pick_image"); if (src) act({ Set: { id, field: "data", value: { ...(S().regions.find(r => r.id === id)?.data ?? {}), src } } }); };
 
+/** The regions on the screen: those under a folded heading are left out until the next heading of its level. */
+export const shown = () => {
+  const out: Region[] = [];
+  let folded = "";
+  for (const r of S().regions) {
+    const level = r.kind === "text" ? (r.style === "heading" ? 1 : r.style === "subheading" ? 2 : 0) : 0;
+    if (folded && (level === 0 || level > (folded === "heading" ? 1 : 2))) continue;
+    folded = level && r.fold ? r.style : "";
+    out.push(r);
+  }
+  return out;
+};
+
 const RegionView = (p: { r: Region }) => {
   const editing = () => editId() === p.r.id;
   const empty = () => <div class="rtxt"><span class="muted">Empty {KIND[p.r.kind].toLowerCase()} region: double-click to type.</span></div>;
   return (
-    <div class={`region k-${p.r.kind}`} classList={{ sel: selId() === p.r.id, editing: editing(), [`s-${p.r.style}`]: !!p.r.style }} data-id={p.r.id}
+    <div class={`region k-${p.r.kind}`} classList={{ sel: selId() === p.r.id, editing: editing(), [`s-${p.r.style}`]: !!p.r.style, hiddenp: !!p.r.hide, folded: !!p.r.fold }} data-id={p.r.id}
       onMouseDown={e => { if (!editing()) { e.preventDefault(); setSelId(p.r.id); (document.querySelector(".cpage") as HTMLElement | null)?.focus(); } }}
       onDblClick={() => { setSelId(p.r.id); setEditId(p.r.id); }}
       onContextMenu={e => { if (editing()) return; setSelId(p.r.id); openMenu(e, [
@@ -183,9 +196,13 @@ const RegionView = (p: { r: Region }) => {
         { label: "Copy Result", run: C.copyResult, off: !outs().get(p.r.id)?.value && !outs().get(p.r.id)?.check }, { label: "Copy as LaTeX", run: C.copyLatex, off: !outs().get(p.r.id)?.latex }, { label: "Copy Text", keys: "Ctrl+C", run: C.copy }, "-",
         { label: "Insert Math Below", run: () => C.insert("math") }, { label: "Insert Text Below", run: () => C.insert("text") }, "-",
         { label: "Mark as Input", on: p.r.style === "input", run: () => act({ Set: { id: p.r.id, field: "style", value: p.r.style === "input" ? "" : "input" } }) },
+        { label: "Hide in Print", on: !!p.r.hide, run: () => act({ Set: { id: p.r.id, field: "hide", value: !p.r.hide } }) },
         { label: "Move Up", keys: "Alt+↑", run: () => C.move(true) }, { label: "Move Down", keys: "Alt+↓", run: () => C.move(false) }, { label: "Delete", keys: "Delete", icon: "del", run: C.del },
       ]); }}>
-      <span class="rtag">{KIND[p.r.kind]}</span>
+      <span class="rtag">{KIND[p.r.kind]}{p.r.hide ? " · hidden in print" : ""}</span>
+      <Show when={p.r.kind === "text" && (p.r.style === "heading" || p.r.style === "subheading")}>
+        <button class="foldbtn" title={p.r.fold ? "Show this section" : "Fold this section away (it still prints)"} onMouseDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); act({ Set: { id: p.r.id, field: "fold", value: !p.r.fold } }); }}>{p.r.fold ? "▸" : "▾"}</button>
+      </Show>
       <Show when={editing()} fallback={
         p.r.kind === "image" ? <ImageView r={p.r} />
           : p.r.kind === "table" || p.r.kind === "material" ? <MathView r={p.r} />
@@ -245,7 +262,7 @@ export const SheetView = () => {
               <p>Write the calculation from top to bottom: an equation per line with its units, text for headings and references, and checks against your limits.</p>
               <p><button class="btn pri" onClick={() => C.insert("math")}>Math region</button> <button class="btn" onClick={() => C.insert("text")}>Text region</button> <button class="btn" onClick={() => C.insert("check")}>Check</button></p>
             </div>}>
-            <For each={S().regions}>{r => <ErrorBoundary fallback={e => <div class="region rerr" data-id={r.id} onClick={() => setSelId(r.id)}><span class="ico">⚠</span>This region could not be shown ({String(e).slice(0, 120)}). Its text is kept: select it and press Enter to edit it.</div>}><RegionView r={r} /></ErrorBoundary>}</For>
+            <For each={shown()}>{r => <ErrorBoundary fallback={e => <div class="region rerr" data-id={r.id} onClick={() => setSelId(r.id)}><span class="ico">⚠</span>This region could not be shown ({String(e).slice(0, 120)}). Its text is kept: select it and press Enter to edit it.</div>}><RegionView r={r} /></ErrorBoundary>}</For>
           </Show>
         </div>
       </div>

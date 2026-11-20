@@ -189,7 +189,8 @@ pub fn zip(files: &[(String, Vec<u8>)]) -> Vec<u8> {
             h.extend(len.to_le_bytes());
             h.extend(nlen.to_le_bytes());
             h.extend(0u16.to_le_bytes());
-            if central { h.extend([0u8; 8]); h.extend(0u32.to_le_bytes()); h.extend(off.to_le_bytes()); }
+            // Comment length, disk number, internal attributes (6 bytes), external attributes (4), then the offset.
+            if central { h.extend([0u8; 6]); h.extend(0u32.to_le_bytes()); h.extend(off.to_le_bytes()); }
             h.extend(name.as_bytes());
             h
         };

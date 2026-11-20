@@ -6,6 +6,7 @@ import { Options, Out, PackCard } from "./api";
 import { backstage, setBackstage, call, out, setOut, opts, setOpts, toast, setThemeRaw, applyTheme } from "./store";
 import { C, keep } from "./cmds";
 import * as D from "./dialogs";
+import { exportHtml, exportWord } from "./export";
 import { Icon, Text, Pick, Check } from "./ui";
 import { listen, invoke } from "./api";
 
@@ -107,6 +108,8 @@ const Export = () => (
   <div><h1>Export</h1>
     <div class="tiles">
       <button class="tile" onClick={() => setBackstage("print")}><div class="pic"><svg class="ic"><use href="#i-print" /></svg></div><b>PDF</b><span>Print the calc sheet and choose “Save as PDF” as the printer.</span></button>
+      <button class="tile" onClick={() => exportWord()}><div class="pic"><svg class="ic"><use href="#i-text" /></svg><small>.docx</small></div><b>Word</b><span>The calc sheet as a Word document: equations Word can edit, results, checks, tables, plots and pictures.</span></button>
+      <button class="tile" onClick={() => exportHtml()}><div class="pic"><svg class="ic"><use href="#i-export" /></svg><small>.html</small></div><b>Web page</b><span>One self-contained page that any browser shows, maths included, to share or put on an intranet.</span></button>
       <button class="tile" onClick={() => C.csv()}><div class="pic"><svg class="ic"><use href="#i-table" /></svg><small>.csv</small></div><b>Inputs and results (CSV)</b><span>Every named value with its unit, and every check: opens in any spreadsheet.</span></button>
       <button class="tile" onClick={async () => { await navigator.clipboard?.writeText(asText()).catch(() => {}); toast("The sheet was copied as text.", true); }}><div class="pic"><svg class="ic"><use href="#i-copy" /></svg></div><b>Copy as text</b><span>Every region as a line of text, to paste anywhere.</span></button>
       <button class="tile" onClick={async () => { const p = await call<string | null>("save_file", { name: `${out()!.sheet.name}.txt`, data: asText() }); if (p) toast(`Saved ${p}`, true); }}><div class="pic"><svg class="ic"><use href="#i-export" /></svg><small>.txt</small></div><b>Text file</b><span>The same text, saved as a file.</span></button>
