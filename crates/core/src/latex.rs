@@ -67,10 +67,14 @@ fn fluid(f: &str, args: &[Node], a: &[String]) -> String {
         "psat" => "p_{\\mathrm{sat}", "Tsat" => "T_{\\mathrm{sat}", p => p,
     };
     let (who, rest) = if kind == "gas" {
-        let g = match args.first().map(|x| &x.e) { Some(E::Var(g)) => g.clone(), _ => String::new() };
-        let mut t = String::new();
-        for c in g.chars() { if c.is_ascii_digit() { t.push_str(&format!("_{c}")); } else { t.push(c); } }
-        (format!("\\mathrm{{{t}}}"), &a[1.min(a.len())..])
+        let who = match args.first().map(|x| &x.e) {
+            Some(E::Var(g)) => match crate::fluids::gas(g) {
+                Some(g) => format!("\\mathrm{{{}}}", g.id.chars().map(|c| if c.is_ascii_digit() { format!("_{c}") } else { c.to_string() }).collect::<String>()),
+                None => name(g),
+            },
+            _ => a.first().cloned().unwrap_or_default(),
+        };
+        (who, &a[1.min(a.len())..])
     } else { ("\\mathrm{water}".to_string(), a) };
     let base = if sym.contains("_{") { format!("{sym},{who}}}") } else if sym.len() == 1 || sym.starts_with('\\') { format!("{sym}_{{{who}}}") } else { format!("\\mathrm{{{sym}}}_{{{who}}}") };
     if rest.is_empty() { base } else { format!("{base}\\left({}\\right)", rest.join(", ")) }
@@ -146,7 +150,7 @@ fn nd(n: &Node, s: &Sub) -> String {
                 "exp" if a.len() == 1 => format!("e^{{{}}}", a[0]),
                 "if" if a.len() == 3 => format!("\\begin{{cases}} {} & \\text{{if }} {} \\\\ {} & \\text{{otherwise}} \\end{{cases}}", a[1], a[0], a[2]),
                 "log" if a.len() == 1 => format!("\\log_{{10}}\\left({}\\right)", a[0]),
-                f if f.starts_with("water_") || f.starts_with("gas_") => fluid(f, args, &a),
+                f if (f.starts_with("water_") || f.starts_with("gas_")) && crate::eval::builtin_name(f) => fluid(f, args, &a),
                 f if FUNCS.contains(&f) => format!("\\{}\\left({}\\right)", if matches!(f, "atan2" | "round" | "floor" | "ceil" | "sum" | "mean" | "len" | "asin" | "acos" | "atan" | "abs" | "re" | "im" | "arg" | "conj" | "db" | "par" | "simplify" | "expand" | "factor" | "lsolve" | "identity" | "dot" | "cross" | "rows" | "cols") { format!("operatorname{{{f}}}") } else { f.to_string() }, a.join(", ")),
                 f => format!("{}\\left({}\\right)", name(f), a.join(", ")),
             }

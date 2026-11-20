@@ -5,9 +5,9 @@
 //! IAPWS 2011 with its industrial critical enhancement, surface tension by IAPWS 2014. Valid from 0 °C to 800 °C up
 //! to 1000 bar and from 800 °C to 2000 °C up to 500 bar.
 //!
-//! Gases, as ideal gases: heat capacity, enthalpy and entropy from NASA 7-coefficient polynomials (McBride, Gordon
-//! and Reno, NASA TM-4513, as in GRI-Mech 3.0), 200 K to 3000 K; dilute-gas viscosity and thermal conductivity as
-//! fits (within 0.2 %) to the reference correlations of NIST/IAPWS-grade sources, over each gas's own range.
+//! Gases, as ideal gases: heat capacity, enthalpy and entropy from the NASA Glenn 7-coefficient polynomials (McBride,
+//! Zehe and Gordon, NASA/TP-2002-211556), 200 K to 3000 K; dilute-gas viscosity and thermal conductivity as fits
+//! (within 0.2 %) to reference correlations, over each gas's own range.
 
 const R: f64 = 461.526;
 const TC: f64 = 647.096;
@@ -191,7 +191,17 @@ fn rho3(t: f64, p: f64, liquid: bool) -> Res<f64> {
         if liquid { lo = [0.998, 0.99, 0.97, 0.9].iter().map(|k| al * k).find(|r| *r > RHOC && f(*r) < 0.0).unwrap_or(RHOC); }
         else { hi = [1.002, 1.01, 1.03, 1.1].iter().map(|k| av * k).find(|r| *r < RHOC && f(*r) > 0.0).unwrap_or(RHOC); lo = 1.0; }
     }
-    if !(f(lo) <= 0.0 && f(hi) >= 0.0) { return Err("The water property equations have no state there.".into()); }
+    if !(f(lo) <= 0.0 && f(hi) >= 0.0) {
+        if TC - t > 0.01 { return Err("The water property equations have no state there.".into()); }
+        let rs: Vec<f64> = (0..=860).map(|i| 40.0 + i as f64).collect();
+        let cross: Vec<usize> = (0..rs.len() - 1).filter(|&i| f(rs[i]).signum() != f(rs[i + 1]).signum()).collect();
+        let k = if liquid { cross.last() } else { cross.first() }.ok_or("The water property equations have no state there.")?;
+        (lo, hi) = (rs[*k], rs[k + 1]);
+        if f(lo) > 0.0 { std::mem::swap(&mut lo, &mut hi); }
+        // Bisection on the found bracket (lo has f < 0, hi has f > 0, in either order).
+        for _ in 0..100 { let m = 0.5 * (lo + hi); if f(m) < 0.0 { lo = m } else { hi = m } }
+        return Ok(0.5 * (lo + hi));
+    }
     // Newton's method, kept inside the bracket (bisection when a step would leave it).
     let mut r = if liquid || t >= TC { hi } else { lo };
     for _ in 0..200 {
@@ -219,7 +229,7 @@ pub fn psat(t: f64) -> Res<f64> {
 
 /// The saturation temperature at a pressure, 611.213 Pa to the critical point (220.64 bar).
 pub fn tsat(p: f64) -> Res<f64> {
-    if !(611.212..=PC).contains(&p) { return Err("Saturation is from 611.2 Pa to the critical pressure, 220.64 bar.".into()); }
+    if !(611.212..=PC).contains(&p) { return Err("Saturation is from 611.213 Pa (the triple point) to the critical pressure, 220.64 bar.".into()); }
     let n = &N4;
     let be = (p / 1e6).powf(0.25);
     let (e, f, g) = (be * be + n[2] * be + n[5], n[0] * be * be + n[3] * be + n[6], n[1] * be * be + n[4] * be + n[7]);
@@ -294,9 +304,11 @@ pub fn p_and(p: f64, target: f64, by: usize) -> Res<State> {
         if target < a { hi = ts } else { lo = ts }
     }
     // The temperature where the property matches, by Brent's method (it rises with temperature at a set pressure).
-    let mut f = |t: f64| tp(t, p).map(|s| val(&s) - target).unwrap_or(f64::NAN);
+    let mut f = |t: f64| tp(t.clamp(273.15, tmax), p).map(|s| val(&s) - target).unwrap_or(f64::NAN);
+    // A target at an end of the range (typed exactly at 2000 °C, say) is that end.
+    for e in [lo, hi] { if f(e).abs() <= 1e-12 * target.abs().max(1.0) { return tp(e, p); } }
     let t = crate::solve::root(&mut f, lo, hi).map_err(|_| format!("No water state at this pressure has that {}: {}", if by == 0 { "enthalpy" } else { "entropy" }, RANGE))?;
-    tp(t, p)
+    tp(t.clamp(273.15, tmax), p)
 }
 
 /// Dynamic viscosity (IAPWS 2008, without the critical enhancement), Pa·s.
@@ -363,7 +375,7 @@ impl Gas {
         if (200.0..=3000.0).contains(&t) { Ok(()) } else { Err(format!("{}: heat capacity, enthalpy and entropy are given from 200 K to 3000 K (−73 °C to 2727 °C).", self.name)) }
     }
     fn transport(&self, t: f64) -> Res<()> {
-        if (self.t.0..=self.t.1).contains(&t) { Ok(()) } else { Err(format!("{}: viscosity and conductivity are given from {} K to {} K ({} °C to {} °C).", self.name, self.t.0, self.t.1, (self.t.0 - 273.15).round(), (self.t.1 - 273.15).round())) }
+        if (self.t.0..=self.t.1).contains(&t) { Ok(()) } else { Err(format!("{}: viscosity and conductivity are given from {} K to {} K ({} °C to {} °C).", self.name, self.t.0, self.t.1, (self.t.0 - 273.15).round(), (self.t.1 - 273.15).round()).replace('-', "−")) }
     }
     pub fn cp(&self, t: f64) -> Res<f64> { self.heat(t)?; let a = self.a(t); Ok((a[0] + t * (a[1] + t * (a[2] + t * (a[3] + t * a[4])))) * self.r()) }
     /// Enthalpy above that at 25 °C, J/kg.
@@ -388,20 +400,20 @@ fn fit(c: &[f64; 5], t: f64) -> f64 { let x = (t / 300.0).ln(); c.iter().rev().f
 // Gases: molar mass (kg/mol), the range of the viscosity and conductivity fits (K), NASA coefficients above and
 // below 1000 K, and the fits of ln μ (Pa·s) and ln k (W/(m·K)) in powers of ln(T/300 K).
 const GASES: [Gas; 8] = [
-    Gas { id: "air", name: "Air", m: 0.02896546, t: (200.0, 1500.0), high: [2.9975366392707996, 0.001474108493934, -6.0344983138314e-07, 1.2290587043718e-10, -9.829652537868e-15, -973.0608123592, 6.420770837603472], low: [3.3922106963128003, 0.00047514895161959996, -1.0345908700338e-06, 2.3781618115278e-09, -1.2296601848170798e-12, -1044.3888075856, 4.462193348063472],
+    Gas { id: "air", name: "Air", m: 0.02896546, t: (200.0, 1500.0), high: [3.097333676485, 0.0012292250386939801, -4.1459019899970003e-07, 6.5743205525256e-11, -3.873176110242e-15, -1000.7654335228001, 5.907704982883072], low: [3.573621910468, -0.0007210209253108801, 1.6672893139645202e-06, -1.2537432823679988e-10, -4.206774249256799e-13, -1064.7502881448, 3.694835528374072],
         mu: [-10.896497381069427, 0.7808917864567656, -0.07856867124713822, 0.008774763987953085, 0.0033099992559076454], k: [-3.636164132107852, 0.8467254027366861, -0.07371922737478229, 0.015155323688221794, 0.0019088635364366453] },
-    Gas { id: "N2", name: "Nitrogen", m: 0.02801348, t: (200.0, 1500.0), high: [2.92664, 0.0014879768, -5.68476e-07, 1.0097038e-10, -6.753351e-15, -922.7977, 5.980528], low: [3.298677, 0.0014082404, -3.963222e-06, 5.641515e-09, -2.444854e-12, -1020.8999, 3.950372],
+    Gas { id: "N2", name: "Nitrogen", m: 0.02801348, t: (200.0, 1500.0), high: [2.95257626, 0.00139690057, -4.92631691e-07, 7.86010367e-11, -4.60755321e-15, -923.948645, 5.87189252], low: [3.53100528, -0.000123660987, -5.02999437e-07, 2.43530612e-09, -1.40881235e-12, -1046.97628, 2.96747468],
         mu: [-10.931991981519722, 0.7741654359314618, -0.07739652186777962, 0.00934571533551679, 0.0033100008186225725], k: [-3.6521077753326088, 0.8353857119807802, -0.07834379185900625, 0.015510955856708452, 0.0023217726811238524] },
-    Gas { id: "O2", name: "Oxygen", m: 0.0319988, t: (200.0, 1500.0), high: [3.28253784, 0.00148308754, -7.57966669e-07, 2.09470555e-10, -2.16717794e-14, -1088.45772, 5.45323129], low: [3.78245636, -0.00299673416, 9.84730201e-06, -9.68129509e-09, 3.24372837e-12, -1063.94356, 3.65767573],
+    Gas { id: "O2", name: "Oxygen", m: 0.0319988, t: (200.0, 1500.0), high: [3.66096083, 0.000656365523, -1.41149485e-07, 2.05797658e-11, -1.29913248e-15, -1215.97725, 3.41536184], low: [3.78245636, -0.00299673415, 9.847302e-06, -9.68129508e-09, 3.24372836e-12, -1063.94356, 3.65767573],
         mu: [-10.788729798706013, 0.8029247269164088, -0.081808101830929, 0.00695723661241094, 0.0033099989698703396], k: [-3.63285241464493, 0.8934286621954015, -0.07330807246003362, 0.013276717083967847, 0.0012722382463280378] },
-    Gas { id: "Ar", name: "Argon", m: 0.039948, t: (200.0, 1500.0), high: [2.5, 0.0, 0.0, 0.0, 0.0, -745.375, 4.366], low: [2.5, 0.0, 0.0, 0.0, 0.0, -745.375, 4.366],
+    Gas { id: "Ar", name: "Argon", m: 0.039948, t: (200.0, 1500.0), high: [2.5, 0.0, 0.0, 0.0, 0.0, -745.375, 4.37967491], low: [2.5, 0.0, 0.0, 0.0, 0.0, -745.375, 4.37967491],
         mu: [-10.692084341189199, 0.8345603576888474, -0.08504781966001619, 0.004450510950775969, 0.0033100001071908925], k: [-4.028320755999433, 0.8372351196178257, -0.08862271891656678, 0.004760777663919134, 0.0033719413480133593] },
-    Gas { id: "CO2", name: "Carbon dioxide", m: 0.0440098, t: (220.0, 1500.0), high: [3.85746029, 0.00441437026, -2.21481404e-06, 5.23490188e-10, -4.72084164e-14, -48759.166, 2.27163806], low: [2.35677352, 0.00898459677, -7.12356269e-06, 2.45919022e-09, -1.43699548e-13, -48371.9697, 9.90105222],
+    Gas { id: "CO2", name: "Carbon dioxide", m: 0.0440098, t: (220.0, 1500.0), high: [4.63659493, 0.00274131991, -9.95828531e-07, 1.60373011e-10, -9.16103468e-15, -49024.9341, -1.93534855], low: [2.35677352, 0.00898459677, -7.12356269e-06, 2.45919022e-09, -1.43699548e-13, -48371.9697, 9.90105222],
         mu: [-11.10751867071644, 0.9549311445606458, -0.060752793619157454, -0.055263394729135856, 0.021284160396633656], k: [-4.090679956316922, 1.3773845448540558, -0.06796604114046197, -0.10276457708915987, 0.0293454506117183] },
-    Gas { id: "H2", name: "Hydrogen", m: 0.00201588, t: (200.0, 1000.0), high: [3.3372792, -4.94024731e-05, 4.99456778e-07, -1.79566394e-10, 2.00255376e-14, -950.158922, -3.20502331], low: [2.34433112, 0.00798052075, -1.9478151e-05, 2.01572094e-08, -7.37611761e-12, -917.935173, 0.683010238],
+    Gas { id: "H2", name: "Hydrogen", m: 0.00201588, t: (200.0, 1000.0), high: [2.93286579, 0.000826607967, -1.46402335e-07, 1.54100359e-11, -6.88804432e-16, -813.065597, -1.02432887], low: [2.34433112, 0.00798052075, -1.9478151e-05, 2.01572094e-08, -7.37611761e-12, -917.935173, 0.683010238],
         mu: [-11.625206572591912, 0.6920704986640737, -0.00040891697048577096, 0.00817199727982183, -0.002769809876318119], k: [-1.679025484840536, 0.7708089281294436, -0.1282181037142152, 0.10029686064417477, -0.006538870248530473] },
-    Gas { id: "He", name: "Helium", m: 0.004002602, t: (200.0, 1500.0), high: [2.5, 0.0, 0.0, 0.0, 0.0, -745.375, 0.928723974], low: [2.5, 0.0, 0.0, 0.0, 0.0, -745.375, 0.928723974],
+    Gas { id: "He", name: "Helium", m: 0.004002602, t: (200.0, 1500.0), high: [2.5, 0.0, 0.0, 0.0, 0.0, -745.375, 0.928724724], low: [2.5, 0.0, 0.0, 0.0, 0.0, -745.375, 0.928724724],
         mu: [-10.82347952439517, 0.6844987864339498, 0.014175614017506211, -0.0029146368076746272, 0.00022658733792651315], k: [-1.8585669601769557, 0.6914999247326152, 0.00564427023008564, -0.0015950324951917432, 0.0002220584488703231] },
-    Gas { id: "CH4", name: "Methane", m: 0.0160428, t: (200.0, 625.0), high: [0.074851495, 0.0133909467, -5.73285809e-06, 1.22292535e-09, -1.0181523e-13, -9468.34459, 18.437318], low: [5.14987613, -0.0136709788, 4.91800599e-05, -4.84743026e-08, 1.66693956e-11, -10246.6476, -4.64130376],
+    Gas { id: "CH4", name: "Methane", m: 0.0160428, t: (200.0, 625.0), high: [1.63552643, 0.0100842795, -3.36916254e-06, 5.34958667e-10, -3.15518833e-14, -10005.6455, 9.99313326], low: [5.14987613, -0.0136709788, 4.91800599e-05, -4.84743026e-08, 1.66693956e-11, -10246.6476, -4.64130376],
         mu: [-11.395821183398432, 0.8455629091104782, -0.08867007417884662, 0.02384755659613781, -0.005595439872800516], k: [-3.371664567279733, 1.2242777055856797, 0.2729232628172612, 0.056089295234311755, -0.2037729653122262] },
 ];

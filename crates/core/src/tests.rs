@@ -1475,10 +1475,10 @@ fn water_and_gas_properties_on_a_sheet() {
     // Wet steam from a pressure and an enthalpy; a vector of temperatures gives a vector (100 °C at 1 bar is steam).
     assert_eq!(result(&["water_x(0.1 bar, 2144 kJ/kg)"]), "0.8161");
     assert_eq!(result(&["T = 20 °C, 40 °C .. 100 °C", "water_rho(T, 1 bar)"]), "[998.2, 992.2, 983.2, 971.8, 0.5896] kg/m³");
-    // Gases (ideal gas; air 20 °C, 1 atm: 1.204 kg/m³; γ = 1.40; Pr = 0.705).
+    // Gases (ideal gas; air 20 °C, 1 atm: 1.204 kg/m³; γ = 1.40; Pr = 0.706).
     assert_eq!(result(&["gas_rho(air, 20 °C, 1 atm)"]), "1.204 kg/m³");
-    assert_eq!(result(&["gas_gamma(air, 300 K)"]), "1.401");
-    assert_eq!(result(&["gas_Pr(air, 300 K)"]), "0.7053");
+    assert_eq!(result(&["gas_gamma(air, 300 K)"]), "1.4");
+    assert_eq!(result(&["gas_Pr(air, 300 K)"]), "0.7063");
     assert_eq!(result(&["gas_M(CH4)"]), "0.01604 kg/mol");
     assert!(run(&["gas_cp(CO2, 500 K)"]).regions[0].latex.contains("c_{p,\\mathrm{CO_2}}"));
     for (lines, msg) in [
@@ -1489,5 +1489,29 @@ fn water_and_gas_properties_on_a_sheet() {
         (&["gas_cp(steam, 300 K)"][..], "gas_cp needs a gas first: air, N2, O2, Ar, CO2, H2, He, CH4."),
         (&["gas_mu(CH4, 800 K)"][..], "Methane: viscosity and conductivity are given from 200 K to 625 K"),
         (&["gas_rho(air, 300 K)"][..], "gas_rho takes the gas, a temperature and a pressure."),
+    ] { assert!(error(lines).starts_with(msg), "{lines:?}: {}", error(lines)); }
+}
+
+#[test]
+fn properties_review() {
+    // Within millikelvins of the critical point the liquid and vapour branches meet at about ρc = 322 kg/m³.
+    assert_eq!(result(&["water_T(220.638 bar, 2000 kJ/kg)"]), "373.9 °C");
+    assert_eq!(result(&["water_rho(373.945 °C, 0.5)"]), "322.1 kg/m³");
+    assert_eq!(result(&["water_h(220.639 bar, 0)"]), "2084 kJ/kg");
+    // The ends of the range give themselves back.
+    assert_eq!(result(&["water_T(10 bar, water_h(2000 °C, 10 bar))"]), "2000 °C");
+    assert_eq!(result(&["water_T(10 bar, water_s(0 °C, 10 bar))"]), "0 °C");
+    // Nitrogen and air below 300 K from coefficients valid there: cp(N₂, 200 K) = 1.040 kJ/(kg·K).
+    assert_eq!(result(&["gas_cp(N2, 200 K)"]), "1.04 kJ/(kg·K)");
+    // A sheet's own gas_flow(q) is drawn and worked out as any function; the gas is drawn as the library writes it.
+    let o = run(&["gas_flow(q) = 2*q", "y = gas_flow(3)", "gas_s(co2, 300 K, 1 bar)"]);
+    assert!(o.regions[1].result == "6" && o.regions[1].latex.contains("\\left(3\\right)") && o.regions[2].latex.contains("s_{\\mathrm{CO_2}}"), "{}", o.regions[1].latex);
+    for (lines, msg) in [
+        (&["water_x(500 Pa, 50 °C)"][..], "No vapour fraction below 611.2 Pa"),
+        (&["water_Tsat(611.2 Pa)"][..], "Saturation is from 611.213 Pa"),
+        (&["gas_rho(air, -300 °C, 1 bar)"][..], "An ideal gas needs an absolute temperature and a pressure above zero."),
+        (&["water_h(1 bar, 0.5 rad)"][..], "water_h takes two of"),
+        (&["water_cp(373.946 °C, 220.64 bar)"][..], "cp goes to infinity at the critical point"),
+        (&["gas_mu(CH4, 100 K)"][..], "Methane: viscosity and conductivity are given from 200 K to 625 K (−73 °C"),
     ] { assert!(error(lines).starts_with(msg), "{lines:?}: {}", error(lines)); }
 }

@@ -12,7 +12,7 @@ Water, steam and gas properties.
 
 **Gases**
 - Air, nitrogen, oxygen, argon, carbon dioxide, hydrogen, helium and methane as ideal gases: gas_cp(air, T), gas_cv, gas_gamma, gas_h, gas_s(air, T, p), gas_rho(air, T, p), gas_mu, gas_nu, gas_k, gas_Pr, gas_M, gas_R.
-- Heat capacity within about 1 % from 200 K to 3000 K; viscosity and conductivity within 0.2 % of reference correlations over each gas's range.
+- Heat capacity within about 0.4 % from 200 K to 3000 K (NASA Glenn polynomials); viscosity and conductivity within 0.2 % of reference correlations over each gas's range.
 
 **Also**
 - A range of temperatures or pressures gives a vector of properties, for a table or a plot.
@@ -20,7 +20,7 @@ Water, steam and gas properties.
 - New calc pack (28 in all): a steam turbine Rankine cycle, checked against an independent IF97 calculation.
 
 **Checks**
-- 85 engine tests (the IAPWS verification tables, viscosity check values, properties on a sheet, what it says out of range, the new pack) and 104 UI tests; random states and random sheets with property calls never panic. Every earlier pack prints as before.
+- 86 engine tests (the IAPWS verification tables, states within millikelvins of the critical point, viscosity check values, properties on a sheet, what it says out of range, the new pack) and 104 UI tests; random states and random sheets with property calls never panic. Every earlier pack prints as before.
 
 ## 0.2.5 — 2026-11-19
 

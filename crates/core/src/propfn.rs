@@ -45,7 +45,7 @@ enum By { T, P, H, S, X }
 
 fn by(v: &Val) -> Option<By> {
     let s = |d: &Dim| v.dim[..7] == d[..7];
-    if s(&TEMP) { Some(By::T) } else if s(&PRESS) { Some(By::P) } else if s(&SPEC_E) { Some(By::H) } else if s(&SPEC_S) { Some(By::S) } else if s(&NONE) { Some(By::X) } else { None }
+    if s(&TEMP) { Some(By::T) } else if s(&PRESS) { Some(By::P) } else if s(&SPEC_E) { Some(By::H) } else if s(&SPEC_S) { Some(By::S) } else if v.dim == NONE { Some(By::X) } else { None }
 }
 
 const PAIRS: &str = "two of: a temperature, a pressure, an enthalpy (kJ/kg), an entropy (kJ/(kg·K)) or a vapour fraction x, as (T, p), (p, h), (p, s), (T, x) or (p, x)";
@@ -76,7 +76,10 @@ pub fn water(f: &str, prop: &str, a: &[Val], at: Span) -> R<Val> {
             _ => Err(format!("{f} takes {PAIRS}.")),
         }
     };
-    let wet = |st: &State, what: &str| -> Result<(), String> { if st.x.is_some() { Err(format!("{what} is not defined for wet steam (a mix of liquid and vapour): give a state outside the saturation dome.")) } else { Ok(()) } };
+    let wet = |st: &State, what: &str| -> Result<(), String> {
+        if st.x.is_none() && !(st.cp.is_finite() && st.cp < 1e7) { return Err(format!("{what} goes to infinity at the critical point (373.946 °C, 220.64 bar): this state is too near it.")); }
+        if st.x.is_some() { Err(format!("{what} is not defined for wet steam (a mix of liquid and vapour): give a state outside the saturation dome.")) } else { Ok(()) }
+    };
     let (dim, abs) = match prop {
         "T" => (TEMP, true), "p" => (PRESS, false), "rho" => (DENS, false), "v" => (SPEC_V, false), "h" | "u" => (SPEC_E, false),
         "s" | "cp" | "cv" => (SPEC_S, false), "w" => (SPEED, false), "x" | "Pr" => (NONE, false), "mu" => (VISC, false), "nu" => (KVISC, false), "k" => (COND, false),
@@ -90,6 +93,7 @@ pub fn water(f: &str, prop: &str, a: &[Val], at: Span) -> R<Val> {
             "x" => match st.x {
                 Some(x) => x,
                 // Outside the dome: the thermodynamic quality (h − h′)/(h″ − h′), below 0 for liquid, above 1 for superheated steam.
+                None if st.p < 611.213 => return Err("No vapour fraction below 611.2 Pa (the triple point): there is no liquid at that pressure.".into()),
                 None if st.p < 22.064e6 => { let (l, v) = fluids::sat(fluids::tsat(st.p)?)?; (st.h - l.h) / (v.h - l.h) }
                 None => return Err("Above the critical pressure (220.64 bar) there is no vapour fraction.".into()),
             },
@@ -101,6 +105,11 @@ pub fn water(f: &str, prop: &str, a: &[Val], at: Span) -> R<Val> {
             }
         })
     }, dim, abs)
+}
+
+/// An absolute temperature and a pressure, both above zero.
+fn positive(x: &[f64]) -> Result<(), String> {
+    if x[0] > 0.0 && x[1] > 0.0 { Ok(()) } else { Err("An ideal gas needs an absolute temperature and a pressure above zero.".into()) }
 }
 
 fn want(f: &str, v: &Val, b: By, at: Span) -> R<()> {
@@ -128,9 +137,9 @@ pub fn gas(f: &str, prop: &str, g: &fluids::Gas, a: &[Val], at: Span) -> R<Val> 
         "gamma" => (NONE, Box::new(move |x| { let cp = g.cp(x[0])?; Ok(cp / (cp - r)) })),
         "h" => (SPEC_E, Box::new(|x| g.h(x[0]))),
         "s" => (SPEC_S, Box::new(|x| g.s(x[0], x[1]))),
-        "rho" => (DENS, Box::new(move |x| Ok(x[1] / (r * x[0])))),
+        "rho" => (DENS, Box::new(move |x| { positive(x)?; Ok(x[1] / (r * x[0])) })),
         "mu" => (VISC, Box::new(|x| g.mu(x[0]))),
-        "nu" => (KVISC, Box::new(move |x| Ok(g.mu(x[0])? * r * x[0] / x[1]))),
+        "nu" => (KVISC, Box::new(move |x| { positive(x)?; Ok(g.mu(x[0])? * r * x[0] / x[1]) })),
         "k" => (COND, Box::new(|x| g.k(x[0]))),
         _ => (NONE, Box::new(|x| Ok(g.mu(x[0])? * g.cp(x[0])? / g.k(x[0])?))),
     };
