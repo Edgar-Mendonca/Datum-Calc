@@ -45,7 +45,7 @@ const NewPage = () => {
       <div class="tiles tpls">
         <button class="tile" onClick={() => D.saveTemplate(() => refetch())}><div class="pic"><svg class="ic"><use href="#i-save" /></svg></div><b>Save as template…</b><span>The open sheet, to start new ones from.</span></button>
         <For each={tpls() ?? []}>{t => <div class="tile tpl"><button class="tplopen" onClick={() => C.template(t.id)}><div class="pic"><svg class="ic"><use href="#i-math" /></svg><small>{t.regions} regions</small></div><b>{t.name}</b></button>
-          <button class="btn sm tpldel" title={`Delete the template “${t.name}”`} onClick={async () => { await call("delete_template", { id: t.id }); refetch(); }}>Delete</button></div>}</For>
+          <button class="btn sm tpldel" title={`Delete the template “${t.name}”`} onClick={() => D.confirm(`Delete the template “${t.name}”? Sheets made from it are not affected.`, "Delete", async () => { await call("delete_template", { id: t.id }); refetch(); })}>Delete</button></div>}</For>
       </div>
       <h2>Calc packs</h2>
       <p class="muted">Ready sheets with the inputs at the top (highlighted), the results and checks below and the references at the end. Change the inputs to your case. Each pack is checked against a hand calculation in Datum Calc's tests.</p>
@@ -141,6 +141,8 @@ const OptionsPage = () => {
       <Sec t="Title block" about="Filled in on every new sheet. Change a sheet's own title block from Home › Title Block.">
         <Opt l="Company" hint="Printed in the title block."><Text value={o().company} set={v => put("company", v)} /></Opt>
         <Opt l="Prepared by" hint="Your name or initials."><Text value={o().by} set={v => put("by", v)} /></Opt>
+        <Opt l="Checked by" hint="Left empty unless the same person checks every sheet."><Text value={o().checked} set={v => put("checked", v)} /></Opt>
+        <Opt l="Client" hint="Left empty unless every sheet is for the same client."><Text value={o().client} set={v => put("client", v)} /></Opt>
         <Opt l="Company logo" hint="PNG or JPG, printed at the top left of each page."><span class="inline">{o().logo && <img src={o().logo} class="logoprev" />}<button class="btn sm" onClick={async () => { const l = await call<string | null>("pick_image"); if (l) put("logo", l); }}>Choose picture…</button>{o().logo && <button class="btn sm" onClick={() => put("logo", "")}>Remove</button>}</span></Opt>
       </Sec>
       <Sec t="Updates" about="Datum Calc checks GitHub for new versions when it starts. Updates install from File › Updates.">

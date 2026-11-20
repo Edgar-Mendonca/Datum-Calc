@@ -29,7 +29,15 @@ export const titleBlock = () => openDialog(() => {
 /** File › Save as template: the sheet under a name, to start new sheets from. */
 export const saveTemplate = (then?: () => void) => openDialog(() => {
   const [name, setName] = createSignal(S().title.title || S().name || "");
-  const ok = async () => { if (await call("save_template", { name: name() }) !== undefined) { toast(`Saved the template “${name().trim()}”.`, true); then?.(); } };
+  const save = async () => { if (await call("save_template", { name: name() }) === undefined) return false; toast(`Saved the template “${name().trim()}”.`, true); then?.(); return true; };
+  // A template of the same name is replaced only when asked; a failed save keeps the dialog open.
+  const ok = async () => {
+    const list = await call<{ name: string }[]>("templates") ?? [];
+    if (!list.some(t => t.name.toLowerCase() === name().trim().toLowerCase())) return save();
+    // The question opens over this dialog (which stays, false); once replaced, both close.
+    confirm(`Replace the template “${name().trim()}”?`, "Replace", async () => { if (await save()) closeDialog(); });
+    return false;
+  };
   return (
     <Dialog title="Save as template" help="templates" ok={ok}>
       <div class="form"><label>Name</label><input value={name()} placeholder="Pump sizing, company standard" onInput={e => setName(e.currentTarget.value)} /></div>
@@ -37,6 +45,11 @@ export const saveTemplate = (then?: () => void) => openDialog(() => {
     </Dialog>
   );
 });
+
+/** A yes-or-no question before something that cannot be undone. */
+export const confirm = (text: string, okText: string, then: () => unknown) => openDialog(() => (
+  <Dialog title="Are you sure?" okText={okText} ok={async () => { await then(); return true; }}><p>{text}</p></Dialog>
+));
 
 export const gettingStarted = () => openDialog(() => (
   <Dialog title="Getting started" wide>

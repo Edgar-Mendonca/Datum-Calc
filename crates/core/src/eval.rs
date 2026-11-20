@@ -126,6 +126,8 @@ pub struct Env {
     steps: u64,
     /// Names a program sets only on some paths, not set on this run.
     unset: std::collections::HashSet<String>,
+    /// The sheet's own units by symbol, so one used above its line is said to be further down.
+    pub(crate) later_units: std::collections::HashSet<String>,
     /// Names that are defined further down the sheet, or whose own line has an error.
     later: HashMap<String, bool>,
     depth: u32,
@@ -136,7 +138,7 @@ impl Env {
     pub(crate) fn tick(&mut self) -> u64 { self.steps += 1; self.steps }
     pub(crate) fn steps(&self) -> u64 { self.steps }
 
-    pub fn new() -> Self { Self { vars: HashMap::new(), funcs: HashMap::new(), shown: HashMap::new(), exprs: HashMap::new(), progs: HashMap::new(), fitted: HashMap::new(), odes: HashMap::new(), steps: 0, unset: Default::default(), later: HashMap::new(), depth: 0 } }
+    pub fn new() -> Self { Self { vars: HashMap::new(), funcs: HashMap::new(), shown: HashMap::new(), exprs: HashMap::new(), progs: HashMap::new(), fitted: HashMap::new(), odes: HashMap::new(), later_units: Default::default(), steps: 0, unset: Default::default(), later: HashMap::new(), depth: 0 } }
 
     /// What a name is for exact maths: a plain number (as a fraction), a kept expression, or a symbol.
     fn look(&self, v: &str) -> crate::sym::Look {
@@ -171,6 +173,7 @@ impl Env {
         match self.later.get(&k) {
             Some(true) => fail(format!("{} has an error on its own line.", show(&k)), at),
             Some(false) => fail(format!("{} is defined further down: move its line above this one.", show(&k)), at),
+            None if env_unit_later(self, name) => fail(format!("{name} is a unit defined further down: move its line above this one."), at),
             None if units::find(name).is_some() => fail(format!("“{name}” is a unit: put a number before it (1 {name})."), at),
             None => fail(format!("{} is not defined. Define it above this line, such as {} = 1.", show(&k), name), at),
         }
@@ -1042,6 +1045,7 @@ pub fn run_env(s: &Sheet, f: &Fmt) -> (SheetOut, Env) {
 fn run_here(s: &Sheet, f: &Fmt) -> (SheetOut, Env) {
     let mut env = Env::new();
     units::custom_clear();
+    LATER_UNITS.with(|l| l.borrow_mut().clear());
     // Names defined anywhere, so a name used too early gets a helpful message.
     for r in &s.regions {
         if r.kind == Kind::Material {
@@ -1050,6 +1054,9 @@ fn run_here(s: &Sheet, f: &Fmt) -> (SheetOut, Env) {
         } else if r.kind == Kind::Table {
             for c in serde_json::from_value::<TableData>(r.data.clone()).unwrap_or_default().cols { if !c.name.trim().is_empty() { env.later.insert(canon(c.name.trim()), false); } }
         } else { for n in region_names(r) { env.later.insert(canon(&n), false); } }
+        if let Ok(t) = parse::lex(split_note(&r.text).0) {
+            if let [(parse::Tok::Id(w), _), (parse::Tok::Id(n), _), (parse::Tok::Op("="), _), ..] = t.as_slice() { if w == "unit" { env.later_units.insert(n.clone()); LATER_UNITS.with(|l| l.borrow_mut().insert(n.clone())); } }
+        }
     }
     let mut out = SheetOut::default();
     let mut known: Vec<String> = vec![];
@@ -1128,6 +1135,13 @@ fn program(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>, o: &mut 
         }
     }
 }
+
+/// Is this the sheet's own unit, defined further down (not yet known)?
+fn env_unit_later(env: &Env, name: &str) -> bool { env.later_units.contains(name) && units::find(name).is_none() }
+
+thread_local! { static LATER_UNITS: std::cell::RefCell<std::collections::HashSet<String>> = Default::default(); }
+/// The same, for the display unit of a result (set where the sheet starts).
+fn env_has_later_unit(u: &str) -> bool { LATER_UNITS.with(|l| l.borrow().contains(u)) }
 
 /// Every name in an expression.
 fn names_in(n: &Node, out: &mut Vec<String>) {
@@ -1265,7 +1279,9 @@ fn region(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>, subst: bo
     o.note = note.into();
     let st = match parse::statement(code, known) {
         Ok(s) => s,
-        Err(e) => {
+        Err(mut e) => {
+            // A unit of the sheet's own used above its line.
+            if let Some(u) = env.later_units.iter().find(|u| e.msg.starts_with(&format!("“{u}” is not a unit")) || e.msg.ends_with(&format!("before “{u}”."))) { e.msg = format!("{u} is a unit defined further down: move its line above this one."); }
             o.error = Some(ErrOut { msg: e.msg, from: e.at.0, to: e.at.1 });
             o.latex = latex::escape_text(code);
             if let Some(n) = defined_name(code) { o.name = canon(&n); }
@@ -1316,17 +1332,27 @@ fn region(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>, subst: bo
             Stmt::Empty => {}
             Stmt::UnitDef { name, at, e } => {
                 if units::find(name).is_some() { return fail(format!("{name} is a unit already: choose another symbol."), *at); }
-                if env.vars.contains_key(&canon(name)) || env.funcs.contains_key(&canon(name)) || constant(&canon(name)).is_some() { return fail(format!("{} is a name on this sheet already: choose another symbol for the unit.", show(&canon(name))), *at); }
+                // Words the sheet reads as keywords or functions cannot be units.
+                if ["for", "in", "to", "from", "log", "if", "else", "while", "end", "break", "return", "check", "solve", "plot", "fit", "ode", "unit", "then", "and", "or", "not"].contains(&name.as_str()) || builtin_name(name) || FUNCTIONS.iter().any(|f| f.0.split('(').next() == Some(name.as_str())) {
+                    return fail(format!("{name} is a word the sheet reads itself: choose another symbol for the unit."), *at);
+                }
+                // A name anywhere on the sheet (above, or further down) would be read two ways.
+                if env.vars.contains_key(&canon(name)) || env.funcs.contains_key(&canon(name)) || env.progs.contains_key(&canon(name)) || env.odes.contains_key(&canon(name)) || env.later.contains_key(&canon(name)) || constant(&canon(name)).is_some() {
+                    return fail(format!("{} is a name on this sheet already: choose another symbol for the unit.", show(&canon(name))), *at);
+                }
                 if !name.chars().all(|c| c.is_alphanumeric() || c == '_') { return fail("A unit's symbol is letters and digits, such as bbl or kWh_th.", *at); }
                 let v = env.eval(e)?;
                 real(&v, "A unit", e.at)?;
                 if v.vec { return fail("A unit is one value, such as 158.987 L.", e.at); }
                 if v.abs { return fail("A unit cannot be an absolute temperature; use a difference (K).", e.at); }
+                if v.x().is_infinite() { return fail("This unit is too large to hold (beyond about 10³⁰⁸ in SI).", e.at); }
                 if !(v.x() > 0.0 && v.x().is_finite()) { return fail("A unit is a size above zero.", e.at); }
                 units::custom_add(name, v.x(), v.dim);
                 let (t, tx, _, _) = show_val(&v, "", f);
                 o.result = format!("1 {name} = {t}");
-                o.result_tex = format!("= {tx}");
+                o.result_tex = tx;
+                // Written as a number with its unit (158.987 L), the value is not repeated.
+                o.input = matches!(e.e, E::Num(..));
             }
             Stmt::Ode { eqs, var, lo, hi, inits } => {
                 let (a, b) = (env.eval(lo)?, env.eval(hi)?);
@@ -1941,6 +1967,7 @@ fn set_result(o: &mut RegionOut, v: &Val, r: &Region, f: &Fmt) {
     let (t, x, val, unit) = show_val(v, &r.unit, f);
     if !r.unit.trim().is_empty() && !v.logic {
         if let Ok(u) = units::parse(&r.unit) { if !units::same(&u.dim, &v.dim) { o.warn = format!("{} cannot show {}; shown in {}.", units::pretty(&r.unit), dim_name(&v.dim), if unit.is_empty() { "plain numbers".into() } else { unit.clone() }); } }
+        else if env_has_later_unit(&r.unit) { o.warn = format!("{} is a unit defined further down: move its line above this one.", r.unit); }
         else { o.warn = format!("“{}” is not a unit.", r.unit); }
     }
     o.result = t;
@@ -1948,6 +1975,8 @@ fn set_result(o: &mut RegionOut, v: &Val, r: &Region, f: &Fmt) {
     o.value = val;
     o.unit = unit;
     o.units = unit_choices(&v.dim, v.abs, v.nm);
+    // The sheet's own units of this kind, in its unit menu.
+    if !v.abs { for u in units::custom_like(&v.dim) { if !o.units.contains(&u) { o.units.push(u); } } }
 }
 
 /// A table: typed columns become vectors (a cell without a unit takes the column's unit); formula

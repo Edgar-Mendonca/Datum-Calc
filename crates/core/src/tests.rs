@@ -1754,3 +1754,28 @@ fn units_of_the_sheets_own() {
         (&["unit w = [1, 2] m"][..], "A unit is one value"),
     ] { assert!(error(lines).starts_with(msg), "{lines:?}: {}", error(lines)); }
 }
+
+#[test]
+fn units_of_the_sheets_own_review() {
+    // The definition shows its value once; a unit is in the menu of results of its kind.
+    let o = run(&["unit bbl_oil = 158.987 L", "V = 2 m^3"]);
+    assert!(o.regions[0].input && o.regions[1].units.contains(&"bbl_oil".to_string()));
+    assert_eq!(result(&["unit q = 2 m", "unit qq = 3 q"]), "1 qq = 6 m");
+    for (lines, msg) in [
+        (&["x = 2 qq", "unit qq = 2 m"][..], "qq is a unit defined further down: move its line above this one."),
+        (&["z = zu", "unit zu = 3 m"][..], "zu is a unit defined further down"),
+        (&["unit for = 2 m"][..], "for is a word the sheet reads itself"),
+        (&["unit sin = 2 m"][..], "sin is a word the sheet reads itself"),
+        (&["unit water_h = 2 m"][..], "water_h is a word the sheet reads itself"),
+        (&["unit hh = 2 m", "hh = 3"][..], ""),
+        (&["unit zz = 1e10 m", "unit yy = 1e300 zz"][..], "This unit is too large to hold"),
+    ] {
+        let o = run(lines);
+        let first = o.regions.iter().find_map(|r| r.error.clone()).map(|e| e.msg).unwrap_or_default();
+        assert!(if msg.is_empty() { first.starts_with("hh is a name on this sheet already") } else { first.starts_with(msg) }, "{lines:?}: {first}");
+    }
+    // A display unit defined further down says so.
+    let mut s = sheet(&["V = 1 m^3", "unit zz = 2 m^3"]);
+    s.regions[0].unit = "zz".into();
+    assert!(eval::run(&s).regions[0].warn.starts_with("zz is a unit defined further down"));
+}

@@ -6,16 +6,16 @@ Units of your own, templates and your company's title block.
 
 **Units of your own**
 - unit bbl_oil = 158.987 L defines a unit for the lines below: 2 bbl_oil, other units built on it (unit kbbl = 1000 bbl_oil), and a result shown in it from its unit menu. It belongs to its sheet (a template keeps it).
-- It says when the symbol is a unit or a name already, or when the unit is an absolute temperature, zero or a vector.
+- It says when the symbol is a unit, a name anywhere on the sheet, or a word the sheet reads itself (for, to, sin), when the unit is an absolute temperature, zero, too large or a vector, and when a unit is used above its line.
 
 **Templates**
-- File › New › Save as template… keeps the open sheet under a name; its tile on File › New starts a new sheet with its regions and title block, dated today. Delete removes a template; sheets made from it are not touched.
+- File › New › Save as template… keeps the open sheet under a name; its tile on File › New starts a new sheet with its regions, title block, units, figures and paper, dated today. A template of the same name is replaced only when asked; Delete asks first; sheets made from a template are not touched.
 
 **Your company's title block**
-- Title block › Use for new sheets keeps the company, client, prepared by, checked by and logo for every new sheet, pack and template.
+- Title block › Use for new sheets keeps the company, client, prepared by, checked by and logo for every new sheet, pack and template; File › Options shows and changes them.
 
 **Checks**
-- 96 engine tests (units of the sheet's own: defined, used, shown, refused, kept to their sheet) and 111 UI tests (templates listed, opened and saved); random sheets with unit lines never panic. Every earlier pack prints as before.
+- 97 engine tests (units of the sheet's own: defined, used, shown, refused, kept to their sheet) and 113 UI tests (templates listed, opened, saved, replaced only when asked, deleted only when asked); random sheets with unit lines never panic. Every earlier pack prints as before.
 
 ## 0.2.8 — 2026-11-20
 

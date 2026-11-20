@@ -355,6 +355,21 @@ const check = (name, ok, info = "") => { console.log(`${ok ? "ok  " : "FAIL"} ${
   await pt.fill(".dlg .form input", "Fan sizing"); await pt.click(".dlg button:has-text('OK')"); await pt.waitForTimeout(200);
   const saved = await pt.evaluate(() => JSON.stringify(window.__calls.filter(c => c[0] === "save_template").pop() ?? null));
   check("Save as template asks for a name and saves", saved.includes('"name":"Fan sizing"'), saved);
+  // Replacing a template of the same name, and deleting one, ask first (review of 0.2.9). File › New is still open.
+  await pt.click(".tile:has-text('Save as template')"); await pt.waitForTimeout(200);
+  await pt.fill(".dlg .form input", "pump standard"); await pt.click(".dlg button:has-text('OK')"); await pt.waitForTimeout(250);
+  const asked = (await pt.locator(".dlg").last().textContent().catch(() => "")) ?? "";
+  const before = await pt.evaluate(() => window.__calls.filter(c => c[0] === "save_template").length);
+  await pt.locator(".dlg").last().locator("button:has-text('Replace')").click(); await pt.waitForTimeout(250);
+  const left = await pt.locator(".dlg").count();
+  const after = await pt.evaluate(() => window.__calls.filter(c => c[0] === "save_template").length);
+  check("saving over a template of the same name asks, then replaces", asked.includes("Replace the template") && after === before + 1 && left === 0, `${asked} ${left}`);
+  await pt.click(".tile.tpl .tpldel"); await pt.waitForTimeout(200);
+  const del0 = await pt.evaluate(() => window.__calls.filter(c => c[0] === "delete_template").length);
+  const askedDel = (await pt.textContent(".dlg").catch(() => "")) ?? "";
+  await pt.click(".dlg button:has-text('Delete')"); await pt.waitForTimeout(200);
+  const del1 = await pt.evaluate(() => window.__calls.filter(c => c[0] === "delete_template").length);
+  check("Delete asks before removing a template", del0 === 0 && askedDel.includes("Delete the template") && del1 === 1, `${del0} ${del1} ${askedDel}`);
   await pt.close();
 
   // 14. Recovery: Discard removes the kept copy; × only closes, so the copy is offered again next time (0.1.9).

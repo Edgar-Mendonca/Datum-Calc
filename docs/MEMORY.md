@@ -363,6 +363,7 @@ tests_ui/run.cjs               Playwright UI tests against ui/dist with a mocked
 
 ### 2026-11-20: Session 1, continued (0.2.9)
 - 0.2.8 released after the review fixes (9 findings).
+- 0.2.9 review fixes (10 findings): the definition shows its value once; keywords, function names and names anywhere on the sheet (`later`) are refused as unit symbols; units used above their line say so (`later_units`, also for a display unit); sheet units in the unit menu (`units::custom_like`); too-large units said. Templates keep their units, figures and paper (`title_defaults` apart from `fresh`), ids keep `_`, names that collide as files get a suffix, Windows device names avoided, unreadable templates listed; replace and delete ask first; the save dialog stays open on failure; Options shows client and checked.
 - Custom units (`Stmt::UnitDef`, `units::find`), templates (`templates`, `save_template`, `new_from_template`, `delete_template`; File › New › Your templates; Save as template dialog), the company title block (Options `client`, `checked`; Title block › Use for new sheets). The disk allowance filled during the toolchain update: `cargo clean` freed 31 GB; build checks of the shell use `cargo check` where linking is not needed.
 
 ## 5. Known limits and next steps

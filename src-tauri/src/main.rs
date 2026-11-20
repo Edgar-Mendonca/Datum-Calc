@@ -83,6 +83,13 @@ fn fresh(a: &App, mut s: Sheet) -> Sheet {
     s.units = o.units.clone();
     s.digits = o.digits;
     s.page.paper = o.paper.clone();
+    title_defaults(a, s)
+}
+
+/// The company's title block, date and revision on a new sheet whose own fields are empty (a template keeps its
+/// units, figures and paper; only this part is filled in).
+fn title_defaults(a: &App, mut s: Sheet) -> Sheet {
+    let o = &a.opts;
     if s.title.company.is_empty() { s.title.company = o.company.clone(); }
     if s.title.by.is_empty() { s.title.by = o.by.clone(); }
     if s.title.logo.is_empty() { s.title.logo = o.logo.clone(); }
@@ -151,7 +158,7 @@ fn templates_dir(app: &AppHandle) -> Option<PathBuf> {
 
 /// A template's file from its id: plain letters, digits, - and _ only, so an id cannot reach outside the folder.
 fn template_file(app: &AppHandle, id: &str) -> R<PathBuf> {
-    if id.is_empty() || !id.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_') { return Err("That is not a template.".into()); }
+    if id.is_empty() || id.starts_with('.') || id.contains("..") || !id.chars().all(|c| c.is_alphanumeric() || matches!(c, '-' | '_' | ' ' | '.')) { return Err("That is not a template.".into()); }
     Ok(templates_dir(app).ok_or("The templates folder cannot be opened.")?.join(format!("{id}.dcalc")))
 }
 
@@ -162,8 +169,9 @@ fn templates(app: AppHandle) -> Vec<Template> {
     let mut out: Vec<Template> = std::fs::read_dir(d).into_iter().flatten().flatten().filter_map(|e| {
         let p = e.path();
         if p.extension()? != "dcalc" { return None; }
-        let s = Doc::open(&p).ok()?.s;
-        Some(Template { id: p.file_stem()?.to_str()?.to_string(), name: s.name.clone(), regions: s.regions.len() })
+        let id = p.file_stem()?.to_str()?.to_string();
+        // One that cannot be read (damaged, or saved by a newer Datum Calc) is listed, and says why when opened.
+        Some(match Doc::open(&p) { Ok(d) => Template { id, name: d.s.name.clone(), regions: d.s.regions.len() }, Err(_) => Template { name: format!("{id} (cannot be read here)"), id, regions: 0 } })
     }).collect();
     out.sort_by_key(|t| t.name.to_lowercase());
     out
@@ -174,8 +182,20 @@ fn templates(app: AppHandle) -> Vec<Template> {
 fn save_template(app: AppHandle, st: State<St>, name: String) -> R<()> {
     let name = name.trim();
     if name.is_empty() { return Err("Give the template a name.".into()); }
-    let id: String = name.chars().map(|c| if c.is_alphanumeric() { c } else { '-' }).collect::<String>().trim_matches('-').chars().take(60).collect();
-    let id = if id.is_empty() { "template".to_string() } else { id };
+    let base: String = name.chars().map(|c| if c.is_alphanumeric() || c == '_' { c } else { '-' }).collect::<String>().trim_matches('-').chars().take(60).collect();
+    let base = if base.is_empty() { "template".to_string() } else { base };
+    // Windows keeps device names for itself (CON, AUX, COM1 …).
+    let reserved = ["CON", "PRN", "AUX", "NUL"].contains(&base.to_uppercase().as_str()) || (base.len() == 4 && ["COM", "LPT"].contains(&base[..3].to_uppercase().as_str()) && base.as_bytes()[3].is_ascii_digit());
+    let base = if reserved { format!("{base}-template") } else { base };
+    // Another name that reads the same as a file (Pump A and Pump-A, or pump on Windows) gets its own file.
+    let mut id = base.clone();
+    for k in 2.. {
+        let f = template_file(&app, &id)?;
+        let other = std::fs::read_dir(f.parent().ok_or("The templates folder cannot be opened.")?).into_iter().flatten().flatten()
+            .find(|e| e.path().file_stem().and_then(|x| x.to_str()).is_some_and(|x| x.eq_ignore_ascii_case(&id)))
+            .and_then(|e| Doc::open(&e.path()).ok()).map(|d| d.s.name);
+        match other { Some(n) if !n.eq_ignore_ascii_case(name) => id = format!("{base}-{k}"), _ => break }
+    }
     let mut s = st.lock().doc.s.clone();
     s.name = name.to_string();
     // A template starts each new sheet: no date and the first revision.
@@ -190,7 +210,7 @@ fn save_template(app: AppHandle, st: State<St>, name: String) -> R<()> {
 fn new_from_template(app: AppHandle, st: State<St>, id: String) -> R<Out> {
     let s = Doc::open(&template_file(&app, &id)?)?.s;
     let mut a = st.lock();
-    let mut s = fresh(&a, s);
+    let mut s = title_defaults(&a, s);
     s.name = "Calc1".into();
     a.doc = Doc::new(s);
     Ok(out(&a))
