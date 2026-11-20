@@ -89,7 +89,7 @@ pub const FLUID_FUNCTIONS: [(&str, &str); 27] = [
 ];
 
 /// A built-in function's name (not one of the sheet's own).
-pub fn builtin_name(k: &str) -> bool { FUNCTIONS.iter().chain(FLUID_FUNCTIONS.iter()).any(|f| f.0.split('(').next() == Some(k)) || ["gas_M", "gas_R", "gas_nu"].contains(&k) }
+pub fn builtin_name(k: &str) -> bool { FUNCTIONS.iter().chain(FLUID_FUNCTIONS.iter()).chain(crate::dynsys::FUNCTIONS.iter()).any(|f| f.0.split('(').next() == Some(k)) || ["gas_M", "gas_R", "gas_nu"].contains(&k) }
 
 pub const FUNCTIONS: [(&str, &str); 48] = [
     ("sqrt(x)", "square root"), ("cbrt(x)", "cube root"), ("abs(x)", "absolute value"), ("exp(x)", "e to the power x"), ("ln(x)", "natural logarithm"), ("log(x)", "logarithm base 10"),
@@ -130,7 +130,7 @@ pub struct Env {
     pub(crate) later_units: std::collections::HashSet<String>,
     /// Names that are defined further down the sheet, or whose own line has an error.
     later: HashMap<String, bool>,
-    depth: u32,
+    pub(crate) depth: u32,
 }
 
 impl Env {
@@ -295,6 +295,8 @@ impl Env {
             for (p, v) in saved.into_iter().rev() { match v { Some(v) => { self.vars.insert(p, v); } None => { self.vars.remove(&p); } } }
             return r.map_err(|e| if e.at.0 < body.at.0 || e.at.1 > body.at.1 { e } else { Error { msg: format!("In {f}: {}", e.msg), at } });
         }
+        // Dynamic systems (0.2.11) take a transfer function by its name: poles(G), step(G, t).
+        if crate::dynsys::is_fn(f) { return crate::dynsys::call(self, f, args, at); }
         // Gas properties name the gas first: gas_cp(air, 300 K).
         if let Some(prop) = f.strip_prefix("gas_").filter(|_| builtin_name(f)) {
             let g = match args.first().map(|a| &a.e) { Some(E::Var(g)) => crate::fluids::gas(g), _ => None };

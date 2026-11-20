@@ -170,8 +170,10 @@ fn random_expr(r: &mut Rng, depth: u32) -> String {
     const FLUID: [&str; 12] = ["water_h(20 °C, 1 bar)", "water_T(1 bar, a)", "water_x(10 bar, 2000 kJ/kg)", "water_rho(a, b)", "water_cp(374 °C, 220.64 bar)", "water_psat(v)",
         "gas_cp(air, a)", "gas_rho(CO2, 1e9 K, 1e-300 Pa)", "gas_mu(He, 1 K)", "water_s(1e-300 Pa, 1e300 kJ/kg)", "water_h(1 bar, 1e-9)", "gas_cp(zz, 300 K)"];
     const MAT: [&str; 14] = ["det(identity(50)*1 W)", "transpose(v)*v", "[1, 2]", "[[1, 2], [3, 4]]", "[[2, 1], [1, 3]] kN/m", "M", "M[1, 2]", "M[2]", "[[1], [2, 3]]", "[a, 2 m]", "[]", "identity(3)", "M^-1", "[[1e300, 0], [0, 1e-300]]"];
+    // Dynamic systems (0.2.11): transfer functions well and badly formed, stable and not.
+    const DYN: [&str; 14] = ["poles(tf)", "step(tf, b*1 s)", "step(H, v*1 s)", "overshoot(H)", "pm(H)", "gm(tf)", "zeros(H)", "settling(tf)", "impulse(H, 1e300 s)", "wn(H)", "dcgain(f)", "step(tf, 1e-300 s, 3 N)", "poles(zz)", "zeta(H)"];
     if depth == 0 || r.below(4) == 0 {
-        return match r.below(7) { 6 => FLUID[r.below(12)].into(), 5 => MAT[r.below(14)].into(), 4 => CX[r.below(13)].into(), 0 => NUMS[r.below(10)].into(), 1 => format!("{} {}", NUMS[r.below(10)], UNITS[r.below(15)]), 2 => ["a", "b", "v", "g", "pi", "zz"][r.below(6)].into(), _ => format!("({})", random_expr(r, depth.saturating_sub(1))) };
+        return match r.below(8) { 7 => DYN[r.below(14)].into(), 6 => FLUID[r.below(12)].into(), 5 => MAT[r.below(14)].into(), 4 => CX[r.below(13)].into(), 0 => NUMS[r.below(10)].into(), 1 => format!("{} {}", NUMS[r.below(10)], UNITS[r.below(15)]), 2 => ["a", "b", "v", "g", "pi", "zz"][r.below(6)].into(), _ => format!("({})", random_expr(r, depth.saturating_sub(1))) };
     }
     match r.below(4) {
         0 | 1 => format!("{} {} {}", random_expr(r, depth - 1), ["+", "-", "*", "/", "^", "<=", ">"][r.below(7)], random_expr(r, depth - 1)),
@@ -191,6 +193,10 @@ fn random_expressions_never_panic() {
         push(Kind::Math, "v = 0, 0.5 .. 3".into(), json!(null));
         push(Kind::Math, "f(x) = x^2 + b".into(), json!(null));
         push(Kind::Math, "M = [[4, -1], [-1, 4]] kN/m".into(), json!(null));
+        push(Kind::Math, "tf(s) = 1/(s^2 + 0.1*s + 1)".into(), json!(null));
+        let h = ["1/(s + 1)", "(s^2 + 1e9*s)/(s^3 + 2*s^2 + 1e-9)", "s^25", "1/(s - 1)", "0", "(1e300*s + 1)/(s + 1e-300)", "H(s)", "1/(s^2 + 1)", "tf(s)/(1 + tf(s))", "1/s^20"];
+        let k = r.below(11);
+        push(Kind::Math, if k < 10 { format!("H(s) = {}", h[k]) } else { format!("H(s) = 1/(s + {})", random_expr(&mut r, 2)) }, json!(null));
         push(Kind::Math, ["unit zu = 2.5 m", "unit zu = 0 m", "unit m = 1 ft", "unit zu = a*b"][round % 4].into(), json!(null));
         if round % 5 == 0 {
             let cell = |r: &mut Rng| [json!("1"), json!("2 m"), json!(""), json!("x"), json!(3), json!(null), json!("1e400")][r.below(7)].clone();

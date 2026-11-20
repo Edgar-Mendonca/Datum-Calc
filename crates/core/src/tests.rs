@@ -491,7 +491,7 @@ mod packs {
     #[test]
     fn all_packs_open_and_list() {
         let cards = crate::packs::cards();
-        assert_eq!(cards.len(), 30);
+        assert_eq!(cards.len(), 31);
         for c in &cards { assert!(!c.name.is_empty() && !c.desc.is_empty() && !c.field.is_empty() && c.checks > 0, "{}", c.id); }
     }
 
@@ -720,6 +720,23 @@ mod packs {
         assert!(close(v(&e, "Q_1") * 3600.0, 58.099_058_17, 1e-8) && close(v(&e, "Q_2") * 3600.0, 41.900_941_83, 1e-8));
         assert!(close(v(&e, "dp_12"), 21_069.487_2, 1e-8) && close(v(&e, "v_2"), 2.315_535_421, 1e-8));
         assert!(o.regions.iter().any(|r| r.result == "Q_1 = 58.1 m³/h, Q_2 = 41.9 m³/h") && checks(&o)[0].0);
+    }
+
+    #[test]
+    fn speed_control() {
+        // scipy.signal and numpy: plant poles −8.41520, −32.08480 rad/s, gain K/(bR + K²) = 1.851852 rad/(s·V); closed-loop
+        // poles −22.07297, −9.21352 ± 5.32652j; gain crossover 8.294868 rad/s, phase margin 70.59258°; step overshoot
+        // 2.23082 %, peak 0.39515 s, rise time (10–90 %) 0.178698 s, settling (2 %) 0.445124 s.
+        let (o, e) = run("speed-control");
+        let p = e.vars.get("p_P").unwrap();
+        assert!(close(p.v[0], -8.415_199_62, 1e-8) && close(p.v[1], -32.084_800_38, 1e-8) && p.im.is_empty());
+        let t = e.vars.get("p_T").unwrap();
+        assert!(close(t.v[0], -9.213_516_2, 1e-7) && close(t.im[0], 5.326_521_38, 1e-7) && close(t.im[1], -5.326_521_38, 1e-7) && close(t.v[2], -22.072_967_59, 1e-8));
+        assert!(close(v(&e, "k_P"), 1.851_851_851_851_85, 1e-12) && close(v(&e, "k_T"), 1.0, 1e-12));
+        assert!(close(v(&e, "ω_c"), 8.294_868_335_213_51, 1e-9) && close(v(&e, "PM").to_degrees(), 70.592_575_573_523_66, 1e-9));
+        assert!(close(v(&e, "OS"), 0.022_308_215_6, 1e-6) && close(v(&e, "t_r"), 0.178_698_404_9, 1e-5) && close(v(&e, "t_s"), 0.445_124, 1e-5));
+        assert!(checks(&o).iter().all(|c| c.0) && checks(&o).len() == 3 && o.regions.iter().all(|r| r.error.is_none()));
+        assert!(o.regions.iter().filter(|r| r.plot.is_some()).count() == 2);
     }
 
     #[test]
@@ -1778,6 +1795,35 @@ fn units_of_the_sheets_own_review() {
     let mut s = sheet(&["V = 1 m^3", "unit zz = 2 m^3"]);
     s.regions[0].unit = "zz".into();
     assert!(eval::run(&s).regions[0].warn.starts_with("zz is a unit defined further down"));
+}
+
+#[test]
+fn dynamic_systems() {
+    let o = run(&[
+        "w_n = 2 rad/s", "z = 0.3", "G(s) = w_n^2/(s^2 + 2*z*w_n*s + w_n^2)",
+        "a = step(G, 1.5 s)", "b = impulse(G, 1 s)", "c = overshoot(G)", "d = risetime(G)", "e = settling(G)", "f = peaktime(G)", "h = wn(G)", "k = zeta(G)",
+        "L(s) = 5/(s*(s + 1)*(s + 2))", "pmL = pm(L)", "n = gm(L)", "q = wgc(L)", "r = wpc(L)",
+        "m_1 = 2 kg", "c_1 = 3 kg/s", "k_1 = 4 N/m", "M(s) = 1/(m_1*s^2 + c_1*s + k_1)", "W(s) = 1/(2 kg*s^2 + 3 kg/s*s + 4 N/m)", "dcgain(W)", "u = dcgain(M)", "x = step(M, [0 s, 1 s], 8 N)",
+        "X(s) = 1/(s + 1 kg)", "y = poles(X)", "D(s) = exp(-s*1 s)", "poles(D)", "E(s) = s + 1", "step(E, 1 s)", "step(G, -1 s)", "overshoot(L)",
+        "pm(M)", "I(s) = 1/s", "dcgain(I)", "zeros(I)", "poles(G + G)", "P(s) = s^0.5", "poles(P)", "poles(w_n)",
+    ]);
+    let res = |n: &str| o.regions.iter().find(|r| r.name == n).map(|r| (r.result.clone(), r.error.as_ref().map(|e| e.msg.clone()).unwrap_or_default())).unwrap();
+    // scipy.signal: step(1.5 s) = 1.355454, impulse(1 s) = 1.085869; overshoot e^(−πζ/√(1−ζ²)) = 0.3723, peak π/ω_d = 1.6466 s,
+    // rise 0.66067 s, settling 5.61504 s. 5/(s(s+1)(s+2)): phase crossover √2 rad/s with gain margin 1.2; crossover 1.2885 rad/s.
+    assert_eq!(res("a").0, "1.355");
+    assert_eq!(res("b").0, "1.086 Hz");
+    assert_eq!((res("c").0, res("d").0, res("e").0, res("f").0), ("0.3723".into(), "660.7 ms".into(), "5.615 s".into(), "1.647 s".into()));
+    assert_eq!((res("h").0, res("k").0), ("2 rad/s".into(), "0.3".into()));
+    assert_eq!((res("n").0, res("r").0, res("q").0), ("1.2".into(), "1.414 rad/s".into(), "1.289 rad/s".into()));
+    assert!(res("pmL").0.starts_with("5.0"), "{:?}", res("pmL"));
+    // Units: a mass on a spring settles at F/k; 8 N on 4 N/m is 2 m.
+    assert_eq!(res("u"), ("0.25 m/N".into(), String::new()));
+    assert!(res("x").0 == "[0, 1.106] m", "{:?}", res("x"));
+    let errs: Vec<String> = o.regions.iter().filter_map(|r| r.error.as_ref().map(|e| e.msg.clone())).collect();
+    for want in ["Terms with different units", "does not make a transfer function", "more zeros than poles", "has no finite zeros", "times of 0 s or more",
+        "pole at s = 0 (an integrator): its step response does not settle", "has units", "is the variable: give values with units", "gain grows without limit", "whole numbers", "is not a transfer function: define it above", "takes the name of a transfer function"] {
+        assert!(errs.iter().any(|e| e.contains(want)), "{want}: {errs:?}");
+    }
 }
 
 #[test]

@@ -1,0 +1,333 @@
+{
+  "format": 1,
+  "name": "DC motor speed control",
+  "title": {
+    "project": "",
+    "number": "PACK-31",
+    "title": "DC motor speed control",
+    "by": "",
+    "checked": "",
+    "date": "",
+    "rev": "A",
+    "company": "",
+    "client": "",
+    "logo": ""
+  },
+  "page": {
+    "paper": "A4",
+    "margins": [
+      15.0,
+      15.0,
+      15.0,
+      20.0
+    ]
+  },
+  "units": "SI",
+  "digits": 4,
+  "regions": [
+    {
+      "id": 1,
+      "kind": "text",
+      "text": "DC motor speed control with a PI controller",
+      "unit": "",
+      "style": "heading",
+      "data": null
+    },
+    {
+      "id": 2,
+      "kind": "text",
+      "text": "A permanent-magnet DC motor drives an inertia against viscous friction. Its speed over its armature voltage is a transfer function P(s), written from the motor's equations with units; a PI controller C(s) closes the loop. The sheet finds the poles, the step response's overshoot and settling time, and the loop's phase margin, and checks them against the requirements. Change the motor or the gains and every result follows.",
+      "unit": "",
+      "style": "note",
+      "data": null
+    },
+    {
+      "id": 3,
+      "kind": "text",
+      "text": "Motor and load",
+      "unit": "",
+      "style": "subheading",
+      "data": null
+    },
+    {
+      "id": 4,
+      "kind": "math",
+      "text": "J = 0.02 kg*m^2  # inertia of rotor and load",
+      "unit": "",
+      "style": "input",
+      "data": null
+    },
+    {
+      "id": 5,
+      "kind": "math",
+      "text": "b = 0.01 N*m*s  # viscous friction",
+      "unit": "",
+      "style": "input",
+      "data": null
+    },
+    {
+      "id": 6,
+      "kind": "math",
+      "text": "K_m = 0.5 N*m/A  # torque constant (equal to the back-emf constant in V·s/rad)",
+      "unit": "",
+      "style": "input",
+      "data": null
+    },
+    {
+      "id": 7,
+      "kind": "math",
+      "text": "R_a = 2 Ω  # armature resistance",
+      "unit": "",
+      "style": "input",
+      "data": null
+    },
+    {
+      "id": 8,
+      "kind": "math",
+      "text": "L_a = 50 mH  # armature inductance",
+      "unit": "",
+      "style": "input",
+      "data": null
+    },
+    {
+      "id": 9,
+      "kind": "text",
+      "text": "Controller and requirements",
+      "unit": "",
+      "style": "subheading",
+      "data": null
+    },
+    {
+      "id": 10,
+      "kind": "math",
+      "text": "K_p = 0.5 V*s  # proportional gain, volts per rad/s of speed error",
+      "unit": "",
+      "style": "input",
+      "data": null
+    },
+    {
+      "id": 11,
+      "kind": "math",
+      "text": "K_i = 5 V  # integral gain, volts per rad of accumulated error",
+      "unit": "",
+      "style": "input",
+      "data": null
+    },
+    {
+      "id": 12,
+      "kind": "math",
+      "text": "OS_max = 5 %  # largest overshoot allowed",
+      "unit": "%",
+      "style": "input",
+      "data": null
+    },
+    {
+      "id": 13,
+      "kind": "math",
+      "text": "t_s_max = 0.6 s  # settling time to within 2 %",
+      "unit": "",
+      "style": "input",
+      "data": null
+    },
+    {
+      "id": 14,
+      "kind": "math",
+      "text": "PM_min = 45°  # smallest phase margin",
+      "unit": "",
+      "style": "input",
+      "data": null
+    },
+    {
+      "id": 15,
+      "kind": "text",
+      "text": "Motor transfer function",
+      "unit": "",
+      "style": "subheading",
+      "data": null
+    },
+    {
+      "id": 16,
+      "kind": "math",
+      "text": "P(s) = K_m/((J*s + b)*(L_a*s + R_a) + K_m^2)  # speed over voltage",
+      "unit": "",
+      "style": "",
+      "data": null
+    },
+    {
+      "id": 17,
+      "kind": "math",
+      "text": "p_P = poles(P)  # mechanical and electrical poles",
+      "unit": "",
+      "style": "",
+      "data": null
+    },
+    {
+      "id": 18,
+      "kind": "math",
+      "text": "k_P = dcgain(P)  # steady speed per volt",
+      "unit": "rad/(s*V)",
+      "style": "",
+      "data": null
+    },
+    {
+      "id": 19,
+      "kind": "text",
+      "text": "Loop and closed loop",
+      "unit": "",
+      "style": "subheading",
+      "data": null
+    },
+    {
+      "id": 20,
+      "kind": "math",
+      "text": "C(s) = K_p + K_i/s  # PI controller",
+      "unit": "",
+      "style": "",
+      "data": null
+    },
+    {
+      "id": 21,
+      "kind": "math",
+      "text": "L(s) = C(s)*P(s)  # loop gain",
+      "unit": "",
+      "style": "",
+      "data": null
+    },
+    {
+      "id": 22,
+      "kind": "math",
+      "text": "PM = pm(L)  # phase margin",
+      "unit": "°",
+      "style": "",
+      "data": null
+    },
+    {
+      "id": 23,
+      "kind": "math",
+      "text": "ω_c = wgc(L)  # gain crossover frequency",
+      "unit": "",
+      "style": "",
+      "data": null
+    },
+    {
+      "id": 24,
+      "kind": "math",
+      "text": "T(s) = L(s)/(1 + L(s))  # closed loop: speed over speed demand",
+      "unit": "",
+      "style": "",
+      "data": null
+    },
+    {
+      "id": 25,
+      "kind": "math",
+      "text": "p_T = poles(T)",
+      "unit": "",
+      "style": "",
+      "data": null
+    },
+    {
+      "id": 26,
+      "kind": "math",
+      "text": "OS = overshoot(T)",
+      "unit": "%",
+      "style": "",
+      "data": null
+    },
+    {
+      "id": 27,
+      "kind": "math",
+      "text": "t_s = settling(T)",
+      "unit": "",
+      "style": "",
+      "data": null
+    },
+    {
+      "id": 28,
+      "kind": "math",
+      "text": "t_r = risetime(T)",
+      "unit": "",
+      "style": "",
+      "data": null
+    },
+    {
+      "id": 29,
+      "kind": "math",
+      "text": "k_T = dcgain(T)  # steady speed over demand: 1, no steady error with integral action",
+      "unit": "",
+      "style": "",
+      "data": null
+    },
+    {
+      "id": 30,
+      "kind": "check",
+      "text": "check OS <= OS_max",
+      "unit": "",
+      "style": "",
+      "data": null
+    },
+    {
+      "id": 31,
+      "kind": "check",
+      "text": "check t_s <= t_s_max",
+      "unit": "",
+      "style": "",
+      "data": null
+    },
+    {
+      "id": 32,
+      "kind": "check",
+      "text": "check PM >= PM_min",
+      "unit": "",
+      "style": "",
+      "data": null
+    },
+    {
+      "id": 33,
+      "kind": "text",
+      "text": "Responses",
+      "unit": "",
+      "style": "subheading",
+      "data": null
+    },
+    {
+      "id": 34,
+      "kind": "plot",
+      "text": "plot step(T, t) for t in 0 s .. 1 s",
+      "unit": "",
+      "style": "",
+      "data": null
+    },
+    {
+      "id": 35,
+      "kind": "plot",
+      "text": "plot db(L(j*ω)) for ω in 0.1 rad/s .. 1000 rad/s log",
+      "unit": "",
+      "style": "",
+      "data": null
+    },
+    {
+      "id": 36,
+      "kind": "text",
+      "text": "Ref: G. F. Franklin, J. D. Powell, A. Emami-Naeini, Feedback Control of Dynamic Systems, 8th ed., §2.3 (DC motor model), §3.4 (step response: overshoot, rise and settling times), §6.4 (gain and phase margins).",
+      "unit": "",
+      "style": "ref",
+      "data": null
+    },
+    {
+      "id": 37,
+      "kind": "text",
+      "text": "Ref: K. Ogata, Modern Control Engineering, 5th ed., §5.3 (transient-response specifications) and §8.2 (PID control).",
+      "unit": "",
+      "style": "ref",
+      "data": null
+    }
+  ],
+  "next_id": 38,
+  "ui": {
+    "pack": {
+      "id": "speed-control",
+      "field": "Control",
+      "desc": "A DC motor's speed held by a PI controller: the motor's transfer function from its equations with units, the closed loop's poles, overshoot and settling time, and the loop's phase margin, checked against the requirements."
+    }
+  }
+}

@@ -35,7 +35,7 @@ const check = (name, ok, info = "") => { console.log(`${ok ? "ok  " : "FAIL"} ${
   check("File page offers a blank sheet", (await p.textContent(".tiles")).includes("Blank Sheet"));
   // 1b. File › New lists the ten calc packs by field; a click opens one (0.1.3).
   await p.click(".bs aside button:has-text('New')"); await p.waitForTimeout(200);
-  check("New lists the thirty calc packs", (await p.$$(".tiles.packs .tile")).length === 30 && (await p.$$eval("h3.packf", h => h.map(x => x.textContent))).join() === "Rotating equipment,Process,Mechanical,Electrical");
+  check("New lists the thirty-one calc packs", (await p.$$(".tiles.packs .tile")).length === 31 && (await p.$$eval("h3.packf", h => h.map(x => x.textContent))).join() === "Rotating equipment,Process,Mechanical,Electrical,Control");
   await p.click(".tiles.packs .tile:has-text('Pump power')"); await p.waitForTimeout(200);
   check("a pack tile opens that pack", JSON.stringify(await p.evaluate(() => window.__calls.filter(c => c[0] === "new_from_pack").pop())).includes("pump-power"));
   await p.click(".tabs .file").catch(() => {}); await p.waitForTimeout(100);
@@ -289,6 +289,8 @@ const check = (name, ok, info = "") => { console.log(`${ok ? "ok  " : "FAIL"} ${
   await p7.click(".tabs > button:text-is('Math')"); await p7.waitForTimeout(100);
   check("the Math tab has the Algebra keys", (await p7.$$eval(".ribbon .rb.key", bs => bs.map(b => b.textContent))).filter(t => ["simplify", "expand", "factor"].includes(t)).length === 3);
   check("the Math tab has the Properties keys, and properties draw with their fluid", (await p7.$$eval(".ribbon .rb.key", bs => bs.map(b => b.textContent))).filter(t => ["water", "steam", "gas"].includes(t)).length === 3 && algText.includes("3214kJ/kg") && algText.includes("CO2") && (await p7.$$(".cpage .katex-error")).length === 0, algText.slice(-200));
+  const keys7 = await p7.$$eval(".ribbon .rb.key", bs => bs.map(b => b.textContent));
+  check("the Math tab has the Dynamics keys; poles show in pairs and the step response draws", ["G(s)", "step", "poles", "OS", "PM"].every(t => keys7.includes(t)) && algText.includes("1.732j") && (await p7.$$(".cpage .region canvas")).length >= 1, algText.slice(-160));
   await p7.click(".tabs > button:text-is('View')"); await p7.waitForTimeout(100);
   await p7.click(".ribbon button:has-text('Fractions')"); await p7.waitForTimeout(120);
   const fr = await p7.evaluate(() => JSON.stringify(window.__calls.filter(c => c[0] === "apply").pop() ?? null));

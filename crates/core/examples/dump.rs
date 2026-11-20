@@ -54,7 +54,11 @@ fn main() {
     alg.regions.push(datum_core::Region { id: 9, kind: Kind::Program, text: "s = 0\nfor i in 1 .. 10\n  if i > 4\n    break\n  end\n  s = s + i\nend".into(), ..Default::default() });
     alg.regions.push(datum_core::Region { id: 10, kind: Kind::Math, text: "h_1 = water_h(400 °C, 40 bar)".into(), ..Default::default() });
     alg.regions.push(datum_core::Region { id: 11, kind: Kind::Math, text: "c_p = gas_cp(CO2, 500 K)".into(), ..Default::default() });
-    alg.next_id = 12;
+    // Dynamic systems (0.2.11): a transfer function, its poles and its step response.
+    for (id, kind, t) in [(12, Kind::Math, "G(s) = 4/(s^2 + 2*s + 4)"), (13, Kind::Math, "p_G = poles(G)"), (14, Kind::Plot, "plot step(G, t) for t in 0 s .. 5 s")] {
+        alg.regions.push(datum_core::Region { id, kind, text: t.into(), ..Default::default() });
+    }
+    alg.next_id = 15;
     alg.exact = true;
     let alg = serde_json::json!({ "sheet": alg, "calc": eval::run(&alg), "path": null, "dirty": false, "undo": false, "redo": false, "rev": 1 });
     // A material region (0.2.1): S355 as "steel", used by the lines below.

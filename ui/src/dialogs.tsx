@@ -83,6 +83,7 @@ const GLOSSARY: [string, [string, string][]][] = [
     ["Property functions", "water_…(two of T, p, h, s, x) for water and steam by IAPWS-IF97, and gas_…(gas, T) for air and common gases as ideal gases, with units."],
     ["unit", "A unit of the sheet's own, for the lines below: unit bbl_oil = 158.987 L."],
     ["ode", "Differential equations in time (or any variable), solved with units from starting values; each state becomes a function of time, such as x(2 s)."],
+    ["Transfer function", "A function of s, G(s) = K/(tau*s + 1): the Laplace transform of a system's output over its input. poles, zeros, step, overshoot, settling, pm and gm work on it by name (0.2.11)."],
     ["Fit", "fit f(x) = model to xs, ys: the model's parameters found by least squares from data, with units and R²; f is defined for the lines below."],
     ["Program region", "A region of several lines with if, else, for, while and break; the names it sets are defined below, or, with a first line such as f(x) =, it is a function that returns a value."],
     ["Material region", "A region that picks a material from the library and defines its properties as names with units (ρ_steel, E_steel, σ_y,steel), with their ranges and sources."],

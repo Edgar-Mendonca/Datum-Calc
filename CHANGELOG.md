@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.2.11 — 2026-11-20
+
+Dynamic systems: transfer functions with units, their responses and their stability margins.
+
+**Transfer functions**
+- Write a transfer function as a function of s: G(s) = K/(tau*s + 1), from names with units defined above. Sums, products, quotients and whole powers of s are allowed, and other transfer functions of s, so a loop C(s)*P(s) and its closed loop L(s)/(1 + L(s)) follow from their parts. Units are checked term by term, so G carries the units of its output over its input; a transfer function in plain numbers reads s in 1/s and times in seconds.
+- Factors common to the top and bottom cancel, so a closed loop shows only its own poles.
+
+**What follows from one**
+- poles(G) and zeros(G) in rad/s (complex in pairs), dcgain(G) with its units, wn(G) and zeta(G) of the dominant poles.
+- step(G, t) and impulse(G, t) in time, exact for any order up to 20; step(G, t, 10 V) for a step of a given size. plot step(G, t) for t in 0 s .. 2 s draws the response.
+- overshoot(G), risetime(G) (10 % to 90 %), settling(G) (to within 2 %) and peaktime(G).
+- For a loop gain L(s): pm(L) and gm(L), the phase and gain margins, at the crossovers wgc(L) and wpc(L).
+- Math › Dynamics keys, a help card, and the transfer function in the glossary.
+
+**Calc pack 31: DC motor speed control**
+- A DC motor's speed held by a PI controller: the motor's transfer function from its equations with units, the closed loop's poles, overshoot, rise and settling times, the loop's phase margin, the step response and the Bode magnitude, checked against the requirements.
+
+**Checks**
+- Every figure checked against scipy.signal and the textbook formulas (overshoot e^(−πζ/√(1−ζ²)), peak time π/ω_d, the margins of 5/(s(s + 1)(s + 2))); the pack against its own design worked in scipy. 101 engine tests, with transfer functions in the grammar fuzz, and 122 UI tests.
+
 ## 0.2.10 — 2026-11-20
 
 Export to a .docx document and to a web page; hide and fold regions.

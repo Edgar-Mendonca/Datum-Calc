@@ -155,6 +155,7 @@ fn nd(n: &Node, s: &Sub) -> String {
                 "log" if a.len() == 1 => format!("\\log_{{10}}\\left({}\\right)", a[0]),
                 f if (f.starts_with("water_") || f.starts_with("gas_")) && crate::eval::builtin_name(f) => fluid(f, args, &a),
                 f if FUNCS.contains(&f) => format!("\\{}\\left({}\\right)", if matches!(f, "atan2" | "round" | "floor" | "ceil" | "sum" | "mean" | "len" | "asin" | "acos" | "atan" | "abs" | "re" | "im" | "arg" | "conj" | "db" | "par" | "simplify" | "expand" | "factor" | "lsolve" | "identity" | "dot" | "cross" | "rows" | "cols" | "points") { format!("operatorname{{{f}}}") } else { f.to_string() }, a.join(", ")),
+                f if crate::dynsys::is_fn(f) => format!("\\operatorname{{{f}}}\\left({}\\right)", a.join(", ")),
                 f => format!("{}\\left({}\\right)", name(f), a.join(", ")),
             }
         }
