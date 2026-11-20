@@ -171,7 +171,7 @@ impl Env {
         match self.later.get(&k) {
             Some(true) => fail(format!("{} has an error on its own line.", show(&k)), at),
             Some(false) => fail(format!("{} is defined further down: move its line above this one.", show(&k)), at),
-            None if units::lookup(name).is_some() => fail(format!("“{name}” is a unit: put a number before it (1 {name})."), at),
+            None if units::find(name).is_some() => fail(format!("“{name}” is a unit: put a number before it (1 {name})."), at),
             None => fail(format!("{} is not defined. Define it above this line, such as {} = 1.", show(&k), name), at),
         }
     }
@@ -1041,6 +1041,7 @@ pub fn run_env(s: &Sheet, f: &Fmt) -> (SheetOut, Env) {
 
 fn run_here(s: &Sheet, f: &Fmt) -> (SheetOut, Env) {
     let mut env = Env::new();
+    units::custom_clear();
     // Names defined anywhere, so a name used too early gets a helpful message.
     for r in &s.regions {
         if r.kind == Kind::Material {
@@ -1313,6 +1314,20 @@ fn region(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>, subst: bo
     let res: R<()> = (|| {
         match &st {
             Stmt::Empty => {}
+            Stmt::UnitDef { name, at, e } => {
+                if units::find(name).is_some() { return fail(format!("{name} is a unit already: choose another symbol."), *at); }
+                if env.vars.contains_key(&canon(name)) || env.funcs.contains_key(&canon(name)) || constant(&canon(name)).is_some() { return fail(format!("{} is a name on this sheet already: choose another symbol for the unit.", show(&canon(name))), *at); }
+                if !name.chars().all(|c| c.is_alphanumeric() || c == '_') { return fail("A unit's symbol is letters and digits, such as bbl or kWh_th.", *at); }
+                let v = env.eval(e)?;
+                real(&v, "A unit", e.at)?;
+                if v.vec { return fail("A unit is one value, such as 158.987 L.", e.at); }
+                if v.abs { return fail("A unit cannot be an absolute temperature; use a difference (K).", e.at); }
+                if !(v.x() > 0.0 && v.x().is_finite()) { return fail("A unit is a size above zero.", e.at); }
+                units::custom_add(name, v.x(), v.dim);
+                let (t, tx, _, _) = show_val(&v, "", f);
+                o.result = format!("1 {name} = {t}");
+                o.result_tex = format!("= {tx}");
+            }
             Stmt::Ode { eqs, var, lo, hi, inits } => {
                 let (a, b) = (env.eval(lo)?, env.eval(hi)?);
                 real(&a, "The range", lo.at)?;

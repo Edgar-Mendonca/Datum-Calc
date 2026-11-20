@@ -109,6 +109,8 @@ pub enum Stmt {
     /// Differential equations (0.2.8): `ode x'' = -k/m*x for t in 0 s .. 10 s from x = 1 cm, x' = 0 m/s`, each
     /// equation for the highest derivative of a state, and a starting value for every state and lower derivative.
     Ode { eqs: Vec<(String, Node)>, var: String, lo: Node, hi: Node, inits: Vec<(String, Node)> },
+    /// A unit of the sheet's own (0.2.9): `unit bbl = 158.987 L`, for the lines below.
+    UnitDef { name: String, at: Span, e: Node },
     /// `log` after the range: a logarithmic x axis (a frequency sweep for a Bode plot).
     Plot { ys: Vec<Node>, var: String, lo: Node, hi: Node, log: bool },
     Show { e: Node },
@@ -126,9 +128,9 @@ impl UnitParser<'_> {
         let mut u = match self.peek(0)? {
             Tok::Id(s) => {
                 if !first && self.known.contains(&s) { return None; }
-                let u = units::lookup(&s)?;
+                let (factor, dim, offset) = units::find(&s)?;
                 self.i += 1;
-                UnitExpr { factor: u.factor, dim: u.dim, offset: u.offset, text: s }
+                UnitExpr { factor, dim, offset, text: s }
             }
             Tok::Op("(") => {
                 self.i += 1;
@@ -460,6 +462,11 @@ pub fn statement(s: &str, known: &[String]) -> Result<Stmt, Error> {
                 Stmt::Solve { lhs, rhs, var, lo, hi }
             }
         }
+        (Tok::Id(w), Some(Tok::Id(_))) if w == "unit" && matches!(p.t.get(2).map(|x| &x.0), Some(Tok::Op("="))) => {
+            let (name, at) = (match &p.t[1].0 { Tok::Id(n) => n.clone(), _ => unreachable!() }, p.t[1].1);
+            p.i = 3;
+            Stmt::UnitDef { name, at, e: p.expr(1)? }
+        }
         (Tok::Id(w), Some(_)) if w == "ode" => {
             p.i = 1;
             let mut eqs = vec![];
@@ -544,6 +551,7 @@ pub fn statement(s: &str, known: &[String]) -> Result<Stmt, Error> {
         Stmt::Solve { lhs, rhs, lo, hi, .. } => vec![lhs, rhs, lo, hi],
         Stmt::SolveSys { eqs, vars } => eqs.iter().flat_map(|(a, b)| [a, b]).chain(vars.iter().map(|v| &v.1)).collect(),
         Stmt::Plot { ys, lo, hi, .. } => ys.iter().chain([lo, hi]).collect(),
+        Stmt::UnitDef { e, .. } => vec![e],
         Stmt::Ode { eqs, lo, hi, inits, .. } => eqs.iter().map(|e| &e.1).chain([lo, hi]).chain(inits.iter().map(|i| &i.1)).collect(),
         Stmt::Fit { model, xs, ys, params, .. } => [model, xs, ys].into_iter().chain(params.iter().filter_map(|p| p.1.as_ref())).collect(),
         Stmt::Empty => vec![],

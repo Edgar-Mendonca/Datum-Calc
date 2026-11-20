@@ -2,7 +2,7 @@
 import { For, Show, createSignal, createResource } from "solid-js";
 import { Lists, Out, TitleBlock } from "./api";
 import { typeText } from "./cmds";
-import { act, call, closeDialog, openDialog, S, opts } from "./store";
+import { act, call, closeDialog, openDialog, S, opts, setOpts, toast } from "./store";
 import { Dialog } from "./ui";
 
 const FIELDS: [keyof TitleBlock, string][] = [["project", "Project"], ["number", "Calc number"], ["title", "Title"], ["by", "Prepared by"], ["checked", "Checked by"], ["date", "Date"], ["rev", "Revision"], ["company", "Company"], ["client", "Client"]];
@@ -17,7 +17,23 @@ export const titleBlock = () => openDialog(() => {
           <button class="btn sm" onClick={async () => { const l = await call<string | null>("pick_image"); if (l) setT({ ...t(), logo: l }); }}>Choose picture…</button>
           <Show when={t().logo}><button class="btn sm" onClick={() => setT({ ...t(), logo: "" })}>Remove</button></Show>
           <Show when={!t().logo && opts().logo}><button class="btn sm" onClick={() => setT({ ...t(), logo: opts().logo })}>Use my company logo</button></Show></div>
+        <label></label><div class="inline"><button class="btn sm" title="New sheets, packs and templates start with this company, client, people and logo" onClick={async () => {
+          const o = { ...opts(), company: t().company, client: t().client, by: t().by, checked: t().checked, logo: t().logo };
+          if (await call("set_options", { opts: o })) { setOpts(o); toast("New sheets will start with this title block.", true); }
+        }}>Use for new sheets</button><span class="muted">company, client, people and logo</span></div>
       </div>
+    </Dialog>
+  );
+});
+
+/** File › Save as template: the sheet under a name, to start new sheets from. */
+export const saveTemplate = (then?: () => void) => openDialog(() => {
+  const [name, setName] = createSignal(S().title.title || S().name || "");
+  const ok = async () => { if (await call("save_template", { name: name() }) !== undefined) { toast(`Saved the template “${name().trim()}”.`, true); then?.(); } };
+  return (
+    <Dialog title="Save as template" help="templates" ok={ok}>
+      <div class="form"><label>Name</label><input value={name()} placeholder="Pump sizing, company standard" onInput={e => setName(e.currentTarget.value)} /></div>
+      <p class="muted">New sheets made from it start with its regions and title block, dated today.</p>
     </Dialog>
   );
 });
@@ -52,6 +68,7 @@ const GLOSSARY: [string, [string, string][]][] = [
     ["Torque and energy", "Both are a force times a length. A force times a length, or a power over a speed, shows in N·m (lbf·ft); a power times a time shows in J (BTU). Either can be chosen in the unit menu."],
     ["Complex number", "A value with a real and an imaginary part, used for AC circuits: (3 + 4j) Ω, or 5 Ω∠53.13°. Shown as 3 + 4j, or as magnitude and angle with View › Polar."],
     ["Property functions", "water_…(two of T, p, h, s, x) for water and steam by IAPWS-IF97, and gas_…(gas, T) for air and common gases as ideal gases, with units."],
+    ["unit", "A unit of the sheet's own, for the lines below: unit bbl_oil = 158.987 L."],
     ["ode", "Differential equations in time (or any variable), solved with units from starting values; each state becomes a function of time, such as x(2 s)."],
     ["Fit", "fit f(x) = model to xs, ys: the model's parameters found by least squares from data, with units and R²; f is defined for the lines below."],
     ["Program region", "A region of several lines with if, else, for, while and break; the names it sets are defined below, or, with a first line such as f(x) =, it is a function that returns a value."],

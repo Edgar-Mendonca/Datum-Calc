@@ -23,17 +23,19 @@ struct Options {
     units: String,
     digits: u8,
     paper: String,
-    /// Defaults for the title block of new sheets.
+    /// Defaults for the title block of new sheets: the company's own, saved from a sheet's title block (0.2.9).
     company: String,
     by: String,
     logo: String,
+    client: String,
+    checked: String,
     /// Number format: "auto" (plain, engineering above 1e6) or "eng" (always engineering).
     number: String,
 }
 
 impl Default for Options {
     fn default() -> Self {
-        Self { autosave: 5, beta: false, theme: "auto".into(), open_last: false, units: "SI".into(), digits: 4, paper: "A4".into(), company: String::new(), by: String::new(), logo: String::new(), number: "auto".into() }
+        Self { autosave: 5, beta: false, theme: "auto".into(), open_last: false, units: "SI".into(), digits: 4, paper: "A4".into(), company: String::new(), by: String::new(), logo: String::new(), client: String::new(), checked: String::new(), number: "auto".into() }
     }
 }
 
@@ -84,6 +86,8 @@ fn fresh(a: &App, mut s: Sheet) -> Sheet {
     if s.title.company.is_empty() { s.title.company = o.company.clone(); }
     if s.title.by.is_empty() { s.title.by = o.by.clone(); }
     if s.title.logo.is_empty() { s.title.logo = o.logo.clone(); }
+    if s.title.client.is_empty() { s.title.client = o.client.clone(); }
+    if s.title.checked.is_empty() { s.title.checked = o.checked.clone(); }
     if s.title.date.is_empty() { s.title.date = today(); }
     if s.title.rev.is_empty() { s.title.rev = "A".into(); }
     s.normalize();
@@ -134,6 +138,66 @@ fn new_from_pack(st: State<St>, id: String) -> R<Out> {
     a.doc = Doc::new(s);
     Ok(out(&a))
 }
+
+/// A template: a sheet saved for starting new ones (0.2.9), kept in the templates folder of the app's settings.
+#[derive(serde::Serialize)]
+struct Template { id: String, name: String, regions: usize }
+
+fn templates_dir(app: &AppHandle) -> Option<PathBuf> {
+    let d = dir(app, false)?.join("templates");
+    std::fs::create_dir_all(&d).ok()?;
+    Some(d)
+}
+
+/// A template's file from its id: plain letters, digits, - and _ only, so an id cannot reach outside the folder.
+fn template_file(app: &AppHandle, id: &str) -> R<PathBuf> {
+    if id.is_empty() || !id.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_') { return Err("That is not a template.".into()); }
+    Ok(templates_dir(app).ok_or("The templates folder cannot be opened.")?.join(format!("{id}.dcalc")))
+}
+
+/// The saved templates, by name.
+#[tauri::command]
+fn templates(app: AppHandle) -> Vec<Template> {
+    let Some(d) = templates_dir(&app) else { return vec![] };
+    let mut out: Vec<Template> = std::fs::read_dir(d).into_iter().flatten().flatten().filter_map(|e| {
+        let p = e.path();
+        if p.extension()? != "dcalc" { return None; }
+        let s = Doc::open(&p).ok()?.s;
+        Some(Template { id: p.file_stem()?.to_str()?.to_string(), name: s.name.clone(), regions: s.regions.len() })
+    }).collect();
+    out.sort_by_key(|t| t.name.to_lowercase());
+    out
+}
+
+/// Saves the sheet as a template under a name (replacing one of the same name).
+#[tauri::command]
+fn save_template(app: AppHandle, st: State<St>, name: String) -> R<()> {
+    let name = name.trim();
+    if name.is_empty() { return Err("Give the template a name.".into()); }
+    let id: String = name.chars().map(|c| if c.is_alphanumeric() { c } else { '-' }).collect::<String>().trim_matches('-').chars().take(60).collect();
+    let id = if id.is_empty() { "template".to_string() } else { id };
+    let mut s = st.lock().doc.s.clone();
+    s.name = name.to_string();
+    // A template starts each new sheet: no date and the first revision.
+    s.title.date.clear();
+    s.title.rev = "A".into();
+    let mut d = Doc::new(s);
+    d.save(&template_file(&app, &id)?)
+}
+
+/// A new sheet from a template: its regions and title block, with today's date and nothing to save yet.
+#[tauri::command]
+fn new_from_template(app: AppHandle, st: State<St>, id: String) -> R<Out> {
+    let s = Doc::open(&template_file(&app, &id)?)?.s;
+    let mut a = st.lock();
+    let mut s = fresh(&a, s);
+    s.name = "Calc1".into();
+    a.doc = Doc::new(s);
+    Ok(out(&a))
+}
+
+#[tauri::command]
+fn delete_template(app: AppHandle, id: String) -> R<()> { std::fs::remove_file(template_file(&app, &id)?).map_err(|e| e.to_string()) }
 
 /// A saved file keeps its extension even when the name typed in the save box has none (`pump` → `pump.dcalc`),
 /// so Explorer still opens it with Datum Calc.
@@ -505,7 +569,7 @@ fn main() {
             }
         })
         .invoke_handler(tauri::generate_handler![
-            state, apply, history, new_sheet, packs, new_from_pack, open, save, save_file, pick_image, table_text, import_table,
+            state, apply, history, new_sheet, packs, new_from_pack, open, save, save_file, pick_image, table_text, import_table, templates, save_template, new_from_template, delete_template,
             lists, materials, options, set_options, autosave, recovery, recover, recent, startup_file, version, open_url, quit, check_update, install_update
         ])
         .run(tauri::generate_context!())

@@ -160,7 +160,7 @@ fn evaluation_speed_gate() {
 
 /// A random expression from the grammar: numbers with units, names, operators, functions, brackets.
 fn random_expr(r: &mut Rng, depth: u32) -> String {
-    const UNITS: [&str; 14] = ["m", "mm", "kg", "s", "N", "kN*m", "m^3/h", "MPa", "°C", "°F", "K", "rpm", "W/(m^2*K)", "%"];
+    const UNITS: [&str; 15] = ["zu", "m", "mm", "kg", "s", "N", "kN*m", "m^3/h", "MPa", "°C", "°F", "K", "rpm", "W/(m^2*K)", "%"];
     const NUMS: [&str; 10] = ["0", "1", "2.5", "-3", "1e-9", "1e9", "1e300", "1e-300", "0.0001", "42"];
     const FUNCS: [&str; 36] = ["transpose", "inv", "det", "norm", "rows", "cols", "lsolve", "dot", "cross", "sqrt", "sin", "cos", "ln", "log", "exp", "abs", "min", "max", "round", "sum", "mean", "len", "if", "hypot", "f", "re", "im", "arg", "conj", "polar", "par", "db", "cosh", "simplify", "expand", "factor"];
     // Complex values and units after brackets (0.1.8).
@@ -171,7 +171,7 @@ fn random_expr(r: &mut Rng, depth: u32) -> String {
         "gas_cp(air, a)", "gas_rho(CO2, 1e9 K, 1e-300 Pa)", "gas_mu(He, 1 K)", "water_s(1e-300 Pa, 1e300 kJ/kg)", "water_h(1 bar, 1e-9)", "gas_cp(zz, 300 K)"];
     const MAT: [&str; 14] = ["det(identity(50)*1 W)", "transpose(v)*v", "[1, 2]", "[[1, 2], [3, 4]]", "[[2, 1], [1, 3]] kN/m", "M", "M[1, 2]", "M[2]", "[[1], [2, 3]]", "[a, 2 m]", "[]", "identity(3)", "M^-1", "[[1e300, 0], [0, 1e-300]]"];
     if depth == 0 || r.below(4) == 0 {
-        return match r.below(7) { 6 => FLUID[r.below(12)].into(), 5 => MAT[r.below(14)].into(), 4 => CX[r.below(13)].into(), 0 => NUMS[r.below(10)].into(), 1 => format!("{} {}", NUMS[r.below(10)], UNITS[r.below(14)]), 2 => ["a", "b", "v", "g", "pi", "zz"][r.below(6)].into(), _ => format!("({})", random_expr(r, depth.saturating_sub(1))) };
+        return match r.below(7) { 6 => FLUID[r.below(12)].into(), 5 => MAT[r.below(14)].into(), 4 => CX[r.below(13)].into(), 0 => NUMS[r.below(10)].into(), 1 => format!("{} {}", NUMS[r.below(10)], UNITS[r.below(15)]), 2 => ["a", "b", "v", "g", "pi", "zz"][r.below(6)].into(), _ => format!("({})", random_expr(r, depth.saturating_sub(1))) };
     }
     match r.below(4) {
         0 | 1 => format!("{} {} {}", random_expr(r, depth - 1), ["+", "-", "*", "/", "^", "<=", ">"][r.below(7)], random_expr(r, depth - 1)),
@@ -191,6 +191,7 @@ fn random_expressions_never_panic() {
         push(Kind::Math, "v = 0, 0.5 .. 3".into(), json!(null));
         push(Kind::Math, "f(x) = x^2 + b".into(), json!(null));
         push(Kind::Math, "M = [[4, -1], [-1, 4]] kN/m".into(), json!(null));
+        push(Kind::Math, ["unit zu = 2.5 m", "unit zu = 0 m", "unit m = 1 ft", "unit zu = a*b"][round % 4].into(), json!(null));
         if round % 5 == 0 {
             let cell = |r: &mut Rng| [json!("1"), json!("2 m"), json!(""), json!("x"), json!(3), json!(null), json!("1e400")][r.below(7)].clone();
             let rows: Vec<serde_json::Value> = (0..r.below(5)).map(|_| json!([cell(&mut r), cell(&mut r)])).collect();

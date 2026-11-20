@@ -35,10 +35,18 @@ const md = (s: string) => s.split("\n").map(l => {
 /** File › New: a blank sheet or one of the calc packs, grouped by field. */
 const NewPage = () => {
   const [packs] = createResource(() => call<PackCard[]>("packs"));
+  const [tpls, { refetch }] = createResource(() => call<{ id: string; name: string; regions: number }[]>("templates"));
   const fields = () => [...new Set((packs() ?? []).map(p => p.field))];
   return (
     <div><h1>New</h1>
       <div class="tiles"><button class="tile" onClick={C.newSheet}><div class="pic"><svg class="ic"><use href="#i-new" /></svg></div><b>Blank Sheet</b><span>An empty calc sheet with your title block.</span></button></div>
+      <h2>Your templates</h2>
+      <p class="muted">Sheets of your own to start from. Save the open sheet as one with Save as template.</p>
+      <div class="tiles tpls">
+        <button class="tile" onClick={() => D.saveTemplate(() => refetch())}><div class="pic"><svg class="ic"><use href="#i-save" /></svg></div><b>Save as template…</b><span>The open sheet, to start new ones from.</span></button>
+        <For each={tpls() ?? []}>{t => <div class="tile tpl"><button class="tplopen" onClick={() => C.template(t.id)}><div class="pic"><svg class="ic"><use href="#i-math" /></svg><small>{t.regions} regions</small></div><b>{t.name}</b></button>
+          <button class="btn sm tpldel" title={`Delete the template “${t.name}”`} onClick={async () => { await call("delete_template", { id: t.id }); refetch(); }}>Delete</button></div>}</For>
+      </div>
       <h2>Calc packs</h2>
       <p class="muted">Ready sheets with the inputs at the top (highlighted), the results and checks below and the references at the end. Change the inputs to your case. Each pack is checked against a hand calculation in Datum Calc's tests.</p>
       <For each={fields()}>{f => <><h3 class="packf">{f}</h3><div class="tiles packs">

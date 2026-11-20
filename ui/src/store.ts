@@ -13,7 +13,7 @@ export const applyTheme = () => { document.documentElement.dataset.theme = theme
 export const [themeTick, setThemeTick] = createSignal(0);
 darkMq?.addEventListener("change", () => theme() === "auto" && applyTheme());
 export const setTheme = (t: string) => { setThemeRaw(t); applyTheme(); setOpts({ ...opts(), theme: t }); invoke("set_options", { opts: opts() }).catch(() => {}); };
-export const [opts, setOpts] = createSignal<Options>({ autosave: 5, beta: false, theme: "auto", openLast: false, units: "SI", digits: 4, paper: "A4", company: "", by: "", logo: "", number: "auto" });
+export const [opts, setOpts] = createSignal<Options>({ autosave: 5, beta: false, theme: "auto", openLast: false, units: "SI", digits: 4, paper: "A4", company: "", by: "", logo: "", client: "", checked: "", number: "auto" });
 
 export const [backstage, setBackstage] = createSignal<string | null>("home");
 export const [tab, setTab] = createSignal("home");

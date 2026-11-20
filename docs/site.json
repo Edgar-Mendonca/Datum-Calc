@@ -35,6 +35,7 @@
     "Water and steam properties by IAPWS-IF97, and air and common gases, as functions with units: water_h(400 °C, 40 bar), water_x(0.1 bar, h), gas_cp(air, T).",
     "Data in and curve fitting: paste cells from a spreadsheet or read a CSV file into a table, fit a model to it by least squares with units, and plot the curve with the measured points.",
     "Differential equations with units: ode x'' = -k/m*x for t in 0 .. 10 s from x = 1 cm, x' = 0 solves in time, plots the result and makes x(t) available below.",
+    "Your own units (unit bbl_oil = 158.987 L), templates of your own sheets, and your company's title block for every new sheet.",
     "Thirty ready calc packs, each with its reference and a test against a worked example.",
     "Complex numbers for AC circuits in the frequency domain: impedances such as (8 + 9.42j) Ω, phasors as 230 V∠-30°, impedances in parallel, complex power, and Bode plots on a log frequency axis.",
     "Each equation can be shown again with its numbers put in, as on a hand calculation.",
@@ -49,32 +50,13 @@
   ],
   "roadmap": [
     {
-      "v": "0.2.9",
-      "title": "Custom units and templates",
+      "v": "0.2.10",
+      "title": "Export and polish",
       "when": "Next",
       "items": [
-        "Units of your own",
-        "Sheet templates",
-        "A saved company title block"
-      ]
-    },
-    {
-      "v": "0.2.10",
-      "title": "Export",
-      "when": "Soon",
-      "items": [
         "Export to Word and HTML",
-        "Collapse or hide regions"
-      ]
-    },
-    {
-      "v": "0.2.8–0.2.10",
-      "title": "ODEs, templates, export",
-      "when": "Soon",
-      "items": [
-        "Differential equations with units",
-        "Custom units, templates and a company title block",
-        "Export to Word and HTML"
+        "Collapse or hide regions",
+        "Polish"
       ]
     },
     {

@@ -84,6 +84,7 @@ export const C = {
   open: (path: string | null = null) => keep(() => loadOut("open", { path })),
   newSheet: () => keep(() => loadOut("new_sheet")),
   pack: (id: string) => keep(() => loadOut("new_from_pack", { id })),
+  template: (id: string) => keep(() => loadOut("new_from_template", { id })),
   /** The selected region's result ("19.61 kW"), to paste into a spreadsheet or a report. */
   copyResult: async () => {
     const o = outs().get(selId());

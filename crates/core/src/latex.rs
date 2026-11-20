@@ -181,6 +181,7 @@ pub fn stmt_with(s: &Stmt, sub: &Sub) -> String {
             vars.iter().map(|v| format!("{} = {}", name(&v.0), node(&v.1))).collect::<Vec<_>>().join(",\\; ")),
         Stmt::Solve { lhs, rhs, var, lo, hi } => format!("{} = {} \\quad \\text{{for }} {} \\in \\left[{}, {}\\right]", node(lhs), node(rhs), name(var), node(lo), node(hi)),
         Stmt::Plot { ys, var, lo, hi, log } => format!("{} \\quad \\text{{for }} {} \\in \\left[{}, {}\\right]{}", ys.iter().map(&node).collect::<Vec<_>>().join(",\\; "), name(var), node(lo), node(hi), if *log { "\\;\\text{(log scale)}" } else { "" }),
+        Stmt::UnitDef { name: n, e, .. } => format!("\\text{{unit }} 1\\,{} = {}", unit(n), node(e)),
         Stmt::Ode { eqs, var, lo, hi, inits } => {
             let e: Vec<String> = eqs.iter().map(|(n, x)| format!("{} = {}", name(n), node(x))).collect();
             format!("{} \\quad \\text{{for }} {} \\in \\left[{}, {}\\right] \\quad \\text{{from }} {}",

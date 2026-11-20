@@ -1728,3 +1728,29 @@ fn differential_equations_review() {
     ] { assert!(error(lines).starts_with(msg), "{lines:?}: {}", error(lines)); }
     assert_eq!(result(&["ode q' = -q/(1 s) for t in -1 s .. 0 from q = 1 m"]), "at t = 0 s: q = 367.9 mm");
 }
+
+#[test]
+fn units_of_the_sheets_own() {
+    // An oil barrel is 158.987294928 L (42 US gallons): 2 bbl = 317.97 L; 50 000 bbl/day = 331.2 m³/h.
+    let u = ["unit bbl_oil = 158.987294928 L", "unit kbbl = 1000 bbl_oil"];
+    assert_eq!(result(&[u[0]]), "1 bbl_oil = 159 L");
+    assert_eq!(result(&[u[0], "V = 2 bbl_oil", "V*1"]), "318 L");
+    assert_eq!(result(&[u[0], u[1], "Q = 50 kbbl/day", "Q*1"]), "331.2 m³/h");
+    // A result shown in the sheet's own unit, as chosen in its unit menu.
+    let mut s = sheet(&[u[0], "V = 1 m^3*5"]);
+    s.regions[1].unit = "bbl_oil".into();
+    assert_eq!(eval::run(&s).regions[1].result, "31.45 bbl_oil");
+    assert!(run(&[u[0]]).regions[0].latex.starts_with("\\text{unit } 1\\,\\mathrm{bbl\\_oil} ="));
+    // A unit is known only below its line, and only on its sheet.
+    assert!(error(&["V = 2 bbl_oil", u[0]]).is_empty() && result(&["V = 2 bbl_oil", u[0]]).starts_with("1 bbl_oil"));
+    assert!(run(&["V = 2 bbl_oil", u[0]]).regions[0].error.is_some());
+    assert!(run(&["W = 2 bbl_oil"]).regions[0].error.is_some(), "another sheet does not know it");
+    assert_eq!(result(&["unit = 3"]), "3", "unit is still a name");
+    for (lines, msg) in [
+        (&["unit m = 2 ft"][..], "m is a unit already"),
+        (&["x = 3", "unit x = 2 m"][..], "x is a name on this sheet already"),
+        (&["unit tc = 20 °C"][..], "A unit cannot be an absolute temperature"),
+        (&["unit z = 0 m"][..], "A unit is a size above zero."),
+        (&["unit w = [1, 2] m"][..], "A unit is one value"),
+    ] { assert!(error(lines).starts_with(msg), "{lines:?}: {}", error(lines)); }
+}

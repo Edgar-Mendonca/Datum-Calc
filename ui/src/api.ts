@@ -15,7 +15,7 @@ export interface Sheet {
   regions: Region[]; next_id: number; ui: any;
 }
 export interface Out { sheet: Sheet; calc: SheetOut; path: string | null; dirty: boolean; undo: boolean; redo: boolean; rev: number }
-export interface Options { autosave: number; beta: boolean; theme: string; openLast: boolean; units: string; digits: number; paper: string; company: string; by: string; logo: string; number: string }
+export interface Options { autosave: number; beta: boolean; theme: string; openLast: boolean; units: string; digits: number; paper: string; company: string; by: string; logo: string; client: string; checked: string; number: string }
 
 export interface CheckOut { pass: boolean; ratio: number | null; lhs: string; rhs: string; op: string }
 export interface PlotOut { xs: number[]; xlabel: string; xunit: string; series: { label: string; ys: number[]; xs?: number[]; points?: boolean }[]; yunit: string; logx?: boolean }

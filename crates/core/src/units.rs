@@ -172,6 +172,21 @@ pub fn lookup(sym: &str) -> Option<&'static Unit> {
     UNITS.iter().chain(ABS_TEMPS).find(|u| u.sym == sym)
 }
 
+// The sheet's own units (0.2.9), defined by `unit bbl = 158.987 L` lines and known to the lines below while the
+// sheet is worked out. Each run has its own thread, so one sheet's units never reach another's.
+thread_local! { static CUSTOM: std::cell::RefCell<Vec<(String, f64, Dim)>> = const { std::cell::RefCell::new(Vec::new()) }; }
+
+/// Forgets the sheet's own units (the start of a run).
+pub fn custom_clear() { CUSTOM.with(|c| c.borrow_mut().clear()); }
+
+/// Adds a unit of the sheet's own: its symbol, its factor to SI and its dimension.
+pub fn custom_add(sym: &str, factor: f64, dim: Dim) { CUSTOM.with(|c| c.borrow_mut().push((sym.to_string(), factor, dim))); }
+
+/// A unit by its symbol, built in or the sheet's own: (factor to SI, dimension, offset for °C and °F).
+pub fn find(sym: &str) -> Option<(f64, Dim, f64)> {
+    lookup(sym).map(|u| (u.factor, u.dim, u.offset)).or_else(|| CUSTOM.with(|c| c.borrow().iter().find(|u| u.0 == sym).map(|u| (u.1, u.2, 0.0))))
+}
+
 /// A parsed unit expression: its factor to SI, its dimension, and an absolute temperature offset
 /// (only for a lone °C or °F).
 #[derive(Debug, Clone, PartialEq)]

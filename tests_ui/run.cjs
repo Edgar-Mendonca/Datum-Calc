@@ -339,6 +339,24 @@ const check = (name, ok, info = "") => { console.log(`${ok ? "ok  " : "FAIL"} ${
   check("Insert › From CSV inserts a table with the file's names and units", ins.includes('"kind":"table"') && ins.includes('"name":"Q"') && ins.includes('"unit":"m^3/h"') && ins.includes('"text":"pump"'), ins.slice(0, 300));
   await p9.close();
 
+  // 13g. Templates and the company title block (0.2.9): File › New lists your templates; a tile starts a sheet from
+  // one; Save as template asks for a name; the title block can be kept for new sheets.
+  const pt = await b.newPage({ viewport: { width: 1440, height: 1000 } });
+  pt.on("pageerror", e => errors.push(String(e)));
+  await pt.addInitScript(st => { window.__calls = []; window.__TAURI__ = { core: { invoke: async (c, a) => { window.__calls.push([c, a]); return c === "state" || c === "apply" || c === "new_from_template" || c === "set_options" ? st : c === "templates" ? [{ id: "pump-std", name: "Pump standard", regions: 12 }] : c === "save_template" ? null : c === "options" ? { theme: "light", autosave: 0, units: "SI", digits: 4, paper: "A4", number: "auto" } : c === "recent" || c === "packs" ? [] : null; } }, event: { listen: async () => () => {} } }; }, fix.state);
+  await pt.goto(url); await pt.waitForTimeout(500);
+  await pt.click(".bs aside button:has-text('New')"); await pt.waitForTimeout(300);
+  check("File › New lists your templates", (await pt.textContent(".bs")).includes("Pump standard") && (await pt.$$(".tile.tpl")).length === 1);
+  await pt.click(".tile.tpl .tplopen"); await pt.waitForTimeout(300);
+  const opened = await pt.evaluate(() => JSON.stringify(window.__calls.filter(c => c[0] === "new_from_template").pop() ?? null));
+  check("a template tile starts a sheet from it", opened.includes('"id":"pump-std"'), opened);
+  await pt.click("button.file"); await pt.waitForTimeout(300); await pt.click(".bs aside button:has-text('New')"); await pt.waitForTimeout(300);
+  await pt.click(".tile:has-text('Save as template')"); await pt.waitForTimeout(200);
+  await pt.fill(".dlg .form input", "Fan sizing"); await pt.click(".dlg button:has-text('OK')"); await pt.waitForTimeout(200);
+  const saved = await pt.evaluate(() => JSON.stringify(window.__calls.filter(c => c[0] === "save_template").pop() ?? null));
+  check("Save as template asks for a name and saves", saved.includes('"name":"Fan sizing"'), saved);
+  await pt.close();
+
   // 14. Recovery: Discard removes the kept copy; × only closes, so the copy is offered again next time (0.1.9).
   for (const [how, sel, want] of [["Discard", ".dlg footer .btn:not(.pri)", true], ["×", ".dlg header .x", false]]) {
     const p4 = await b.newPage({ viewport: { width: 1440, height: 900 } });
