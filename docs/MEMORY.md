@@ -357,6 +357,7 @@ tests_ui/run.cjs               Playwright UI tests against ui/dist with a mocked
 
 ### 2026-11-20: Session 1, continued (0.2.8)
 - 0.2.7 released after the review fixes (15 findings; the first CI run caught a lint the older local toolchain missed).
+- 0.2.8 review fixes (9 findings): a failing trial stage shortens the step (the error, with its time, only at the shortest step); unit positions on ode/fit lines found by the parser's own unit reader; derivative units checked every call; a work budget (steps × states); a program function replaces a solved state; tolerance scale from the starting value, else the first rate × span, else 1 SI unit; Dormand–Prince dense output (Hairer's coefficients) instead of Hermite; bare 0 beside an absolute temperature refused, bare 0 at either end; the variable cannot be a state or carry primes; duplicate starting values; the end of the range in its typed unit.
 - Differential equations: `ode.rs` (Dormand–Prince with Hermite reading), `Stmt::Ode`, states as functions, the end values and a plot on the line; primes drawn as primes; words in unit position (1 s) stay units on ode and fit lines; `ode` key on the Math tab; tank-drain pack checked against Torricelli's exact solution; tests against exact solutions (decay, spring, cooling in °C, a coupled pair).
 
 ## 5. Known limits and next steps

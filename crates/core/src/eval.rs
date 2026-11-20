@@ -1093,6 +1093,8 @@ fn program(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>, o: &mut 
         if builtin_name(&k) { o.error = Some(ErrOut { msg: format!("{name} is a built-in function: choose another name."), from: 0, to: name.chars().count() }); return; }
         o.name = k.clone();
         env.funcs.remove(&k);
+        env.odes.remove(&k);
+        env.fitted.remove(&k);
         env.progs.insert(k, std::sync::Arc::new(p));
         known.push(name.clone());
         return;
@@ -1316,11 +1318,15 @@ fn region(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>, subst: bo
                 real(&a, "The range", lo.at)?;
                 real(&b, "The range", hi.at)?;
                 if a.vec || b.vec { return fail("The range goes between single values.", (lo.at.0, hi.at.1)); }
-                // A bare 0 at the start takes the unit of the end: for t in 0 .. 10 s.
-                let a = if a.x() == 0.0 && units::is_none(&a.dim) { Val { dim: b.dim, abs: b.abs, ..a } } else { a };
+                // A bare 0 at either end takes the other end's unit (for t in 0 .. 10 s); not an absolute temperature's.
+                let bare = |v: &Val| v.x() == 0.0 && units::is_none(&v.dim);
+                if (bare(&a) && b.abs) || (bare(&b) && a.abs) { return fail("Give 0 with its unit here: 0 °C or 0 K are not the same temperature.", (lo.at.0, hi.at.1)); }
+                let a = if bare(&a) { Val { dim: b.dim, ..a } } else { a };
+                let b = if bare(&b) { Val { dim: a.dim, ..b } } else { b };
                 same_or(&a, &b, "use", hi.at)?;
                 if b.x().partial_cmp(&a.x()) != Some(std::cmp::Ordering::Greater) || !(b.x() - a.x()).is_finite() { return fail("The range must go from a smaller to a larger value.", (lo.at.0, hi.at.1)); }
                 let tdim = a.dim;
+                if var.ends_with('\'') { return fail("The variable after for is a plain name, such as t.", lo.at); }
                 // The states: each equation's name and its lower derivatives (x'' gives x and x'), in order.
                 let span = (eqs[0].1.at.0, eqs[eqs.len() - 1].1.at.1);
                 let mut states: Vec<(String, usize, Option<usize>)> = vec![]; // name, equation, index of the next state
@@ -1331,11 +1337,13 @@ fn region(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>, subst: bo
                     for j in 0..order {
                         let s = format!("{base}{}", "'".repeat(j));
                         if states.iter().any(|x| x.0 == s) { return fail(format!("{} has two equations.", show(&canon(&s))), span); }
+                        if canon(&s) == canon(var) { return fail(format!("{} is the variable the equations run over; name the state otherwise.", show(&canon(var))), span); }
                         let next = (j + 1 < order).then_some(states.len() + 1);
                         states.push((s, k, next));
                     }
                 }
                 if states.len() > 20 { return fail("At most 20 states.", span); }
+                for (k, (n, x)) in inits.iter().enumerate() { if inits[..k].iter().any(|(m, _)| canon(m) == canon(n)) { return fail(format!("{} has two starting values.", show(&canon(n))), x.at); } }
                 for (n, x) in inits { if !states.iter().any(|s| canon(&s.0) == canon(n)) { return fail(format!("{} is not one of these equations' states: they are {}.", show(&canon(n)), states.iter().map(|s| show(&canon(&s.0))).collect::<Vec<_>>().join(", ")), x.at); } }
                 // Starting values give the units: each derivative is its state's units per unit of time (a bare 0 takes them).
                 let mut y0 = vec![];
@@ -1358,7 +1366,6 @@ fn region(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>, subst: bo
                 let keys: Vec<String> = states.iter().map(|s| canon(&s.0)).chain([canon(var)]).collect();
                 let saved: Vec<Option<Val>> = keys.iter().map(|k| env.vars.get(k).cloned()).collect();
                 let restore = |env: &mut Env| for (k, s) in keys.iter().zip(&saved) { match s { Some(v) => { env.vars.insert(k.clone(), v.clone()); } None => { env.vars.remove(k); } } };
-                let checked = std::cell::Cell::new(false);
                 let mut rhs = |t: f64, y: &[f64]| -> R<Vec<f64>> {
                     env.vars.insert(canon(var), Val { v: vec![t], dim: tdim, abs: a.abs, ..Default::default() });
                     for (k, s) in states.iter().enumerate() { env.vars.insert(canon(&s.0), Val { v: vec![y[k]], ..vals[k].clone() }); }
@@ -1371,29 +1378,30 @@ fn region(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>, subst: bo
                                 let v = env.eval(e)?;
                                 real(&v, "A derivative", e.at)?;
                                 if v.vec { return fail("A derivative is one value at each time.", e.at); }
-                                if !checked.get() {
-                                    let want = units::div(&vals[k].dim, &tdim);
-                                    if !units::same(&v.dim, &want) { return fail(format!("{} must be in {} per {} (the units of {} over time); this is {}.", show(&canon(&eqs[s.1].0)), dim_name(&vals[k].dim), dim_name(&tdim), show(&canon(&s.0)), dim_name(&v.dim)), e.at); }
-                                }
+                                let want = units::div(&vals[k].dim, &tdim);
+                                if !units::same(&v.dim, &want) { return fail(format!("{} must be in {} per {} (the units of {} over time); this is {}.", show(&canon(&eqs[s.1].0)), dim_name(&vals[k].dim), dim_name(&tdim), show(&canon(&s.0)), dim_name(&v.dim)), e.at); }
                                 v.x()
                             }
                         };
                     }
-                    checked.set(true);
                     Ok(d)
                 };
                 let f0 = match rhs(a.x(), &y0) { Ok(v) => v, Err(e) => { restore(env); return Err(e); } };
-                let scale: Vec<f64> = y0.iter().zip(&f0).map(|(y, d)| y.abs().max(d.abs() * (b.x() - a.x())).max(1e-300)).collect();
+                let scale: Vec<f64> = y0.iter().zip(&f0).map(|(y, d)| if *y != 0.0 { y.abs() } else if *d != 0.0 { d.abs() * (b.x() - a.x()) } else { 1.0 }).collect();
                 let solved = crate::ode::solve(&mut rhs, a.x(), b.x(), y0, &scale);
                 restore(env);
+                // The end of the range in the unit it was typed in (100 s, not 1.667 min).
+                let unit_of = |n: &Node| match &n.e { E::Num(_, Some(u)) => Some(u.text.clone()), E::Neg(x) => match &x.e { E::Num(_, Some(u)) => Some(u.text.clone()), _ => None }, _ => None };
+                let typed = unit_of(hi).or_else(|| unit_of(lo)).unwrap_or_default();
+                let at_t = |t: f64| show_val(&Val { v: vec![t], ..b.clone() }, &typed, f).0;
                 let path = match solved {
                     Ok(p) => p,
-                    Err(Some(e)) => return Err(e),
-                    Err(None) => return fail("The solution changes too fast to follow over this range (the equations may be stiff, or blow up): try a shorter range or other values.", span),
+                    Err((t, Some(e))) => return Err(Error { msg: format!("At {} = {}: {}", show(&canon(var)), at_t(t), e.msg), at: e.at }),
+                    Err((t, None)) => return fail(format!("The solution changes too fast to follow after {} = {} (the equations may be stiff, or blow up): try a shorter range or other values.", show(&canon(var)), at_t(t)), span),
                 };
                 let sol = std::sync::Arc::new(crate::ode::Solved { path, dims: vals.iter().map(|v| v.dim).collect(), abs: vals.iter().map(|v| v.abs).collect(), tdim, tabs: a.abs });
                 // Each state is a function of time for the lines below; the line shows the values at the end.
-                let (end, _, _, _) = show_val(&b, "", f);
+                let (end, end_tex, _, xu_end) = show_val(&b, &typed, f);
                 let (mut texts, mut texes) = (vec![], vec![]);
                 let last = sol.path.ys.last().cloned().unwrap_or_default();
                 for (k, (s, _, _)) in states.iter().enumerate() {
@@ -1422,14 +1430,14 @@ fn region(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>, subst: bo
                 }
                 o.name = canon(&states[0].0);
                 o.result = format!("at {} = {end}: {}", show(&canon(var)), texts.join(", "));
-                o.result_tex = format!("\\text{{at }} {} = {}:\\; {}", latex::name(var), show_val(&b, "", f).1, texes.join(",\\; "));
+                o.result_tex = format!("\\text{{at }} {} = {end_tex}:\\; {}", latex::name(var), texes.join(",\\; "));
                 // A plot of the states themselves (not their derivatives) that share the first one's units.
                 let base: Vec<usize> = (0..states.len()).filter(|k| *k == 0 || states[k - 1].2 != Some(*k)).filter(|k| units::same(&vals[*k].dim, &vals[0].dim)).collect();
                 let n = 121;
                 let xs: Vec<f64> = (0..n).map(|i| a.x() + (b.x() - a.x()) * i as f64 / (n - 1) as f64).collect();
                 let mut p = PlotOut::default();
                 // The time axis in the unit of the end of the range (0 .. 10 min reads in min, not ms).
-                let (_, _, _, xu) = show_val(&b, "", f);
+                let xu = xu_end;
                 let (xk, xo, _) = units::display(b.x(), &shown_dim(&b), b.abs, &xu, f.us);
                 p.xs = xs.iter().map(|x| (x - xo) / xk).collect();
                 p.xlabel = show(&canon(var));

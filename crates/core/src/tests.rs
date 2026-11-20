@@ -1699,3 +1699,32 @@ fn differential_equations() {
         (&["ode x' = -x/(2 s) for t in 0 s .. 10 s from x = 1 m", "x(2 m)"][..], "x takes a time, not a length."),
     ] { assert!(error(lines).starts_with(msg), "{lines:?}: {}", error(lines)); }
 }
+
+#[test]
+fn differential_equations_review() {
+    // A trial step that overshoots below zero (√ of a negative) shortens the step instead of failing the line.
+    assert_eq!(result(&["ode z' = -sqrt(z)^2/(1 s) for t in 0 .. 10 s from z = 1"]), "at t = 10 s: z = 45.4×10⁻⁶");
+    // Past the time the tank empties, it says when, and the time reads in the unit typed.
+    assert!(error(&["ode h' = -0.001*sqrt(2*g*h) for t in 0 .. 15 min from h = 2 m"]).starts_with("At t = 10.64 min: sqrt of a negative number"));
+    // Units after numbers stay units on an ode line, also with powers and brackets.
+    assert_eq!(result(&["ode V' = 0.5 m^3/h for t in 0 .. 2 h from V = 0 m^3"]), "at t = 2 h: V = 1 m³");
+    assert_eq!(result(&["A = 2 m^2", "C = 1 MJ/K", "ode T' = -10 W/(m^2*K)*A*(T - 20 °C)/C for t in 0 .. 1 h from T = 80 °C"]), "at t = 1 h: T = 75.83 °C");
+    // A state at rest with a rate of round-off; a fast decay over a long time ends near zero.
+    assert!(error(&["ode x' = 1 m/s*(sin(t/(1 s))^2 + cos(t/(1 s))^2 - 1) for t in 0 .. 10 s from x = 0 m"]).is_empty());
+    let (_, env) = eval::run_env(&sheet(&["ode w' = -1000*w/(1 s) for t in 0 .. 100 s from w = 1 m", "got = w(100 s)"]), &eval::Fmt { digits: 4, eng: false, us: false, polar: false, exact: false });
+    assert!(env.vars.get("got").unwrap().x().abs() < 1e-11);
+    // A later program function replaces a solved state of the same name.
+    assert_eq!(result(&["ode x' = -x/(1 s) for t in 0 .. 1 s from x = 1 m", "x(a) =\n  return 7*a", "x(2)"]), "14");
+    // Between steps, as accurate as at them: the dense output of the method.
+    let (_, env) = eval::run_env(&sheet(&["ode y'' = -y/(1 s^2) for t in 0 .. 20 s from y = 1 m, y' = 0"]), &eval::Fmt { digits: 4, eng: false, us: false, polar: false, exact: false });
+    let sol = env.odes.get("y").unwrap().0.clone();
+    for k in 0..140 { let t = 0.07 + k as f64 * 0.1421; assert!((sol.path.at(0, t) - t.cos()).abs() < 1e-8 && (sol.path.slope(1, t) + t.cos()).abs() < 5e-8, "{t}"); }
+    for (lines, msg) in [
+        (&["ode x' = if(t < 1 s, -x/(1 s), 1) for t in 0 .. 3 s from x = 1 m"][..], "At t = 1 s: x' must be in a length per a time"),
+        (&["ode x' = 1 m/K for T in 0 .. 40 °C from x = 0 m"][..], "Give 0 with its unit here"),
+        (&["ode t' = -t/(1 s) for t in 0 .. 1 s from t = 1 s"][..], "t is the variable the equations run over"),
+        (&["ode u' = -u/(1 s) for t in 0 .. 1 s from u = 1 m, u = 2 m"][..], "u has two starting values."),
+        (&["ode u' = -u/(1 s) for t' in 0 .. 1 s from u = 1 m"][..], "The variable after for is a plain name"),
+    ] { assert!(error(lines).starts_with(msg), "{lines:?}: {}", error(lines)); }
+    assert_eq!(result(&["ode q' = -q/(1 s) for t in -1 s .. 0 from q = 1 m"]), "at t = 0 s: q = 367.9 mm");
+}

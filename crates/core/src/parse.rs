@@ -400,13 +400,18 @@ pub fn statement(s: &str, known: &[String]) -> Result<Stmt, Error> {
         if let Some((Tok::Id(n), _)) = t.get(k + 1) { names.push(n.clone()); }
         for j in k + 1..t.len() { if let (Tok::Id(n), Some((Tok::Op("="), _))) = (&t[j].0, t.get(j + 1)) { names.push(n.clone()); } }
     }
-    // Words written as units after a number (1 s, 2 kN*m) stay units; the other words are names.
+    // Words in a unit after a number or a bracket (1 s, 0.5 m^3/h, 10 W/(m^2*K), (2 + 3) mm/s) stay units: the
+    // same reader that reads them later marks them; the other words are names.
     let unit_at = {
         let mut u = vec![false; t.len()];
-        for j in 1..t.len() {
-            if let Tok::Id(_) = t[j].0 {
-                u[j] = matches!(t[j - 1].0, Tok::Num(_)) || (j >= 2 && matches!(t[j - 1].0, Tok::Op("*" | "/")) && u[j - 2]);
+        let base = names.clone();
+        let mut j = 1;
+        while j < t.len() {
+            if matches!(t[j - 1].0, Tok::Num(_) | Tok::Op(")" | "]")) && matches!(t[j].0, Tok::Id(_) | Tok::Op("(")) {
+                let mut up = UnitParser { toks: &t, i: j, known: &base };
+                if up.expr_inner(false).is_some() && up.i > j { u[j..up.i].iter_mut().for_each(|x| *x = true); j = up.i; continue; }
             }
+            j += 1;
         }
         u
     };

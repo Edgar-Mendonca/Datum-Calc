@@ -8,12 +8,13 @@ Differential equations with units.
 - ode x'' = -k/m*x - c/m*x' for t in 0 .. 10 s from x = 1 cm, x' = 0 solves an equation in time from its starting values. Several equations are solved together: ode T' = (T_a - T)/tau, h' = … for t in … from T = 80 °C, h = 0 m.
 - Units come from the starting values; each derivative must be its state's units per unit of time, and it says so when it is not. Temperatures in °C stay absolute.
 - The line shows the values at the end and a plot of the solution. Each state (x, x') and each equation's derivative (x'') becomes a function of time for the lines below: x(2 s), x'(0.5 s), or a vector of times; in plots too.
-- An adaptive Runge–Kutta method (Dormand–Prince 5(4)) keeps the solution within about one part in 10⁸ of the exact one, between its steps too; a solution that blows up or is too stiff to follow is said, not drawn.
+- An adaptive Runge–Kutta method (Dormand–Prince 5(4)) with its own dense output keeps the solution within about one part in 10⁸ of the exact one, between its steps too. A trial step that overshoots (a square root of a level that dipped below zero) is retried shorter; a solution that blows up, is too stiff to follow, or cannot be worked out says at what time.
+- Units are read as units on an ode line (0.5 m^3/h, 10 W/(m^2*K)); the derivative's units are checked at every step; a starting value given twice, a state named like the variable, or a bare 0 beside a temperature in °C are said.
 - Primes are drawn as primes (x′, y″). A Math › ode key starts a line.
 - New calc pack (30 in all): a tank draining through an orifice, solved in time and checked against its exact solution.
 
 **Checks**
-- 94 engine tests (decay, a spring, cooling in °C and a coupled pair against exact solutions; what it says when it cannot; the new pack) and 108 UI tests; random sheets with differential equations never panic. Every earlier pack prints as before.
+- 95 engine tests (decay, a spring, cooling in °C and a coupled pair against exact solutions; what it says when it cannot; the new pack) and 108 UI tests; random sheets with differential equations never panic. Every earlier pack prints as before.
 
 ## 0.2.7 — 2026-11-20
 
