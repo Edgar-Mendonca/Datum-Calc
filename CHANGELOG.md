@@ -6,17 +6,19 @@ Data in and curve fitting.
 
 **Data in**
 - Copy cells in a spreadsheet and paste them on the sheet: they become a table. Paste them into a table's cell and they fill it from there, adding rows and columns as needed.
-- Insert › From CSV reads a CSV or text file into a table. Tabs, semicolons or commas, decimal commas and quoted cells are read; a heading such as Q (m3/h) or H [m] gives each column its name and unit, and a second row of units is read too. What could not be read (an unknown unit, rows beyond 2,000) is said.
+- Insert › From CSV reads a CSV or text file into a table. Tabs, semicolons or commas (whichever most lines share, with a title line above the table left out), decimal commas, thousands separators and quoted cells, line breaks inside quotes included, are read; a UTF-16 file is read too; a heading such as Q (m3/h) or H [m] gives each column its name and unit, and a second row of units is read too. What could not be read (an unknown unit, rows beyond 2,000) is said.
 
 **Curve fitting**
 - fit H(Q) = a + b*Q + c*Q^2 to Q, H finds a, b and c by least squares from two columns of data, each with its units (m, m/(m³/h), m/(m³/h)²), shows R², and defines H(Q) for the lines below.
 - Any model that is a sum of terms, each proportional to one parameter, is fitted at once: polynomials, a + b/x, a*x + b*ln(x). Other models (A*exp(-t/tau), k*x^n) are fitted from a starting guess for each parameter, which also gives its unit.
-- The parameters are the names the sheet does not define, or those listed after for.
+- The parameters are the names the sheet does not define, or those listed after for; names the fit holds from the sheet are said. A fitted function keeps its own fitted values, even when a later fit uses the same names.
+- It says when the data have an empty cell, when a parameter does not change the model, when a fit from guesses does not settle, and when R² is not defined (all y the same). Temperatures in °C stay absolute: fitting T in °C gives the intercept in °C and the slope in K.
+- A vector may hold temperatures: [20, 30, 40] °C, as a range or a table column can.
 - points(xs, ys) draws measured values on a plot beside the curves: plot H(Q), points(Q_d, H_d) for Q in 0 .. 150 m^3/h.
 - New calc pack (29 in all): a pump curve fitted to test data, the system curve and the operating point, checked against an independent least-squares and root calculation.
 
 **Checks**
-- 90 engine tests (fits against independent results, linear and nonlinear; reading spreadsheet and CSV text; the new pack) and 107 UI tests (a fit and its plot, Insert › From CSV); random pasted text and random fit lines never panic. Every earlier pack prints as before.
+- 92 engine tests (fits against independent results, linear and nonlinear; reading spreadsheet and CSV text; the new pack) and 107 UI tests (a fit and its plot, Insert › From CSV); random pasted text and random fit lines never panic. Every earlier pack prints as before.
 
 ## 0.2.6 — 2026-11-20
 

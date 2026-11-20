@@ -1335,7 +1335,7 @@ fn vectors_and_matrices() {
         (&[a, "A/A"][..], "To divide by a matrix, multiply by its inverse"),
         (&["det([[1, 2, 3], [4, 5, 6]])"][..], "det needs a square matrix."),
         (&[a, "A[1]"][..], "A matrix entry needs a row and a column"),
-        (&["[20 °C, 30 °C]"][..], "A matrix cannot hold absolute temperatures"),
+        (&["[[20 °C, 30 °C]]"][..], "A matrix cannot hold absolute temperatures"),
     ] { assert!(error(lines).starts_with(msg), "{lines:?}: {}", error(lines)); }
 }
 
@@ -1531,7 +1531,7 @@ fn properties_review() {
 
 #[test]
 fn data_into_tables() {
-    use crate::tabin::parse;
+    let parse = |t: &str| crate::tabin::parse(t, false);
     let t = |v: &serde_json::Value| (v["cols"].as_array().unwrap().iter().map(|c| format!("{}|{}", c["name"].as_str().unwrap(), c["unit"].as_str().unwrap())).collect::<Vec<_>>(), v["rows"].clone(), v["notes"].as_array().unwrap().len());
     // Copied from a spreadsheet: tabs, a heading with units in brackets (m3 is m^3).
     let (c, r, n) = t(&parse("Q (m3/h)\tH [m]\n0\t50.3\n40\t46.5\n80\t37.4\n").unwrap());
@@ -1585,13 +1585,13 @@ fn curve_fitting() {
     let p = ["x = [10, 20, 40, 80]", "y = [1.1, 4.1, 15.8, 62.5]", "fit f(z) = k*z^n to x, y for k = 0.01, n = 2"];
     assert!((val(&[p[0], p[1], p[2], "k"]) / 0.010_716_427_912_555 - 1.0).abs() < 1e-6 && (val(&[p[0], p[1], p[2], "n"]) / 1.978_769_928_007_445 - 1.0).abs() < 1e-7);
     // Listed parameters, a known term (no parameter) subtracted, a straight line through exact points.
-    assert_eq!(result(&["L = 2 m", "x = [0, 1, 2] s", "y = [2, 4, 6] m", "fit s(t) = L + v*t to x, y for v"]), "v = 2 m/s; R² = 1.0000");
+    assert_eq!(result(&["L = 2 m", "x = [0, 1, 2] s", "y = [2, 4, 6] m", "fit s(t) = L + v*t to x, y for v"]), "v = 2 m/s; R² = 1.0000; L as defined", "a name the fit holds is said");
     assert_eq!(result(&["x = [1, 2, 4] m", "y = [3, 2, 1.5] N", "fit F(r) = a + b/r to x, y"]), "a = 1 N, b = 2 N·m; R² = 1.0000");
     for (lines, msg) in [
         (&["x = [1, 2, 3]", "y = [1, 2]", "fit f(z) = a + b*z to x, y"][..], "The data have 3 x values and 2 y values"),
         (&["x = [1, 2]", "y = [1, 2]", "fit f(z) = a + b*z + c*z^2 to x, y"][..], "3 parameters need at least 3 data points"),
         (&["x = [1, 1, 1]", "y = [1, 2, 3]", "fit f(z) = a + b*z to x, y"][..], "The data do not fix every parameter"),
-        (&["x = [1, 2, 3]", "y = [1, 2, 3]", "fit f(z) = a*exp(b*z) to x, y"][..], "This model is not linear in its parameters: give each a starting guess"),
+        (&["x = [1, 2, 3]", "y = [1, 2, 3]", "fit f(z) = a*exp(b*z) to x, y"][..], "This model is not linear in its parameters"),
         (&["x = [1, 2, 3]", "y = [1, 2, 3]", "a = 1", "fit f(z) = a*z to x, y"][..], "Every name in this model is defined on the sheet already"),
         (&["x = [1, 2, 3] m", "y = [1, 2, 3] s", "fit f(z) = a + b*z to x, 3"][..], "The data are two vectors"),
         (&["x = [1, 2, 3] m", "y = [1, 2, 3] s", "fit f(z) = a + a*z to x, y"][..], "a multiplies terms in different units"),
@@ -1600,4 +1600,54 @@ fn curve_fitting() {
         (&["points([1, 2], [3, 4])"][..], "points(xs, ys) marks measured values on a plot"),
         (&["x = [1, 2] m", "y = [3, 4] s", "plot 2*q, points(x, y) for q in 0 .. 3"][..], "The points' x values are a length, the plot's x is a pure number."),
     ] { let got = error(lines); assert!(if msg.is_empty() { got.is_empty() } else { got.starts_with(msg) }, "{lines:?}: {got}"); }
+}
+
+#[test]
+fn fitting_review() {
+    let x = ["xs = [0, 1, 2, 3]", "ys = [1.1, 2.9, 5.1, 7]", "zs = [0, 1, 4, 9]"];
+    // A fitted function keeps its own fitted values when a later fit reuses the names.
+    let o = run(&[x[0], x[1], x[2], "fit f(z) = a + b*z to xs, ys", "y_1 = f(2)", "fit g(z) = a + b*z^2 to xs, zs for a, b", "y_2 = f(2)"]);
+    assert!(o.regions[4].result == o.regions[6].result && o.regions[4].result == "5.02", "{} {}", o.regions[4].result, o.regions[6].result);
+    // An absolute temperature stays absolute: T = −30 °C + 5 K/kW·P.
+    let t = ["P_d = [0, 4, 8, 12] kW", "T_d = [-30, -10, 10, 30] °C", "fit T(P) = a + b*P to P_d, T_d"];
+    assert_eq!(result(&t), "a = -30 °C, b = 5 K/kW; R² = 1.0000");
+    assert_eq!(result(&[t[0], t[1], t[2], "T(16 kW)"]), "50 °C");
+    // Exact data: round-off shown as 0; all y the same: R² is not defined unless the fit is exact.
+    assert_eq!(result(&["Q_d = [0, 40, 80] m^3/h", "H_d = [50, 46.8, 37.2] m", "fit H(Q) = a + b*Q + c*Q^2 to Q_d, H_d"]), "a = 50 m, b = 0 m/(m³/h), c = -0.002 m/(m³/h)²; R² = 1.0000");
+    assert_eq!(result(&["xs = [1, 2, 3, 4]", "ys = [5, 5, 5, 5]", "fit f(z) = b*z to xs, ys"]), "b = 1.667; R² = —");
+    for (lines, msg) in [
+        (&[x[0], x[1], "fit f(z) = p*q*z to xs, ys for p = 0, q = 0"][..], "p does not change the model at its starting guess"),
+        (&[x[0], x[1], "fit f(z) = s*z to xs, ys for s = 1, w = 2"][..], "w is listed but is not in the model."),
+        (&[x[0], x[1], "fit f(z) = a + b*z to xs, ys for a, a"][..], "a is listed twice."),
+        (&[x[0], x[1], "fit f(z) = a + b*z to xs, ys for a, z"][..], "z is the model's variable, not a parameter."),
+        (&[x[0], "ys = [1, 2, 0/0, 4]", "fit f(z) = a + b*z to xs, ys"][..], ""),
+        (&["xs = 1, 2 .. 6000", "ys = xs*2", "fit f(z) = a*exp(b*z/6000) to xs, ys for a = 1, b = 1"][..], "A fit from starting guesses takes at most 5,000 points."),
+        (&[x[0], x[1], "fit f(z) = 2*(a + b*z) to xs, ys"][..], "This model is not linear in its parameters as written: multiply out brackets"),
+        (&[x[0], x[1], "fit f(z) = a + b*z + 1 m to xs, ys"][..], "Cannot add"),
+    ] { let got = error(lines); assert!(if msg.is_empty() { !got.is_empty() } else { got.starts_with(msg) }, "{lines:?}: {got}"); }
+    // A blank cell in a table column is said, not taken for dependent data.
+    let mut s = sheet(&["fit f(z) = a + b*z to X, Y"]);
+    s.regions.insert(0, Region { id: 99, kind: Kind::Table, data: serde_json::json!({ "cols": [{ "name": "X" }, { "name": "Y" }], "rows": [["1", "2"], ["2", ""], ["3", "6"]] }), ..Default::default() });
+    let e = eval::run(&s).regions[1].error.clone().map(|e| e.msg).unwrap_or_default();
+    assert!(e.starts_with("Value 2 of the y data is empty or not a number."), "{e}");
+}
+
+#[test]
+fn reading_data_review() {
+    let rows = |t: &str, pasted: bool| { let v = crate::tabin::parse(t, pasted).unwrap(); (v["cols"].as_array().unwrap().iter().map(|c| c["name"].as_str().unwrap().to_string()).collect::<Vec<_>>(), v["rows"].clone(), v["notes"].as_array().unwrap().iter().map(|n| n.as_str().unwrap().to_string()).collect::<Vec<_>>()) };
+    // One column copied with decimal commas (no tabs): one column, not two.
+    assert_eq!(rows("1,5\n2,5\n3,5", true).1, serde_json::json!([["1.5"], ["2.5"], ["3.5"]]));
+    // A title above the table is left out; 1,2 in a comma file is two cells.
+    let (c, r, n) = rows("Pump test 2026\nQ,H\n1,2\n3,4", false);
+    assert!(c == ["Q", "H"] && r == serde_json::json!([["1", "2"], ["3", "4"]]) && n[0].starts_with("Left out 1 line"), "{c:?} {r} {n:?}");
+    // Thousands with commas in tab-separated text; thousands with points or spaces before a decimal comma.
+    let (_, r, n) = rows("1,234\t2\n5,678\t3", true);
+    assert!(r == serde_json::json!([["1234", "2"], ["5678", "3"]]) && n.iter().any(|x| x.contains("thousands")), "{r}");
+    assert_eq!(rows("Q;H\n1.234,5;2\n1 234,5;3", false).1, serde_json::json!([["1234.5", "2"], ["1234.5", "3"]]));
+    // Values with units are data, not a heading; quoted line breaks; old line ends; a heading alone.
+    assert_eq!(rows("12 m;3 s\n4 m;5 s", false).1, serde_json::json!([["12 m", "3 s"], ["4 m", "5 s"]]));
+    assert_eq!(rows("a,b\n\"multi\nline\",2\n3,4", false).1, serde_json::json!([["multi\nline", "2"], ["3", "4"]]));
+    assert_eq!(rows("Q,H\r1,2\r3,4", false).1, serde_json::json!([["1", "2"], ["3", "4"]]));
+    let (c, r, _) = rows("Q (m3/h);H [m]", false);
+    assert!(c == ["Q", "H"] && r == serde_json::json!([["", ""]]), "{c:?} {r}");
 }

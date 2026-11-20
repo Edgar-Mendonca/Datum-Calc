@@ -116,6 +116,8 @@ pub struct Env {
     pub shown: HashMap<String, String>,
     /// Names that hold an exact expression from simplify, expand or factor (y = expand((x+1)^2)).
     pub exprs: HashMap<String, crate::sym::RatF>,
+    /// The fitted values a fitted function was made with (0.2.7), put in place while it runs.
+    pub fitted: HashMap<String, Vec<(String, Val)>>,
     /// Functions written as programs (0.2.5).
     pub progs: HashMap<String, std::sync::Arc<crate::prog::Prog>>,
     /// Times round the loops of programs on the current line (a plot calls a function once per point).
@@ -132,7 +134,7 @@ impl Env {
     pub(crate) fn tick(&mut self) -> u64 { self.steps += 1; self.steps }
     pub(crate) fn steps(&self) -> u64 { self.steps }
 
-    pub fn new() -> Self { Self { vars: HashMap::new(), funcs: HashMap::new(), shown: HashMap::new(), exprs: HashMap::new(), progs: HashMap::new(), steps: 0, unset: Default::default(), later: HashMap::new(), depth: 0 } }
+    pub fn new() -> Self { Self { vars: HashMap::new(), funcs: HashMap::new(), shown: HashMap::new(), exprs: HashMap::new(), progs: HashMap::new(), fitted: HashMap::new(), steps: 0, unset: Default::default(), later: HashMap::new(), depth: 0 } }
 
     /// What a name is for exact maths: a plain number (as a fraction), a kept expression, or a symbol.
     fn look(&self, v: &str) -> crate::sym::Look {
@@ -182,17 +184,20 @@ impl Env {
             E::Im(_, e) => { let v = self.eval(e)?; if v.abs { return fail("A temperature cannot be imaginary.", n.at); } Ok(Val { im: v.v.clone(), v: vec![0.0; v.v.len()], ..v }.tidy()) }
             E::Mat(matrix, rows) => {
                 // Every entry a single real value with the same units; a matrix is kept row by row.
-                let (mut v, mut dim): (Vec<f64>, Option<Dim>) = (vec![], None);
+                let (mut v, mut dim, mut abs): (Vec<f64>, Option<Dim>, Option<bool>) = (vec![], None, None);
                 if rows.len() * rows[0].len() > 10_000 { return fail("A matrix holds at most 10,000 values.", n.at); }
                 for x in rows.iter().flatten() {
                     let e = self.eval(x)?;
                     real(&e, "A matrix", x.at)?;
                     if e.vec { return fail("An entry of a matrix is one value.", x.at); }
-                    if e.abs { return fail(ABS_MAT, x.at); }
+                    // A vector may hold temperatures (20 °C, 30 °C), as a range or a table column does; a matrix may not.
+                    if e.abs && *matrix { return fail(ABS_MAT, x.at); }
+                    if abs.is_some_and(|a| a != e.abs) { return fail("Every entry needs the same kind of temperature: all in °C (or °F), or all differences.", x.at); }
+                    abs = Some(e.abs);
                     match dim { Some(d) if !units::same(&d, &e.dim) => return fail(format!("Every entry needs the same units: this is {}, the first is {}.", dim_name(&e.dim), dim_name(&d)), x.at), None => dim = Some(e.dim), _ => {} }
                     v.push(e.x());
                 }
-                Ok(Val { v, dim: dim.unwrap_or(NONE), vec: true, rows: if *matrix { rows.len() } else { 0 }, ..Default::default() })
+                Ok(Val { v, dim: dim.unwrap_or(NONE), abs: abs.unwrap_or(false), vec: true, rows: if *matrix { rows.len() } else { 0 }, ..Default::default() })
             }
             E::Index(a, idx) => {
                 let base = self.eval(a)?;
@@ -253,12 +258,14 @@ impl Env {
             if params.len() != args.len() { return fail(format!("{f} takes {} value{}.", params.len(), if params.len() == 1 { "" } else { "s" }), at); }
             if self.depth > 40 { return fail(format!("{f} calls itself too deeply."), at); }
             let vals = args.iter().map(|a| self.eval(a)).collect::<R<Vec<_>>>()?;
-            let saved: Vec<(String, Option<Val>)> = params.iter().map(|p| (canon(p), self.vars.get(&canon(p)).cloned())).collect();
+            let bound = self.fitted.get(&k).cloned().unwrap_or_default();
+            let saved: Vec<(String, Option<Val>)> = params.iter().map(|p| canon(p)).chain(bound.iter().map(|b| b.0.clone())).map(|p| (p.clone(), self.vars.get(&p).cloned())).collect();
+            for (n, v) in bound { self.vars.insert(n, v); }
             for (p, v) in params.iter().zip(vals) { self.vars.insert(canon(p), v); }
             self.depth += 1;
             let r = self.eval(&body);
             self.depth -= 1;
-            for (p, v) in saved { match v { Some(v) => { self.vars.insert(p, v); } None => { self.vars.remove(&p); } } }
+            for (p, v) in saved.into_iter().rev() { match v { Some(v) => { self.vars.insert(p, v); } None => { self.vars.remove(&p); } } }
             return r.map_err(|e| if e.at.0 < body.at.0 || e.at.1 > body.at.1 { e } else { Error { msg: format!("In {f}: {}", e.msg), at } });
         }
         // Gas properties name the gas first: gas_cp(air, 300 K).
@@ -1277,6 +1284,18 @@ fn region(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>, subst: bo
                 }
                 let m = xv.v.len();
                 if yv.v.len() != m { return fail(format!("The data have {m} x values and {} y values: they need the same number.", yv.v.len()), (xs.at.0, ys.at.1)); }
+                for (v, n, w) in [(&xv, xs, "x"), (&yv, ys, "y")] {
+                    if let Some(i) = v.v.iter().position(|x| !x.is_finite()) { return fail(format!("Value {} of the {w} data is empty or not a number.", i + 1), n.at); }
+                }
+                let mut in_model = vec![];
+                names_in(model, &mut in_model);
+                let in_model: Vec<String> = in_model.iter().map(|n| canon(n)).collect();
+                for (k, p) in params.iter().enumerate() {
+                    let c = canon(&p.0);
+                    if c == canon(var) { return fail(format!("{} is the model's variable, not a parameter.", show(&c)), model.at); }
+                    if params[..k].iter().any(|q| canon(&q.0) == c) { return fail(format!("{} is listed twice.", show(&c)), model.at); }
+                    if !in_model.contains(&c) { return fail(format!("{} is listed but is not in the model.", show(&c)), model.at); }
+                }
                 // The parameters: as listed, or every name in the model the sheet does not define (not the variable, not a constant).
                 let names: Vec<String> = if params.is_empty() {
                     let mut all = vec![];
@@ -1325,21 +1344,32 @@ fn region(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>, subst: bo
                                             gdim[*j] = Some(g.dim);
                                             a[i][*j] += sign * g.x();
                                         }
-                                        None => { same_or(&yv, &g, "subtract", t.at)?; rest -= sign * g.x(); }
+                                        None => { same_or(&yv, &g, "add", t.at)?; rest -= sign * g.x(); }
                                     }
                                 }
                                 b[i] = rest;
                             }
                             let p = crate::solve::lstsq(&a, &b).ok_or_else(|| Error { msg: "The data do not fix every parameter (they are not independent here): check the model, or give more points with different x values.".into(), at: model.at })?;
-                            let vals: Vec<Val> = p.iter().zip(&gdim).map(|(v, d)| Val::num(*v, units::div(&yv.dim, &d.unwrap_or(NONE)))).collect();
+                            let ymax = yv.v.iter().fold(0.0f64, |m, v| m.max(v.abs()));
+                            let vals: Vec<Val> = p.iter().enumerate().zip(&gdim).map(|((j, v), d)| {
+                                // A coefficient whose whole contribution is round-off beside the data is zero.
+                                let gmax = a.iter().fold(0.0f64, |m, r| m.max(r[j].abs()));
+                                let v = if (v * gmax).abs() <= 1e-12 * ymax { 0.0 } else { *v };
+                                let d = d.unwrap_or(NONE);
+                                let abs = yv.abs && units::is_none(&d);
+                                // An absolute temperature of 0 °C up to round-off is 0 °C.
+                                let v = if abs && (v - 273.15).abs() <= 1e-12 * ymax { 273.15 } else { v };
+                                Val { abs, ..Val::num(v, units::div(&yv.dim, &d)) }
+                            }).collect();
                             {
                                     let shown = |n: &Node, v: &Val| match &n.e { E::Var(k) => env.shown.get(&canon(k)).cloned(), _ => None }.unwrap_or_else(|| show_val(v, "", f).3);
                                     let (yu, xu) = (shown(ys, &yv), shown(xs, &xv));
                                     *units_out.borrow_mut() = gdim.iter().map(|d| {
                                         let d = d.unwrap_or(NONE);
                                         if units::is_none(&d) { return yu.clone(); }
-                                        (-4i8..=4).filter(|k| *k != 0).find(|k| units::same(&units::pow(&xv.dim, *k), &d)).map(|k| {
-                                            let yy = if yu.is_empty() { "1".to_string() } else { yu.clone() };
+                                        (-6i8..=6).filter(|k| *k != 0).find(|k| units::same(&units::pow(&xv.dim, *k), &d)).map(|k| {
+                                            // A slope of an absolute temperature is a difference: K for °C, Δ°F for °F.
+                                            let yy = if yu.is_empty() { "1".to_string() } else { yu.replace("°C", "K").replace("°F", "Δ°F") };
                                             // Brackets only around a compound unit: m/s, m/(m³/h).
                                             let xu = if xu.contains(['/', '·', '*', ' ']) { format!("({xu})") } else { xu.clone() };
                                             match k { 1 => format!("{yy}/{xu}"), -1 => format!("{yy}*{xu}"), k if k > 0 => format!("{yy}/{xu}^{k}"), k => format!("{yy}*{xu}^{}", -k) }
@@ -1350,11 +1380,14 @@ fn region(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>, subst: bo
                         }
                         // Not linear (or guesses given): Levenberg–Marquardt from the guesses, which give the units.
                         _ => {
-                            let gs: Vec<Val> = names.iter().map(|n| params.iter().find(|p| canon(&p.0) == *n).and_then(|p| p.1.as_ref())).map(|g| g.map(|g| env.eval(g))).collect::<Option<R<Vec<Val>>>>().ok_or_else(|| Error { msg: format!("This model is not linear in its parameters: give each a starting guess, such as fit {name}({var}) = … to …, … for {} = 1, …", names[0]), at: model.at })??;
+                            let gs: Vec<Val> = names.iter().map(|n| params.iter().find(|p| canon(&p.0) == *n).and_then(|p| p.1.as_ref())).map(|g| g.map(|g| env.eval(g))).collect::<Option<R<Vec<Val>>>>().ok_or_else(|| Error { msg: format!("This model is not linear in its parameters as written: multiply out brackets such as 2*(a + b*x), or give each parameter a starting guess, such as fit {name}({var}) = … to …, … for {} = 1, …", names[0]), at: model.at })??;
                             for (g, p) in gs.iter().zip(params) { real(g, "A starting guess", p.1.as_ref().map(|n| n.at).unwrap_or(model.at))?; if g.vec { return fail("A starting guess is one value.", model.at); } }
+                            if m > 5000 { return fail("A fit from starting guesses takes at most 5,000 points.", (xs.at.0, ys.at.1)); }
                             let cs: Vec<f64> = gs.iter().map(|g| if g.x() != 0.0 { g.x().abs() } else { 1.0 }).collect();
                             let ys_scale = (yv.v.iter().map(|v| v * v).sum::<f64>() / m as f64).sqrt().max(1e-300);
+                            let evals = std::cell::Cell::new(0usize);
                             let resid = |env: &mut Env, p: &[f64]| -> R<Vec<f64>> {
+                                evals.set(evals.get() + m);
                                 for (k, (n, g)) in names.iter().zip(&gs).enumerate() { env.vars.insert(n.clone(), Val { v: vec![p[k]], ..g.clone() }); }
                                 (0..m).map(|i| {
                                     env.vars.insert(canon(var), xi(i));
@@ -1369,35 +1402,47 @@ fn region(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>, subst: bo
                             let mut r = resid(env, &p)?;
                             if r.iter().any(|v| !v.is_finite()) { return fail("The model cannot be worked out at every point from these guesses.", model.at); }
                             let ss = |r: &[f64]| r.iter().map(|v| v * v).sum::<f64>();
+                            let n = p.len();
                             let mut lam: f64 = 1e-3;
-                            for _ in 0..300 {
+                            let mut settled = false;
+                            for step in 0..300 {
                                 // The Jacobian in relative parameters, then a damped step, the damping eased when a step helps.
-                                let mut jac = vec![vec![0.0; p.len()]; m];
-                                for j in 0..p.len() {
+                                let mut aug = vec![vec![0.0; n]; m + n];
+                                for j in 0..n {
                                     let h = 1e-7 * if p[j] != 0.0 { p[j].abs() } else { cs[j] };
                                     let mut ph = p.clone();
                                     ph[j] += h;
                                     let rh = resid(env, &ph)?;
-                                    for i in 0..m { jac[i][j] = (rh[i] - r[i]) / h * cs[j]; }
+                                    for i in 0..m { aug[i][j] = (rh[i] - r[i]) / h * cs[j]; }
+                                    if step == 0 && (0..m).all(|i| aug[i][j] == 0.0) { return fail(format!("{} does not change the model at its starting guess, so the data cannot fix it: try another guess.", show(&names[j])), model.at); }
                                 }
-                                let mut improved = false;
+                                let d: Vec<f64> = (0..n).map(|j| (0..m).map(|i| aug[i][j] * aug[i][j]).sum::<f64>().sqrt().max(1e-12)).collect();
+                                let mut rhs: Vec<f64> = r.iter().map(|v| -v).collect();
+                                rhs.extend(std::iter::repeat_n(0.0, n));
+                                let mut moved = false;
                                 for _ in 0..30 {
-                                    let mut aug = jac.clone();
-                                    let mut rhs: Vec<f64> = r.iter().map(|v| -v).collect();
-                                    for j in 0..p.len() { let d = (jac.iter().map(|row| row[j] * row[j]).sum::<f64>()).sqrt().max(1e-12); let mut row = vec![0.0; p.len()]; row[j] = lam.sqrt() * d; aug.push(row); rhs.push(0.0); }
+                                    for j in 0..n { aug[m + j].iter_mut().for_each(|x| *x = 0.0); aug[m + j][j] = lam.sqrt() * d[j]; }
                                     let Some(dy) = crate::solve::lstsq(&aug, &rhs) else { lam *= 10.0; continue };
                                     let pn: Vec<f64> = p.iter().zip(&dy).zip(&cs).map(|((a, d), c)| a + d * c).collect();
                                     match resid(env, &pn) {
                                         Ok(rn) if rn.iter().all(|v| v.is_finite()) && ss(&rn) < ss(&r) => {
-                                            let small = dy.iter().all(|d| d.abs() < 1e-12) || (ss(&r) - ss(&rn)) <= 1e-15 * ss(&r).max(1e-300);
-                                            p = pn; r = rn; lam = (lam / 10.0).max(1e-12); improved = !small;
+                                            let small = dy.iter().all(|d| d.abs() < 1e-10) || (ss(&r) - ss(&rn)) <= 1e-14 * ss(&r).max(1e-300);
+                                            p = pn; r = rn; lam = (lam / 10.0).max(1e-12);
+                                            moved = true;
+                                            settled = small;
                                             break;
                                         }
                                         _ => lam *= 10.0,
                                     }
+                                    if evals.get() > 3_000_000 { break; }
                                 }
-                                if !improved { break; }
+                                // No step helps even with heavy damping: a minimum (the gradient is as small as it gets).
+                                if !moved { settled = true; }
+                                if settled || evals.get() > 3_000_000 { break; }
                             }
+                            if !settled { return fail("The fit did not settle from these guesses: try guesses closer to the answer.", model.at); }
+                            // Each parameter in its guess's unit (h/m³ as typed, not s/m³).
+                            *units_out.borrow_mut() = names.iter().map(|nm| params.iter().find(|q| canon(&q.0) == *nm).and_then(|q| q.1.as_ref()).and_then(|g| match &g.e { E::Num(_, Some(u)) => Some(u.text.clone()), E::Neg(x) => match &x.e { E::Num(_, Some(u)) => Some(u.text.clone()), _ => None }, _ => None }).unwrap_or_default()).collect();
                             Ok((p.iter().zip(&gs).map(|(v, g)| Val { v: vec![*v], ..g.clone() }).collect(), 0.0))
                         }
                     }
@@ -1406,9 +1451,9 @@ fn region(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>, subst: bo
                 // How well it fits: R² = 1 − Σ(y − f)²/Σ(y − ȳ)².
                 for (n, v) in names.iter().zip(&vals) { env.vars.insert(n.clone(), v.clone()); }
                 let mut sse = 0.0;
-                for i in 0..m {
+                for (i, y) in yv.v.iter().enumerate() {
                     env.vars.insert(canon(var), xi(i));
-                    match env.eval(model) { Ok(f) => sse += (f.x() - yv.v[i]).powi(2), Err(e) => { restore(env); return Err(e); } }
+                    match env.eval(model) { Ok(f) => sse += (f.x() - y).powi(2), Err(e) => { restore(env); return Err(e); } }
                 }
                 let mean = yv.v.iter().sum::<f64>() / m as f64;
                 let sst: f64 = yv.v.iter().map(|y| (y - mean).powi(2)).sum();
@@ -1425,14 +1470,21 @@ fn region(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>, subst: bo
                     env.exprs.remove(n);
                     known.push(n.clone());
                 }
-                let r2 = if sst > 0.0 { 1.0 - sse / sst } else { 1.0 };
-                let r2t = format!("{:.4}", r2);
-                o.result = format!("{}; R² = {r2t}", texts.join(", "));
+                let ysq: f64 = yv.v.iter().map(|y| y * y).sum();
+                let r2t = if sst > 0.0 { format!("{:.4}", 1.0 - sse / sst) } else if sse <= 1e-20 * ysq.max(1e-300) { "1".into() } else { "—".into() };
+                // Names of the model the fit did not change (from the sheet, or constants such as e and g) are said.
+                let mut held: Vec<String> = in_model.iter().filter(|k| **k != canon(var) && !names.contains(k) && **k != "π").cloned().collect();
+                held.dedup();
+                held.sort();
+                held.dedup();
+                let held_t = if held.is_empty() { String::new() } else { format!("; {} as defined", held.iter().map(|h| show(h)).collect::<Vec<_>>().join(", ")) };
+                o.result = format!("{}; R² = {r2t}{held_t}", texts.join(", "));
                 o.result_tex = format!("\\Rightarrow\\; {},\\quad R^2 = {r2t}", texes.join(",\\; "));
                 o.name = canon(name);
                 env.exprs.remove(&canon(name));
                 env.progs.remove(&canon(name));
                 env.funcs.insert(canon(name), (vec![var.clone()], model.clone()));
+                env.fitted.insert(canon(name), names.iter().cloned().zip(vals.iter().cloned()).collect());
                 known.push(name.clone());
             }
             Stmt::Assign { name, e, .. } => {
@@ -1453,6 +1505,7 @@ fn region(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>, subst: bo
                 o.name = canon(name);
                 env.exprs.remove(&canon(name));
                 env.progs.remove(&canon(name));
+                env.fitted.remove(&canon(name));
                 env.funcs.insert(canon(name), (params.clone(), e.clone()));
                 known.push(name.clone());
             }

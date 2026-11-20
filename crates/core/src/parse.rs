@@ -316,6 +316,15 @@ impl P<'_> {
                 let mut up = UnitParser { toks: &self.t, i: self.i, known: self.known };
                 match up.expr_inner(false) {
                     Some(u) if u.offset == 0.0 => { let end = self.t[up.i - 1].1 .1; self.i = up.i; Ok(Node { e: E::Unit(Box::new(m), u), at: (at.0, end) }) }
+                    // Temperatures after a vector of plain numbers, [20, 30] °C: each number takes the unit, as typed after each.
+                    Some(u) if !matrix => {
+                        let E::Mat(_, rows) = &m.e else { return Ok(m) };
+                        let num = |n: &Node| match &n.e { E::Num(x, None) => Some(*x), E::Neg(a) => if let E::Num(x, None) = a.e { Some(-x) } else { None }, _ => None };
+                        let Some(xs): Option<Vec<f64>> = rows[0].iter().map(num).collect() else { return Ok(m) };
+                        let end = self.t[up.i - 1].1 .1;
+                        self.i = up.i;
+                        Ok(Node { e: E::Mat(false, vec![xs.iter().zip(&rows[0]).map(|(x, n)| Node { e: E::Num(*x, Some(u.clone())), at: n.at }).collect()]), at: (at.0, end) })
+                    }
                     _ => Ok(m),
                 }
             }

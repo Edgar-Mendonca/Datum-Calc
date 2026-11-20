@@ -60,8 +60,10 @@ export const C = {
   paste: async (given?: string) => {
     const t = given ?? await navigator.clipboard?.readText().catch(() => "");
     if (!t) return toast("The clipboard has no text.");
-    // Cells copied from a spreadsheet (tabs over several lines) become a table.
-    if (/\t/.test(t) && t.trim().split(/\r?\n/).length > 1) return C.tableFrom(await call<TableIn>("table_text", { text: t }));
+    // Cells copied from a spreadsheet become a table: several lines with the same number of tabs on each
+    // (text indented with tabs varies from line to line).
+    const tabs = t.split(/\r?\n/).filter(l => l.trim()).map(l => (l.match(/\t/g) ?? []).length);
+    if (tabs.length > 1 && tabs[0] > 0 && tabs.every(n => n === tabs[0])) return C.tableFrom(await call<TableIn>("table_text", { text: t }));
     const lines = t.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
     const at = below();
     if (await act({ Batch: lines.map((l, k) => ({ Insert: { at: at + k, kind: /^check\b/.test(l) ? "check" : /[=]/.test(l) ? "math" : "text", text: l } })) })) setSelId(S().regions[at + lines.length - 1]?.id ?? 0);

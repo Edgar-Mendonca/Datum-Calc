@@ -380,7 +380,7 @@ fn pasted_text_never_panics() {
     for _ in 0..3000 {
         let n = r.below(60);
         let t: String = (0..n).map(|_| if r.below(3) == 0 { seps[r.below(8)] } else { bits[r.below(19)] }).collect();
-        if let Ok(v) = crate::tabin::parse(&t) {
+        if let Ok(v) = crate::tabin::parse(&t, r.below(2) == 0) {
             let w = v["cols"].as_array().unwrap().len();
             assert!(w <= 50 && v["rows"].as_array().unwrap().iter().all(|row| row.as_array().unwrap().len() == w), "{t:?}");
         }

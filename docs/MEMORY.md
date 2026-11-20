@@ -350,6 +350,8 @@ tests_ui/run.cjs               Playwright UI tests against ui/dist with a mocked
 
 ### 2026-11-20: Session 1, continued (0.2.7)
 - 0.2.6 released after the review fixes (9 findings).
+- 0.2.7 review fixes (15 findings): fitted functions keep their values (`Env.fitted`, bound while the function runs); held names said; absolute y gives an absolute intercept; LM: at most 5,000 points, a 3,000,000-evaluation budget, an error when it does not settle or a parameter does not move the model, no Jacobian copy per damping step, the guess's unit for display; listed parameters checked (in the model, not twice, not the variable); NaN data said; R² "—" when all y are equal; round-off snapped to 0. tabin: separator by the most common count with title lines left out, pasted text without tabs is one column, decimal commas only on evidence, thousands separators, quote-aware rows (line breaks), `\r` line ends, "12 m" cells are data; UTF-16 files; the paste replaces only an untouched table; sheet paste needs the same tab count on every line. Vectors (not matrices) may hold absolute temperatures, also `[20, 30] °C`.
+- CI's clippy (Rust 1.100) was newer than the container's (1.97) and failed on a lint the local gate passed: `rustup update stable` before the gate keeps them the same.
 - Data in and fitting: `tabin.rs`, Insert › From CSV, paste from a spreadsheet; `fit` statement (linear least squares and Levenberg–Marquardt), `solve::lstsq`, `points()` on plots; pump-test pack (fit, system curve, operating point; numpy/scipy values); fuzz of pasted text and fit lines.
 
 ## 5. Known limits and next steps

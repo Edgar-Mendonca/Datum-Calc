@@ -217,17 +217,23 @@ fn base64_decode(s: &str) -> R<Vec<u8>> {
 
 /// A table from pasted text: cells copied from a spreadsheet (tabs) or CSV.
 #[tauri::command]
-fn table_text(text: String) -> R<serde_json::Value> { datum_core::tabin::parse(&text) }
+fn table_text(text: String) -> R<serde_json::Value> { datum_core::tabin::parse(&text, true) }
 
 /// A table from a CSV or text file, its name as the caption.
 #[tauri::command]
 async fn import_table(app: AppHandle) -> R<Option<serde_json::Value>> {
     let Some(path) = pick(&app, "Data", &["csv", "txt", "tsv"]) else { return Ok(None) };
+    if std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0) > 5_000_000 { return Err("Choose a file smaller than 5 MB.".into()); }
     let bytes = std::fs::read(&path).map_err(|e| e.to_string())?;
-    if bytes.len() > 5_000_000 { return Err("Choose a file smaller than 5 MB.".into()); }
-    // UTF-8, or else a one-byte code page (as many instruments write), read byte by byte.
-    let text = String::from_utf8(bytes).unwrap_or_else(|e| e.into_bytes().iter().map(|&b| b as char).collect());
-    let mut v = datum_core::tabin::parse(&text)?;
+    // UTF-16 (a spreadsheet's "Unicode text") by its byte-order mark; else UTF-8, or else a one-byte code page
+    // (as many instruments write), read byte by byte.
+    let utf16 = |be: bool| char::decode_utf16(bytes[2..].chunks(2).filter(|c| c.len() == 2).map(|c| if be { u16::from_be_bytes([c[0], c[1]]) } else { u16::from_le_bytes([c[0], c[1]]) })).map(|c| c.unwrap_or('\u{fffd}')).collect::<String>();
+    let text = match bytes.get(..2) {
+        Some([0xFF, 0xFE]) => utf16(false),
+        Some([0xFE, 0xFF]) => utf16(true),
+        _ => String::from_utf8(bytes.clone()).unwrap_or_else(|_| bytes.iter().map(|&b| b as char).collect()),
+    };
+    let mut v = datum_core::tabin::parse(&text, false)?;
     v["caption"] = serde_json::Value::String(path.file_stem().and_then(|s| s.to_str()).unwrap_or("Data").to_string());
     Ok(Some(v))
 }

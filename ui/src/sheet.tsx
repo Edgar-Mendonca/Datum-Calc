@@ -78,8 +78,10 @@ const TableEditor = (p: { r: Region }) => {
     e.preventDefault();
     const v = await call<{ cols: { name: string; unit: string; formula: string }[]; rows: string[][]; notes: string[] }>("table_text", { text });
     if (!v) return;
-    const empty = d().rows.every(r => r.every(c => !c.trim()));
-    if (empty && v.cols.some(c => !/^c\d+$/.test(c.name))) { setD({ cols: v.cols, rows: v.rows }); }
+    // A heading in the paste names the columns only of a table not yet set up: the starter Q, H or blank c1, c2 ….
+    const starter = JSON.stringify(d().cols) === JSON.stringify([{ name: "Q", unit: "m^3/h", formula: "" }, { name: "H", unit: "m", formula: "" }]) && d().rows.every(r => r.every(c => !c.trim() || c === "0"));
+    const blank = d().cols.every(c => /^c\d+$/.test(c.name) && !c.unit && !c.formula) && d().rows.every(r => r.every(c => !c.trim()));
+    if ((starter || blank) && v.cols.some(c => !/^c\d+$/.test(c.name))) { setD({ cols: v.cols, rows: v.rows }); }
     else {
       const i0 = +(t.dataset.r ?? 0), j0 = +(t.dataset.c ?? 0);
       const w = Math.max(d().cols.length, j0 + (v.rows[0]?.length ?? 0)), h = Math.max(d().rows.length, i0 + v.rows.length);
