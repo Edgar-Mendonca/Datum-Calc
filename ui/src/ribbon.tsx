@@ -1,6 +1,6 @@
 // Title bar, quick access toolbar, Tell Me and the ribbon.
 import { For, Show, JSX, createSignal, createMemo, onMount } from "solid-js";
-import { out, tab, setTab, setBackstage, openMenu, openDialog, closeDialog, theme, setTheme, selId, zoom, setZoom, act, varsPanel } from "./store";
+import { out, tab, setTab, setBackstage, openMenu, openDialog, closeDialog, theme, setTheme, selId, zoom, setZoom, act, varsPanel, toast } from "./store";
 import { C, ALL_CMDS, typeText } from "./cmds";
 import * as D from "./dialogs";
 import { Icon } from "./ui";
@@ -129,7 +129,7 @@ export const Ribbon = () => (
     <Show when={tab() === "format" && sel()}>
       <G l="Region Style" h="regions"><S_><For each={STYLES.slice(0, 3)}>{([k, l]) => <B i="style" l={l} on={(sel()?.style ?? "") === k} run={() => setStyle(k)} />}</For></S_><S_><For each={STYLES.slice(3)}>{([k, l]) => <B i="style" l={l} on={(sel()?.style ?? "") === k} run={() => setStyle(k)} />}</For></S_>
         <S_><B i="style" l="Hide in Print" on={!!sel()?.hide} title="Keep the selected region out of print and exports; it is still worked out" run={() => { const r = sel(); if (r) act({ Set: { id: r.id, field: "hide", value: !r.hide } }); }} />
-        <B i="style" l="Fold Section" on={!!sel()?.fold} title="Fold away the regions under the selected heading on the screen (they still print)" run={() => { const r = sel(); if (r && r.kind === "text" && (r.style === "heading" || r.style === "subheading")) act({ Set: { id: r.id, field: "fold", value: !r.fold } }); }} /></S_></G>
+        <B i="style" l="Fold Section" on={!!sel()?.fold} title="Fold away the regions under the selected heading on the screen (they still print)" run={() => { const r = sel(); if (!r) return; if (r.kind === "text" && (r.style === "heading" || r.style === "subheading")) act({ Set: { id: r.id, field: "fold", value: !r.fold } }); else toast("Only a heading or subheading folds its section: select one, or make this region a heading first."); }} /></S_></G>
       <Show when={sel()?.kind === "image"}><G l="Picture" h="regions"><B big i="image" l="Change" run={() => pickPicture(selId())} /><S_><For each={[25, 50, 75, 100]}>{w => <B i="fit" l={`${w} %`} on={(sel()?.data?.width ?? 60) === w} run={() => act({ Set: { id: selId(), field: "data", value: { ...(sel()?.data ?? {}), width: w } } })} />}</For></S_></G></Show>
       <G l="Kind" h="regions"><S_><For each={[["math", "Math"], ["text", "Text"], ["check", "Check"], ["solve", "Solve"], ["plot", "Plot"]] as const}>{([k, l]) => <B i={k} l={l} on={sel()?.kind === k} run={() => act({ Set: { id: selId(), field: "kind", value: k } })} />}</For></S_></G>
       <G l="Arrange" h="arrange"><S_><B i="up" l="Move Up" run={() => C.move(true)} /><B i="down" l="Move Down" run={() => C.move(false)} /><B i="del" l="Delete" run={C.del} /></S_></G>

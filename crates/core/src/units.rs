@@ -182,6 +182,9 @@ pub fn custom_clear() { CUSTOM.with(|c| c.borrow_mut().clear()); }
 /// Adds a unit of the sheet's own: its symbol, its factor to SI and its dimension.
 pub fn custom_add(sym: &str, factor: f64, dim: Dim) { CUSTOM.with(|c| c.borrow_mut().push((sym.to_string(), factor, dim))); }
 
+/// The sheet's own units, to hand on to work done elsewhere with the same sheet (its .docx export).
+pub fn custom_list() -> Vec<(String, f64, Dim)> { CUSTOM.with(|c| c.borrow().clone()) }
+
 /// The sheet's own units with this dimension (for a result's unit menu).
 pub fn custom_like(dim: &Dim) -> Vec<String> { CUSTOM.with(|c| c.borrow().iter().filter(|u| same(&u.2, dim)).map(|u| u.0.clone()).collect()) }
 

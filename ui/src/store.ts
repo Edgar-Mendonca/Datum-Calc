@@ -1,11 +1,42 @@
 // Window state: the open sheet, the selected region, panels, messages, menus and dialogs.
 import { createSignal, batch, JSX } from "solid-js";
-import { invoke, Out, Options } from "./api";
+import { invoke, Out, Options, Region } from "./api";
 
 export const [out, setOutRaw] = createSignal<Out | null>(null);
 export const [tick, setTick] = createSignal(0);
 export const setOut = (o: Out | null | undefined) => { if (o) batch(() => { setOutRaw(o); setTick(t => t + 1); }); };
 export const S = () => out()!.sheet;
+
+/** While true, folded sections are shown (exports draw the plots in them). */
+export const [unfoldAll, setUnfoldAll] = createSignal(false);
+const level = (r: Region) => r.kind === "text" ? (r.style === "heading" ? 1 : r.style === "subheading" ? 2 : 0) : 0;
+/** The regions on the screen: those under a folded heading are left out until the next heading of its level. */
+export const shown = () => {
+  const res: Region[] = [];
+  let folded = 0;
+  for (const r of S().regions) {
+    const l = level(r);
+    if (!unfoldAll() && folded && (l === 0 || l > folded)) continue;
+    folded = l && r.fold ? l : 0;
+    res.push(r);
+  }
+  return res;
+};
+/** The folded headings a region is under (empty when it is on the screen). */
+export const foldedOver = (id: number) => {
+  const rs = S().regions, i = rs.findIndex(r => r.id === id), over: Region[] = [];
+  let need = 3;
+  for (let j = i - 1; j >= 0 && need > 1; j--) { const l = level(rs[j]); if (l && l < need) { if (rs[j].fold) over.push(rs[j]); need = l; } }
+  return over;
+};
+/** A folded heading's section: the heading and the regions under it, as ids. */
+export const section = (id: number) => {
+  const rs = S().regions, i = rs.findIndex(r => r.id === id), r = rs[i];
+  if (i < 0 || !r.fold || !level(r)) return [id];
+  let j = i + 1;
+  while (j < rs.length && (level(rs[j]) === 0 || level(rs[j]) > level(r))) j++;
+  return rs.slice(i, j).map(x => x.id);
+};
 /** auto, light or dark; auto follows Windows. */
 export const [theme, setThemeRaw] = createSignal("auto");
 const darkMq = typeof matchMedia === "function" ? matchMedia("(prefers-color-scheme: dark)") : null;

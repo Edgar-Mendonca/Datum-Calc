@@ -1,16 +1,20 @@
-//! Word equations (0.2.10): an expression as Office Math (OMML), the way latex.rs writes it as LaTeX, so an
-//! exported calc sheet has equations Word can edit.
+//! Document equations (0.2.10): an expression as OMML (the maths of Office Open XML), the way latex.rs writes it as LaTeX, so an
+//! exported calc sheet has equations a word processor can edit.
 use crate::eval::canon;
 use crate::parse::{Node, Stmt, E};
 
 /// Text for XML.
-pub fn esc(s: &str) -> String { s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;").replace('"', "&quot;") }
+pub fn esc(s: &str) -> String {
+    // Control characters other than tab and line ends cannot be written in XML at all: leave them out.
+    let s: String = s.chars().filter(|c| !c.is_control() || matches!(c, '\t' | '\n' | '\r')).filter(|c| !matches!(c, '\u{FFFE}' | '\u{FFFF}')).collect();
+    s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;").replace('"', "&quot;")
+}
 
-/// A run of maths (italic for one letter, as Word sets variables).
+/// A run of maths (italic for one letter, as variables are set).
 fn r(t: &str) -> String { format!("<m:r><m:t xml:space=\"preserve\">{}</m:t></m:r>", esc(t)) }
 /// A run set upright as normal text: words, units, function names (normal text also keeps a unit such as bar from
 /// being read as a command by other editors).
-pub fn rp(t: &str) -> String { format!("<m:r><m:rPr><m:nor/><m:sty m:val=\"p\"/></m:rPr><m:t xml:space=\"preserve\">{}</m:t></m:r>", esc(t)) }
+pub fn rp(t: &str) -> String { format!("<m:r><m:rPr><m:nor/></m:rPr><m:t xml:space=\"preserve\">{}</m:t></m:r>", esc(t)) }
 fn sub(b: &str, s: &str) -> String { format!("<m:sSub><m:e>{b}</m:e><m:sub>{s}</m:sub></m:sSub>") }
 fn sup(b: &str, s: &str) -> String { format!("<m:sSup><m:e>{b}</m:e><m:sup>{s}</m:sup></m:sSup>") }
 fn frac(a: &str, b: &str) -> String { format!("<m:f><m:num>{a}</m:num><m:den>{b}</m:den></m:f>") }

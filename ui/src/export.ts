@@ -1,25 +1,55 @@
 // Export (0.2.10): the calc sheet as a web page (HTML with MathML, which browsers draw without fonts or scripts)
-// and as a Word document (.docx, written by the engine with equations Word can edit). Regions hidden from print are
+// and as a .docx document (written by the engine, with equations a word processor can edit). Regions hidden from print are
 // left out of both. The window gives the drawn plots as pictures.
 import katex from "katex";
 import { Region } from "./api";
-import { S, out, call, toast } from "./store";
+import { S, out, call, toast, setUnfoldAll } from "./store";
 
 const ml = (tex: string) => katex.renderToString(tex, { output: "mathml", throwOnError: false, strict: false, displayMode: false });
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const ops: Record<string, string> = { "<=": "≤", ">=": "≥", "!=": "≠", "==": "=" };
 
-/** The plots as drawn on the sheet: region id → PNG data URL, with the canvas size. */
-const plots = () => {
-  const m = new Map<number, { src: string; w: number; h: number }>();
-  document.querySelectorAll<HTMLCanvasElement>(".cpage .region canvas").forEach(cv => {
-    const id = +((cv.closest(".region") as HTMLElement | null)?.dataset.id ?? 0);
-    if (id && cv.width) m.set(id, { src: cv.toDataURL("image/png"), w: cv.width, h: cv.height });
-  });
+type Pic = { src: string; w: number; h: number };
+const frame = () => new Promise(r => requestAnimationFrame(() => r(null)));
+
+/** The plots as drawn on the sheet: region id → PNG data URL, with the canvas size. Folded sections are shown for a
+ *  moment so their plots are drawn too. */
+const plots = async () => {
+  setUnfoldAll(true);
+  try {
+    await frame(); await frame();
+    const m = new Map<number, Pic>();
+    document.querySelectorAll<HTMLCanvasElement>(".cpage .region canvas").forEach(cv => {
+      const id = +((cv.closest(".region") as HTMLElement | null)?.dataset.id ?? 0);
+      if (id && cv.width) m.set(id, { src: cv.toDataURL("image/png"), w: cv.width, h: cv.height });
+    });
+    return m;
+  } finally { setUnfoldAll(false); }
+};
+
+/** Each picture region as an upright PNG (the browser turns photos by their orientation tag, and reads GIF and SVG
+ *  too), at most 2000 pixels across. */
+const pictures = async () => {
+  const m = new Map<number, Pic>();
+  for (const r of S().regions.filter(r => r.kind === "image" && !r.hide && r.data?.src)) {
+    try {
+      const img = new Image(); img.src = r.data.src; await img.decode();
+      const k = Math.min(1, 2000 / Math.max(img.naturalWidth || 800, img.naturalHeight || 600));
+      const cv = document.createElement("canvas");
+      cv.width = Math.max(1, Math.round((img.naturalWidth || 800) * k)); cv.height = Math.max(1, Math.round((img.naturalHeight || 600) * k));
+      cv.getContext("2d")!.drawImage(img, 0, 0, cv.width, cv.height);
+      m.set(r.id, { src: cv.toDataURL("image/png"), w: cv.width, h: cv.height });
+    } catch { /* a picture the browser cannot read: the engine tries its own data */ }
+  }
   return m;
 };
 
-const fileName = (ext: string) => `${(S().title.title || S().name || "calc").replace(/[\\/:*?"<>|]+/g, " ").trim() || "calc"}.${ext}`;
+/** A file name from the sheet's title: no characters or names Windows refuses. */
+export const fileName = (ext: string) => {
+  let n = (S().title.title || S().name || "calc").replace(/[\u0000-\u001f\\/:*?"<>|]+/g, " ").replace(/\s+/g, " ").trim().replace(/[. ]+$/, "").slice(0, 120);
+  if (/^(con|prn|aux|nul|com\d|lpt\d)(\..*)?$/i.test(n)) n = `${n} calc`;
+  return `${n || "calc"}.${ext}`;
+};
 
 /** One region as HTML. */
 const region = (r: Region, pics: Map<number, { src: string }>): string => {
@@ -48,27 +78,30 @@ const region = (r: Region, pics: Map<number, { src: string }>): string => {
   if (t) h += `<table><thead><tr>${t.cols.map(c => `<th>${esc(c.name)}${c.unit ? `<br><small>(${esc(c.unit)})</small>` : ""}</th>`).join("")}</tr></thead><tbody>${Array.from({ length: t.rows }, (_, i) => `<tr>${t.cols.map(c => `<td>${esc(c.cells[i] ?? "")}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
   const p = pics.get(r.id);
   if (o.plot && p) h += `<figure><img src="${p.src}" alt="Plot"></figure>`;
-  if (o.material) h += `<p class="muted">Material: ${esc(o.material.title)}</p>`;
+  const m = o.material;
+  if (m) h += `<h3>${esc(m.title)}</h3>${m.des ? `<p class="muted">${esc(m.des)}</p>` : ""}<table><thead><tr><th>Property</th><th>Value</th><th>Range</th><th>Source</th></tr></thead><tbody>${m.rows.map(x => `<tr><td>${esc(x.what)}</td><td>${esc(`${x.value} ${x.unit}`.trim())}</td><td>${esc(x.range)}</td><td>${esc(x.source)}</td></tr>`).join("")}</tbody></table>${m.sources.map(x => `<p class="ref">${esc(x)}</p>`).join("")}`;
   if (o.error) h += `<div class="err">⚠ ${esc(o.error.msg)}</div>`;
   return `<section class="r k-${r.kind}">${h}</section>`;
 };
 
 /** The sheet as one self-contained web page. */
 export const exportHtml = async () => {
-  const s = S(), t = s.title, pics = plots();
+  const s = S(), t = s.title, pics = await plots();
   const field = (l: string, v: string) => `<td><small>${l}</small><br>${esc(v || "—")}</td>`;
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(t.title || s.name)}</title>
-<style>body{font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;color:#1B2733;max-width:860px;margin:2rem auto;padding:0 1rem}table{border-collapse:collapse;margin:.4rem 0}td,th{border:1px solid #C9D1DA;padding:.25rem .6rem;text-align:left;vertical-align:top}th{background:#F3F5F7}.tb td{min-width:8rem}.tb small{color:#5B6878}h2{margin:1.4rem 0 .3rem}h3{margin:1rem 0 .2rem}.note{color:#5B6878;font-style:italic;margin-left:1rem}.ref{color:#5B6878;font-size:.9em}.input{background:#FFF6E0}.line{margin:.35rem 0}.pass{color:#1E7B34}.fail{color:#B42318}.muted{color:#5B6878;font-size:.9em}.err{color:#B42318}figure{margin:.6rem 0}figure img{max-width:100%}math{font-size:1.1em}</style></head><body>
-<table class="tb"><tr>${field("Project", t.project)}${field("Calc number", t.number)}${field("Title", t.title || s.name)}${field("Revision", t.rev)}</tr><tr>${field("Prepared by", t.by)}${field("Checked by", t.checked)}${field("Company", t.company)}${field("Date", t.date)}</tr></table>
-${s.regions.filter(r => !r.hide).map(r => region(r, pics)).join("\n")}
+<style>body{font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;color:#1B2733;max-width:860px;margin:2rem auto;padding:0 1rem}table{border-collapse:collapse;margin:.4rem 0}td,th{border:1px solid #C9D1DA;padding:.25rem .6rem;text-align:left;vertical-align:top}th{background:#F3F5F7}.tb td{min-width:8rem}.tb small{color:#5B6878}h2{margin:1.4rem 0 .3rem}h3{margin:1rem 0 .2rem}.note{color:#5B6878;font-style:italic;margin-left:1rem}.ref{color:#5B6878;font-size:.9em}.input{background:#FFF6E0}.line{margin:.35rem 0}.pass{color:#1E7B34}.fail{color:#B42318}.muted{color:#5B6878;font-size:.9em}.err{color:#B42318}figure{margin:.6rem 0}figure img{max-width:100%}.logo{max-height:60px;margin-bottom:.4rem}math{font-size:1.1em}</style></head><body>
+${/^data:image\//.test(t.logo) ? `<img class="logo" src="${esc(t.logo)}" alt="">` : ""}
+<table class="tb"><tr>${field("Project", t.project)}${field("Calc number", t.number)}${field("Title", t.title || s.name)}${field("Revision", t.rev)}</tr><tr>${field("Prepared by", t.by)}${field("Checked by", t.checked)}${field("Company", t.company)}${field("Date", t.date)}</tr>${t.client ? `<tr>${field("Client", t.client)}</tr>` : ""}</table>
+${s.regions.filter(r => !r.hide && r.style !== "ref").map(r => region(r, pics)).join("\n")}
+${s.regions.filter(r => !r.hide && r.style === "ref").map(r => region(r, pics)).join("\n")}
 <p class="muted">Made with Datum Calc.</p></body></html>`;
   const path = await call<string | null>("save_file", { name: fileName("html"), data: html });
   if (path) toast(`Saved ${path}`, true);
 };
 
-/** The sheet as a Word document, written by the engine. */
-export const exportWord = async () => {
-  const pics = [...plots()].map(([id, p]) => [id, p.src, p.w, p.h]);
+/** The sheet as a .docx document, written by the engine. */
+export const exportDocx = async () => {
+  const pics = [...await plots(), ...await pictures()].map(([id, p]) => [id, p.src, p.w, p.h]);
   const path = await call<string | null>("export_docx", { plots: pics, name: fileName("docx") });
   if (path) toast(`Saved ${path}`, true);
 };

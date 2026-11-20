@@ -1,5 +1,5 @@
 // Commands shared by the ribbon, menus, keys and Tell Me.
-import { act, call, loadOut, out, selId, setBackstage, setEditId, setOut, setSelId, setZoom, toast, zoom, setVarsPanel, varsPanel, S } from "./store";
+import { act, call, loadOut, out, selId, setBackstage, setEditId, setOut, setSelId, setZoom, toast, zoom, setVarsPanel, varsPanel, S, shown, section } from "./store";
 import { Kind, Out } from "./api";
 import * as D from "./dialogs";
 import { outs, ratio } from "./calc";
@@ -7,10 +7,14 @@ import { outs, ratio } from "./calc";
 const GH = "https://github.com/Edgar-Mendonca/Datum-Calc";
 /** Runs `then` once unsaved changes are saved or let go: New, Open, a pack or an update replaces the sheet. */
 export const keep = (then: (discarded?: boolean) => void) => out()?.dirty ? D.confirmClose(then) : then();
-/** Where a new region goes: below the selected one, or at the end. */
 /** A table read from text or a file by the engine (tabin.rs). */
 type TableIn = { cols: { name: string; unit: string; formula: string }[]; rows: string[][]; notes: string[]; caption?: string };
-const below = () => { const i = out()?.sheet.regions.findIndex(r => r.id === selId()) ?? -1; return i >= 0 ? i + 1 : out()?.sheet.regions.length ?? 0; };
+/** Where a new region goes: below the selected one (after the whole section of a folded heading), or at the end. */
+const below = () => {
+  if (!out()) return 0;
+  const sec = section(selId()), i = S().regions.findIndex(r => r.id === sec[sec.length - 1]);
+  return i >= 0 ? i + 1 : S().regions.length;
+};
 const STARTER: Record<Kind, string> = { math: "", text: "", check: "check ", solve: "solve x^2 = 2 for x in 0 .. 10", plot: "plot sin(x), cos(x) for x in 0 .. 2*pi", table: "", image: "", material: "", program: "s = 0\nfor i in 1 .. 10\n  s = s + i\nend" };
 
 /** The textarea being edited, so symbol buttons can type into it. */
@@ -50,7 +54,16 @@ export const C = {
   },
   figures: (n: number) => act({ SheetSet: { field: "digits", value: n } }),
   del: () => { const id = selId(); if (!id) return toast("Select a region first."); const i = S().regions.findIndex(r => r.id === id); act({ Delete: { ids: [id] } }).then(ok => { if (ok) setSelId(S().regions[Math.min(i, S().regions.length - 1)]?.id ?? 0); }); },
-  move: (up: boolean) => { const id = selId(); if (id) act({ Move: { ids: [id], up } }); },
+  /** Up or down past the next region on the screen: a folded section moves as one, and moves past one as one. */
+  move: (up: boolean) => {
+    const id = selId(); if (!id) return;
+    const ids = section(id), rs = S().regions, vis = shown(), k = vis.findIndex(r => r.id === id);
+    const first = rs.findIndex(r => r.id === ids[0]), last = first + ids.length - 1;
+    const other = vis[k + (up ? -1 : 1)];
+    if (!other) return;
+    const o = section(other.id), steps = up ? first - rs.findIndex(r => r.id === o[0]) : rs.findIndex(r => r.id === o[o.length - 1]) - last;
+    if (steps > 0) act({ Batch: Array.from({ length: steps }, () => ({ Move: { ids, up } })) });
+  },
   copy: async () => {
     const r = out()?.sheet.regions.find(x => x.id === selId());
     if (!r) return toast("Select a region first.");
@@ -99,7 +112,7 @@ export const C = {
     if (!out()) return;
     const q = (x: string) => /[",\n]/.test(x) ? `"${x.replace(/"/g, '""')}"` : x;
     const rows = [["Name", "Value", "Unit", "Kind", "Description"]];
-    for (const r of S().regions) {
+    for (const r of S().regions.filter(r => !r.hide)) {
       const o = outs().get(r.id);
       if (!o) continue;
       if (o.check) rows.push([r.text.split("#")[0].replace(/^check\s*/, "").trim(), o.check.pass ? "PASS" : "FAIL", ratio(o.check.ratio, 3), "check", o.note]);

@@ -1826,4 +1826,60 @@ fn word_export() {
     d.apply(crate::sheet::Op::Set { id, field: "hide".into(), value: serde_json::json!(true) }).unwrap();
     assert!(d.s.regions[0].hide && d.s.json().contains("\"hide\": true"));
     assert!(d.apply(crate::sheet::Op::Set { id, field: "fold".into(), value: serde_json::json!("yes") }).is_err());
+    // Only a heading folds; a heading made plain text again is unfolded.
+    assert!(d.apply(crate::sheet::Op::Set { id, field: "fold".into(), value: serde_json::json!(true) }).is_err() && !d.s.regions[0].fold);
+    d.apply(crate::sheet::Op::Insert { at: 1, kind: Kind::Text, text: "Loads".into(), data: Default::default() }).unwrap();
+    let h = d.s.regions[1].id;
+    d.apply(crate::sheet::Op::Set { id: h, field: "style".into(), value: serde_json::json!("heading") }).unwrap();
+    d.apply(crate::sheet::Op::Set { id: h, field: "fold".into(), value: serde_json::json!(true) }).unwrap();
+    d.apply(crate::sheet::Op::Set { id: h, field: "style".into(), value: serde_json::json!("") }).unwrap();
+    assert!(!d.s.regions[1].fold);
+
+    // The review's cases: control characters, the sheet's own units, a material, an empty table, a table error,
+    // references at the end, the summary of checks, A3 with the sheet's margins, a picture's width, the title's
+    // client and the sheet name standing in for an empty title.
+    let mut s = crate::sheet::Sheet::new("Tank sizing");
+    s.page.paper = "A3".into();
+    s.page.margins = [20.0, 10.0, 20.0, 25.0];
+    s.title.client = "Harbour Board".into();
+    s.ui = serde_json::json!({ "print": { "summary": true } });
+    let png = |w: u32, h: u32| { let mut b = b"\x89PNG\r\n\x1a\n\0\0\0\x0dIHDR".to_vec(); b.extend(w.to_be_bytes()); b.extend(h.to_be_bytes()); b.extend([8, 6, 0, 0, 0]); b };
+    let rows: Vec<(Kind, &str, &str, serde_json::Value)> = vec![
+        (Kind::Text, "Ref: tank code, part 4", "ref", serde_json::Value::Null),
+        (Kind::Text, "bell\u{7}here", "", serde_json::Value::Null),
+        (Kind::Math, "unit bbl = 158.987 L", "", serde_json::Value::Null),
+        (Kind::Math, "v = 3 bbl", "input", serde_json::Value::Null),
+        (Kind::Check, "check v <= 1 m^3", "", serde_json::Value::Null),
+        (Kind::Material, "", "", serde_json::json!({ "id": "ss-304", "name": "steel" })),
+        (Kind::Table, "", "", serde_json::json!({ "cols": [], "rows": [] })),
+        (Kind::Table, "", "", serde_json::json!({ "cols": [{ "name": "q", "unit": "", "formula": "nosuch * 2" }], "rows": [[""]] })),
+        (Kind::Image, "Tank", "", serde_json::json!({ "width": 50 })),
+    ];
+    for (k, (kind, text, style, data)) in rows.into_iter().enumerate() {
+        s.regions.push(Region { id: k as u32 + 1, kind, text: text.into(), style: style.into(), data, ..Default::default() });
+    }
+    s.next_id = 10;
+    let o = eval::run(&s);
+    let pics: std::collections::HashMap<u32, crate::docx::Picture> = [(9, crate::docx::picture(png(400, 100)).unwrap())].into();
+    let z = crate::docx::document(&s, &o, &pics);
+    assert_eq!(u32::from_le_bytes(z[10..14].try_into().unwrap()), 0x0021_0000, "a valid zip date");
+    let p = parts(&z);
+    let doc = String::from_utf8(p[2].1.clone()).unwrap();
+    assert!(!doc.contains('\u{7}') && doc.contains("bellhere"), "control characters are left out");
+    assert!(doc.contains("\u{2009}bbl</m:t>") && !doc.contains("Unknown unit"), "the sheet's own units read again");
+    assert!(doc.contains("<w:pStyle w:val=\"Input\"/>"), "inputs shaded");
+    assert!(doc.contains(">Summary of checks<") && (doc.contains("checks fail.") || doc.contains("checks pass.")), "the summary of checks");
+    assert!(doc.contains(">Property<") && doc.contains("304"), "the material's datasheet");
+    assert!(!doc.contains("<w:tr></w:tr>") && !doc.contains("<w:tr><w:trPr><w:tblHeader/></w:trPr></w:tr>"), "no empty rows");
+    assert!(doc.contains("⚠"), "the table's error");
+    let (refs, end) = (doc.find("tank code").unwrap(), doc.find(">References<").unwrap());
+    assert!(end < refs && refs > doc.find("Property").unwrap(), "references at the end");
+    assert!(doc.contains("w:w=\"16838\" w:h=\"23811\"") && doc.contains("w:top=\"1133\"") && doc.contains("w:left=\"1417\""), "A3 and the sheet's margins");
+    assert!(doc.contains(">Harbour Board<") && doc.contains(">Tank sizing<"), "the client, and the sheet's name for an empty title");
+    // The picture: half the text width (A3 297 mm less 35 mm of margins), in proportion.
+    let w = (16838 - 566 - 1417) as u64 * 635 / 2;
+    assert!(doc.contains(&format!("cx=\"{w}\" cy=\"{}\"", w / 4)), "picture size");
+    assert!(p.iter().any(|x| x.0 == "word/media/image1.png"));
+    assert!(crate::units::custom_list().is_empty(), "the sheet's units do not stay behind");
+    assert!(crate::docx::picture(b"GIF89a....".to_vec()).is_none() && crate::docx::picture_from_data_url("data:image/png;base64,/9j/4AAQ").is_none());
 }

@@ -883,7 +883,16 @@ pub struct MatRow { pub tex: String, pub what: String, pub value: String, pub un
 pub struct VarOut { pub name: String, pub tex: String, pub value: String, pub unit: String, pub id: u32 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Default)]
-pub struct SheetOut { pub regions: Vec<RegionOut>, pub vars: Vec<VarOut>, pub checks: usize, pub failed: usize, pub errors: usize }
+pub struct SheetOut {
+    pub regions: Vec<RegionOut>,
+    pub vars: Vec<VarOut>,
+    pub checks: usize,
+    pub failed: usize,
+    pub errors: usize,
+    /// The sheet's own units (0.2.9), for work done with the sheet elsewhere (its .docx export reads its lines again).
+    #[serde(skip)]
+    pub units: Vec<(String, f64, Dim)>,
+}
 
 /// How results are written: significant figures, engineering notation, US units, complex values as r∠θ.
 pub struct Fmt { pub digits: u8, pub eng: bool, pub us: bool, pub polar: bool, pub exact: bool }
@@ -1079,6 +1088,7 @@ fn run_here(s: &Sheet, f: &Fmt) -> (SheetOut, Env) {
         }
         out.regions.push(o);
     }
+    out.units = units::custom_list();
     (out, env)
 }
 

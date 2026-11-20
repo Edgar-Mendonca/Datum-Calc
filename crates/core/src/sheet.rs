@@ -108,6 +108,11 @@ impl Default for Sheet {
     }
 }
 
+impl Region {
+    /// A heading or subheading: the regions that fold away under it.
+    pub fn heading(&self) -> bool { self.kind == Kind::Text && (self.style == "heading" || self.style == "subheading") }
+}
+
 impl Sheet {
     pub fn new(name: &str) -> Self { Self { name: name.into(), ..Default::default() } }
 
@@ -202,10 +207,13 @@ fn exec(s: &mut Sheet, op: Op) -> Result<(), String> {
             match field.as_str() {
                 "text" => { let t = text()?; if t.len() > MAX_TEXT { return Err("A region holds at most 20,000 characters.".into()); } r.text = t; }
                 "unit" => r.unit = text()?,
-                "style" => r.style = text()?,
+                "style" => { r.style = text()?; r.fold &= r.heading(); }
                 "hide" => r.hide = value.as_bool().ok_or("hide is true or false.")?,
-                "fold" => r.fold = value.as_bool().ok_or("fold is true or false.")?,
-                "kind" => r.kind = serde_json::from_value(value.clone()).map_err(|_| "Unknown region kind.")?,
+                "fold" => {
+                    r.fold = value.as_bool().ok_or("fold is true or false.")?;
+                    if r.fold && !r.heading() { r.fold = false; return Err("Only a heading or subheading folds its section: make the region a heading first.".into()); }
+                }
+                "kind" => { r.kind = serde_json::from_value(value.clone()).map_err(|_| "Unknown region kind.")?; r.fold &= r.heading(); }
                 "data" => {
                     if value.get("src").and_then(|v| v.as_str()).is_some_and(|v| v.len() > MAX_PICTURE) { return Err("Choose a picture smaller than 6 MB.".into()); }
                     if value.get("rows").and_then(|v| v.as_array()).is_some_and(|v| v.len() > MAX_ROWS) { return Err("A table holds at most 2,000 rows.".into()); }

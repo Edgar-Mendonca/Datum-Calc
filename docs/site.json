@@ -41,7 +41,7 @@
     "Each equation can be shown again with its numbers put in, as on a hand calculation.",
     "Exact maths: fractions that stay fractions, and simplify, expand and factor on expressions.",
     "About 250 materials from Datum Atlas: pick one and its density, moduli, strengths and thermal properties become names with units, with their sources.",
-    "A printable calc sheet with a title block, a summary of checks, page numbers and references; export to Word (equations Word can edit), a web page, PDF and CSV."
+    "A printable calc sheet with a title block, a summary of checks, page numbers and references; export to a .docx document (with equations you can edit), a web page, PDF and CSV."
   ],
   "screenshots": [
     "docs/images/pack.png",

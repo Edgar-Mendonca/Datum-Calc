@@ -2,18 +2,19 @@
 
 ## 0.2.10 — 2026-11-20
 
-Export to Word and to a web page; hide and fold regions.
+Export to a .docx document and to a web page; hide and fold regions.
 
 **Export**
-- File › Export › Word writes the calc sheet as a .docx: the title block, headings, notes, every equation as a Word equation you can edit, with its result, checks with PASS or FAIL and the utilisation, tables, plots and pictures.
+- File › Export › Document writes the calc sheet as a .docx file (the open Office Open XML format that word processors read): the title block with the client and logo, the summary of checks when the sheet prints one, headings, notes, every equation as an equation you can edit there, with its result, checks with PASS or FAIL and the utilisation, tables, material datasheets, plots and pictures, and the references at the end. The page size and margins are the sheet's own; units of the sheet's own show as written.
 - File › Export › Web page writes one .html file that any browser shows, maths included, without the internet: to share or to put on an intranet.
 
 **Hide and fold**
-- Hide in Print (right-click a region, or Home) keeps a region out of print and exports; it is still worked out and shown faint on the screen, tagged as hidden.
-- The arrow beside a heading folds its section away on the screen while you work elsewhere; folded sections still print.
+- Hide in Print (right-click a region, or Format › Region Style) keeps a region out of print and exports; it is still worked out and shown faint on the screen, tagged as hidden.
+- The arrow beside a heading folds its section away on the screen while you work elsewhere; folded sections still print. The arrow keys step over a folded section, Move Up and Move Down carry it as one, a new region goes after it, and choosing a region inside it (from the checks list, say) opens it.
+- Regions hidden in print are also left out of the summary of checks, CSV and the text file. Versions before 0.2.10 open these sheets but show and print every region.
 
 **Checks**
-- 98 engine tests (the Word package read back: its parts and their checksums, equations, results, checks, a hidden region left out; every pack exports) and 118 UI tests (folding, hiding, both exports). Every earlier pack prints as before.
+- 98 engine tests (the .docx package read back: its parts and their checksums, equations, results, checks, a hidden region left out, page size and margins, pictures to size, materials, references, the sheet's own units; every pack exports) and 121 UI tests (folding, stepping over a fold, hiding, both exports with the plots of folded sections). Every earlier pack prints as before.
 
 ## 0.2.9 — 2026-11-20
 

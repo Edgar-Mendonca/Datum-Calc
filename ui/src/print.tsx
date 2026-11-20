@@ -18,7 +18,7 @@ export const PrintRegion = (p: { r: Region }) => <ErrorBoundary fallback={<div c
 const SUMMARY: Region = { id: -1, kind: "text", text: "", unit: "", style: "summary", data: null };
 const summaryOn = () => !!S().ui?.print?.summary;
 const SummaryBlock = () => {
-  const checks = () => S().regions.map(r => ({ r, o: outs().get(r.id) })).filter(x => x.o?.check);
+  const checks = () => S().regions.filter(r => !r.hide).map(r => ({ r, o: outs().get(r.id) })).filter(x => x.o?.check);
   const failed = () => checks().filter(x => !x.o!.check!.pass).length;
   return (
     <div class="psum">

@@ -1,8 +1,9 @@
 // The calc sheet on screen: the page with its title block and regions, top to bottom.
 // Click selects a region; double-click or Enter edits it; Esc or a click outside finishes.
-import { ErrorBoundary, For, Index, Show, createEffect, createMemo, createResource, createSignal, onMount } from "solid-js";
+import { ErrorBoundary, For, Index, Show, createEffect, createMemo, createResource, createSignal, onMount, on, untrack } from "solid-js";
 import { MatLibrary, Material, Region, TableData } from "./api";
-import { act, call, out, S, selId, setSelId, editId, setEditId, zoom, openMenu, toast } from "./store";
+import { act, call, out, S, selId, setSelId, editId, setEditId, zoom, openMenu, toast, shown, foldedOver } from "./store";
+export { shown };
 import { C, setField } from "./cmds";
 import * as D from "./dialogs";
 import { Help } from "./help";
@@ -171,19 +172,6 @@ const MaterialEditor = (p: { r: Region }) => {
 /** Picture size choices for the Format tab. */
 export const pickPicture = async (id: number) => { const src = await call<string | null>("pick_image"); if (src) act({ Set: { id, field: "data", value: { ...(S().regions.find(r => r.id === id)?.data ?? {}), src } } }); };
 
-/** The regions on the screen: those under a folded heading are left out until the next heading of its level. */
-export const shown = () => {
-  const out: Region[] = [];
-  let folded = "";
-  for (const r of S().regions) {
-    const level = r.kind === "text" ? (r.style === "heading" ? 1 : r.style === "subheading" ? 2 : 0) : 0;
-    if (folded && (level === 0 || level > (folded === "heading" ? 1 : 2))) continue;
-    folded = level && r.fold ? r.style : "";
-    out.push(r);
-  }
-  return out;
-};
-
 const RegionView = (p: { r: Region }) => {
   const editing = () => editId() === p.r.id;
   const empty = () => <div class="rtxt"><span class="muted">Empty {KIND[p.r.kind].toLowerCase()} region: double-click to type.</span></div>;
@@ -201,7 +189,7 @@ const RegionView = (p: { r: Region }) => {
       ]); }}>
       <span class="rtag">{KIND[p.r.kind]}{p.r.hide ? " · hidden in print" : ""}</span>
       <Show when={p.r.kind === "text" && (p.r.style === "heading" || p.r.style === "subheading")}>
-        <button class="foldbtn" title={p.r.fold ? "Show this section" : "Fold this section away (it still prints)"} onMouseDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); act({ Set: { id: p.r.id, field: "fold", value: !p.r.fold } }); }}>{p.r.fold ? "▸" : "▾"}</button>
+        <button class="foldbtn" title={p.r.fold ? "Show this section" : "Fold this section away (it still prints)"} onMouseDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); if (!p.r.fold) setSelId(p.r.id); act({ Set: { id: p.r.id, field: "fold", value: !p.r.fold } }); }}>{p.r.fold ? "▸" : "▾"}</button>
       </Show>
       <Show when={editing()} fallback={
         p.r.kind === "image" ? <ImageView r={p.r} />
@@ -237,10 +225,9 @@ const TitleBlockView = () => {
 export const SheetView = () => {
   let page!: HTMLDivElement;
   const width = () => (PAPERS.find(p => p[0] === S().page.paper) ?? PAPERS[0])[1] * MM;
-  const idx = () => S().regions.findIndex(r => r.id === selId());
   const key = (e: KeyboardEvent) => {
     if (e.ctrlKey || e.metaKey) return;
-    const rs = S().regions, i = idx();
+    const rs = shown(), i = rs.findIndex(r => r.id === selId());
     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
       e.preventDefault();
       if (e.altKey) return C.move(e.key === "ArrowUp");
@@ -249,6 +236,8 @@ export const SheetView = () => {
     } else if ((e.key === "Enter" || e.key === "F2") && i >= 0) { e.preventDefault(); setEditId(rs[i].id); }
     else if (e.key === "Delete" && i >= 0) { e.preventDefault(); C.del(); }
   };
+  // A region chosen elsewhere (the checks list, an error) inside a folded section: unfold the section.
+  createEffect(on(selId, id => { const over = untrack(() => foldedOver(id)); if (over.length) act({ Batch: over.map(r => ({ Set: { id: r.id, field: "fold", value: false } })) }); }));
   // Keep the selected region in view.
   createEffect(() => { const id = selId(); out(); queueMicrotask(() => page?.querySelector(`[data-id="${id}"]`)?.scrollIntoView({ block: "nearest" })); });
   return (

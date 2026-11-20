@@ -146,7 +146,7 @@ fn new_from_pack(st: State<St>, id: String) -> R<Out> {
     Ok(out(&a))
 }
 
-/// File › Export › Word: the sheet as a .docx with Word equations; the window gives its plots as PNG pictures
+/// File › Export › Document: the sheet as a .docx with editable equations; the window gives its plots as PNG pictures
 /// (region id, data URL, width, height).
 #[tauri::command]
 async fn export_docx(app: AppHandle, st: State<'_, St>, plots: Vec<(u32, String, u32, u32)>, name: String) -> R<Option<String>> {
@@ -156,7 +156,7 @@ async fn export_docx(app: AppHandle, st: State<'_, St>, plots: Vec<(u32, String,
         Some((id, datum_core::docx::Picture { w: w.max(1), h: h.max(1), ..p }))
     }).collect();
     let bytes = datum_core::docx::document(&s, &o, &pics);
-    let Some(path) = app.dialog().file().add_filter("Word", &["docx"]).set_file_name(&name).blocking_save_file().and_then(|f| f.into_path().ok()).map(|p| with_ext(p, "docx")) else { return Ok(None) };
+    let Some(path) = app.dialog().file().add_filter("Document", &["docx"]).set_file_name(&name).blocking_save_file().and_then(|f| f.into_path().ok()).map(|p| with_ext(p, "docx")) else { return Ok(None) };
     std::fs::write(&path, bytes).map_err(|e| format!("Could not save {}: {e}", path.display()))?;
     Ok(Some(path.display().to_string()))
 }

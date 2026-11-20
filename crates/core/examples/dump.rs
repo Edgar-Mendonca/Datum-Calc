@@ -76,15 +76,15 @@ fn main() {
     let fit = serde_json::json!({ "sheet": fit, "calc": eval::run(&fit), "path": null, "dirty": false, "undo": false, "redo": false, "rev": 1 });
     // Folding, hiding and export (0.2.10): a folded heading over a line, a line hidden in print, a plot.
     let mut ex = Sheet::new("Export");
-    let rows: [(Kind, &str, &str, bool, bool); 6] = [
-        (Kind::Text, "Folded part", "heading", true, false), (Kind::Math, "a_fold = 2 m", "", false, false),
+    let rows: [(Kind, &str, &str, bool, bool); 7] = [
+        (Kind::Text, "Folded part", "heading", true, false), (Kind::Math, "a_fold = 2 m", "", false, false), (Kind::Plot, "plot 2*x for x in 0 .. 1", "", false, false),
         (Kind::Text, "Shown part", "heading", false, false), (Kind::Math, "b = 3 m", "", false, false),
         (Kind::Math, "secret = 99 kg", "", false, true), (Kind::Plot, "plot b*x for x in 0 .. 2", "", false, false),
     ];
     for (k, (kind, text, style, fold, hide)) in rows.into_iter().enumerate() {
         ex.regions.push(datum_core::Region { id: k as u32 + 1, kind, text: text.into(), style: style.into(), fold, hide, ..Default::default() });
     }
-    ex.next_id = 7;
+    ex.next_id = 8;
     let ex = serde_json::json!({ "sheet": ex, "calc": eval::run(&ex), "path": null, "dirty": false, "undo": false, "redo": false, "rev": 1 });
     let mut tabin = tab.clone();
     tabin["caption"] = "pump".into();
