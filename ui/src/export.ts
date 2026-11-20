@@ -48,7 +48,7 @@ const region = (r: Region, pics: Map<number, { src: string }>): string => {
   if (t) h += `<table><thead><tr>${t.cols.map(c => `<th>${esc(c.name)}${c.unit ? `<br><small>(${esc(c.unit)})</small>` : ""}</th>`).join("")}</tr></thead><tbody>${Array.from({ length: t.rows }, (_, i) => `<tr>${t.cols.map(c => `<td>${esc(c.cells[i] ?? "")}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
   const p = pics.get(r.id);
   if (o.plot && p) h += `<figure><img src="${p.src}" alt="Plot"></figure>`;
-  if (o.material) h += `<p class="muted">Material: ${esc(o.material.name)}</p>`;
+  if (o.material) h += `<p class="muted">Material: ${esc(o.material.title)}</p>`;
   if (o.error) h += `<div class="err">⚠ ${esc(o.error.msg)}</div>`;
   return `<section class="r k-${r.kind}">${h}</section>`;
 };
