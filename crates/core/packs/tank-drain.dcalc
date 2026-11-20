@@ -1,0 +1,181 @@
+{
+  "format": 1,
+  "name": "Tank draining through an orifice",
+  "title": {
+    "project": "",
+    "number": "PACK-30",
+    "title": "Tank draining through an orifice",
+    "by": "",
+    "checked": "",
+    "date": "",
+    "rev": "A",
+    "company": "",
+    "client": "",
+    "logo": ""
+  },
+  "page": {
+    "paper": "A4",
+    "margins": [
+      15.0,
+      15.0,
+      15.0,
+      20.0
+    ]
+  },
+  "units": "SI",
+  "digits": 4,
+  "regions": [
+    {
+      "id": 1,
+      "kind": "text",
+      "text": "Tank draining through an orifice",
+      "unit": "",
+      "style": "heading",
+      "data": null
+    },
+    {
+      "id": 2,
+      "kind": "text",
+      "text": "An open tank empties through a sharp-edged orifice in its floor. The outflow is C_d A_o √(2gh) (Torricelli), so the level falls at h′ = −C_d A_o/A_t · √(2gh). The equation is solved in time from the starting level; for a tank of constant section it also has an exact solution, worked out below as a check.",
+      "unit": "",
+      "style": "note",
+      "data": null
+    },
+    {
+      "id": 3,
+      "kind": "text",
+      "text": "Inputs",
+      "unit": "",
+      "style": "subheading",
+      "data": null
+    },
+    {
+      "id": 4,
+      "kind": "math",
+      "text": "A_t = 1.5 m^2  # tank floor area",
+      "unit": "",
+      "style": "input",
+      "data": null
+    },
+    {
+      "id": 5,
+      "kind": "math",
+      "text": "d_o = 50 mm  # orifice diameter",
+      "unit": "",
+      "style": "input",
+      "data": null
+    },
+    {
+      "id": 6,
+      "kind": "math",
+      "text": "C_d = 0.62  # discharge coefficient, sharp-edged orifice",
+      "unit": "",
+      "style": "input",
+      "data": null
+    },
+    {
+      "id": 7,
+      "kind": "math",
+      "text": "h_0 = 2 m  # starting level",
+      "unit": "",
+      "style": "input",
+      "data": null
+    },
+    {
+      "id": 8,
+      "kind": "math",
+      "text": "h_min = 0.1 m  # level to keep after 10 minutes",
+      "unit": "",
+      "style": "input",
+      "data": null
+    },
+    {
+      "id": 9,
+      "kind": "text",
+      "text": "Level in time",
+      "unit": "",
+      "style": "subheading",
+      "data": null
+    },
+    {
+      "id": 10,
+      "kind": "math",
+      "text": "A_o = pi*d_o^2/4",
+      "unit": "",
+      "style": "",
+      "data": null
+    },
+    {
+      "id": 11,
+      "kind": "math",
+      "text": "ode h' = -C_d*A_o/A_t*sqrt(2*g*h) for t in 0 .. 10 min from h = h_0",
+      "unit": "",
+      "style": "",
+      "data": null
+    },
+    {
+      "id": 12,
+      "kind": "math",
+      "text": "h_10 = h(10 min)",
+      "unit": "",
+      "style": "",
+      "data": null
+    },
+    {
+      "id": 13,
+      "kind": "math",
+      "text": "Q_10 = -A_t*h'(10 min)  # outflow after 10 minutes",
+      "unit": "L/s",
+      "style": "",
+      "data": null
+    },
+    {
+      "id": 14,
+      "kind": "check",
+      "text": "check h_10 >= h_min",
+      "unit": "",
+      "style": "",
+      "data": null
+    },
+    {
+      "id": 15,
+      "kind": "text",
+      "text": "Check against the exact solution",
+      "unit": "",
+      "style": "subheading",
+      "data": null
+    },
+    {
+      "id": 16,
+      "kind": "math",
+      "text": "t_e = A_t/(C_d*A_o)*sqrt(2*h_0/g)  # time to empty",
+      "unit": "min",
+      "style": "",
+      "data": null
+    },
+    {
+      "id": 17,
+      "kind": "math",
+      "text": "h_x = h_0*(1 - (10 min)/t_e)^2  # the exact level after 10 minutes",
+      "unit": "",
+      "style": "",
+      "data": null
+    },
+    {
+      "id": 18,
+      "kind": "text",
+      "text": "Ref: F. M. White, Fluid Mechanics, 8th ed., §3.7 (Torricelli, draining a tank) and §6.12 (orifice discharge coefficients).",
+      "unit": "",
+      "style": "ref",
+      "data": null
+    }
+  ],
+  "next_id": 19,
+  "ui": {
+    "pack": {
+      "id": "tank-drain",
+      "field": "Process",
+      "desc": "The level in an open tank emptying through an orifice, solved as a differential equation in time with units, and checked against its exact solution."
+    }
+  }
+}

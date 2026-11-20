@@ -34,7 +34,8 @@
     "Small programs in a region: if, else, for, while and break with units, or a function that returns a value, such as a friction factor for any flow regime.",
     "Water and steam properties by IAPWS-IF97, and air and common gases, as functions with units: water_h(400 °C, 40 bar), water_x(0.1 bar, h), gas_cp(air, T).",
     "Data in and curve fitting: paste cells from a spreadsheet or read a CSV file into a table, fit a model to it by least squares with units, and plot the curve with the measured points.",
-    "Twenty-nine ready calc packs, each with its reference and a test against a worked example.",
+    "Differential equations with units: ode x'' = -k/m*x for t in 0 .. 10 s from x = 1 cm, x' = 0 solves in time, plots the result and makes x(t) available below.",
+    "Thirty ready calc packs, each with its reference and a test against a worked example.",
     "Complex numbers for AC circuits in the frequency domain: impedances such as (8 + 9.42j) Ω, phasors as 230 V∠-30°, impedances in parallel, complex power, and Bode plots on a log frequency axis.",
     "Each equation can be shown again with its numbers put in, as on a hand calculation.",
     "Exact maths: fractions that stay fractions, and simplify, expand and factor on expressions.",
@@ -48,21 +49,22 @@
   ],
   "roadmap": [
     {
-      "v": "0.2.8",
-      "title": "Differential equations",
+      "v": "0.2.9",
+      "title": "Custom units and templates",
       "when": "Next",
       "items": [
-        "Equations in time with units",
-        "Plotted over time"
+        "Units of your own",
+        "Sheet templates",
+        "A saved company title block"
       ]
     },
     {
-      "v": "0.2.9–0.2.10",
-      "title": "Templates and export",
+      "v": "0.2.10",
+      "title": "Export",
       "when": "Soon",
       "items": [
-        "Custom units, templates and a company title block",
-        "Export to Word and HTML"
+        "Export to Word and HTML",
+        "Collapse or hide regions"
       ]
     },
     {

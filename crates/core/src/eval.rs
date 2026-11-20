@@ -118,6 +118,8 @@ pub struct Env {
     pub exprs: HashMap<String, crate::sym::RatF>,
     /// The fitted values a fitted function was made with (0.2.7), put in place while it runs.
     pub fitted: HashMap<String, Vec<(String, Val)>>,
+    /// The states of solved differential equations (0.2.8), each a function of time: the solution and its index.
+    pub odes: HashMap<String, (std::sync::Arc<crate::ode::Solved>, usize, bool)>,
     /// Functions written as programs (0.2.5).
     pub progs: HashMap<String, std::sync::Arc<crate::prog::Prog>>,
     /// Times round the loops of programs on the current line (a plot calls a function once per point).
@@ -134,7 +136,7 @@ impl Env {
     pub(crate) fn tick(&mut self) -> u64 { self.steps += 1; self.steps }
     pub(crate) fn steps(&self) -> u64 { self.steps }
 
-    pub fn new() -> Self { Self { vars: HashMap::new(), funcs: HashMap::new(), shown: HashMap::new(), exprs: HashMap::new(), progs: HashMap::new(), fitted: HashMap::new(), steps: 0, unset: Default::default(), later: HashMap::new(), depth: 0 } }
+    pub fn new() -> Self { Self { vars: HashMap::new(), funcs: HashMap::new(), shown: HashMap::new(), exprs: HashMap::new(), progs: HashMap::new(), fitted: HashMap::new(), odes: HashMap::new(), steps: 0, unset: Default::default(), later: HashMap::new(), depth: 0 } }
 
     /// What a name is for exact maths: a plain number (as a fraction), a kept expression, or a symbol.
     fn look(&self, v: &str) -> crate::sym::Look {
@@ -143,7 +145,7 @@ impl Env {
         if let Some(r) = self.exprs.get(&k) { return Look::Expr(r.clone()); }
         // A name the sheet would refuse on a numeric line is refused here too, rather than taken for a symbol.
         if !self.vars.contains_key(&k) {
-            if self.funcs.contains_key(&k) || self.progs.contains_key(&k) || builtin_name(&k) { return Look::Refuse(format!("{k} is a function; exact maths works on names and numbers.")); }
+            if self.funcs.contains_key(&k) || self.progs.contains_key(&k) || self.odes.contains_key(&k) || builtin_name(&k) { return Look::Refuse(format!("{k} is a function; exact maths works on names and numbers.")); }
             match self.later.get(&k) {
                 Some(true) => return Look::Refuse(format!("{k} has an error on its own line.")),
                 Some(false) => return Look::Refuse(format!("{k} is defined further down: move its line above this one.")),
@@ -230,6 +232,28 @@ impl Env {
 
     fn call(&mut self, f: &str, args: &[Node], at: Span) -> R<Val> {
         let k = canon(f);
+        if let Some((s, i, rate)) = self.odes.get(&k).cloned() {
+            if args.len() != 1 { return fail(format!("{f} takes one value: the {}.", if units::same(&s.tdim, &[0, 0, 1, 0, 0, 0, 0, 0]) { "time" } else { "variable" }), at); }
+            let a = self.eval(&args[0])?;
+            real(&a, f, args[0].at)?;
+            if a.mat() { return fail(format!("{f} takes a value or a vector."), args[0].at); }
+            if !units::same(&a.dim, &s.tdim) { return fail(format!("{f} takes {}, not {}.", dim_name(&s.tdim), dim_name(&a.dim)), args[0].at); }
+            let (t0, t1) = (s.path.ts[0], *s.path.ts.last().unwrap_or(&s.path.ts[0]));
+            let tol = 1e-12 * (t1 - t0).abs();
+            let mut v = vec![];
+            for t in &a.v {
+                if *t < t0 - tol || *t > t1 + tol || !t.is_finite() {
+                    // Both ends in the unit of the end: from 0 s to 10 s.
+                    let fm = Fmt { digits: 4, eng: false, us: false, polar: false, exact: false };
+                    let r = |x: f64, u: &str| show_val(&Val { v: vec![x], dim: s.tdim, abs: s.tabs, ..Default::default() }, u, &fm);
+                    let (hi, _, _, u) = r(t1, "");
+                    return fail(format!("{f} is solved from {} to {hi} only.", r(t0, &u).0), args[0].at);
+                }
+                v.push(if rate { s.path.slope(i, t.clamp(t0, t1)) } else { s.path.at(i, t.clamp(t0, t1)) });
+            }
+            // The highest derivative is the rate of the last state: its units over time, never absolute.
+            return Ok(Val { v, dim: if rate { units::div(&s.dims[i], &s.tdim) } else { s.dims[i] }, abs: s.abs[i] && !rate, vec: a.vec, ..Default::default() });
+        }
         if let Some(p) = self.progs.get(&k).cloned() {
             if self.steps > crate::prog::MAX_LINE { return fail(crate::prog::LINE_MSG, at); }
             let params = &p.head.as_ref().expect("a function program").1;
@@ -1151,6 +1175,17 @@ fn factor_of(t: &Node, names: &[String]) -> Option<Option<usize>> {
 /// Every name a line defines: one, or the unknowns of `solve … for x = g, y = g`.
 fn defined_names(t: &str) -> Vec<String> {
     let Ok(toks) = parse::lex(t) else { return vec![] };
+    if matches!(toks.first().map(|x| &x.0), Some(parse::Tok::Id(w)) if w == "ode") {
+        let to = toks.iter().position(|x| x.0 == parse::Tok::Id("for".into())).unwrap_or(toks.len());
+        let mut out = vec![];
+        for j in 1..to {
+            if let (parse::Tok::Id(n), Some((parse::Tok::Op("="), _))) = (&toks[j].0, toks.get(j + 1)) {
+                let base = n.trim_end_matches('\'');
+                for k in 0..=n.len() - base.len() { out.push(format!("{base}{}", "'".repeat(k))); }
+            }
+        }
+        return out;
+    }
     if matches!(toks.first().map(|x| &x.0), Some(parse::Tok::Id(w)) if w == "fit") {
         let mut out: Vec<String> = toks.get(1).and_then(|x| if let parse::Tok::Id(n) = &x.0 { Some(n.clone()) } else { None }).into_iter().collect();
         if let Some(k) = toks.iter().position(|x| x.0 == parse::Tok::Id("for".into())) {
@@ -1240,7 +1275,7 @@ fn region(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>, subst: bo
         return o;
     }
     // j and i, when they are the imaginary unit rather than a name of the sheet, are drawn upright like a unit.
-    let bound: Vec<&str> = match &st { Stmt::Func { params, .. } => params.iter().map(|p| p.as_str()).collect(), Stmt::Solve { var, .. } | Stmt::Plot { var, .. } => vec![var.as_str()], Stmt::SolveSys { vars, .. } => vars.iter().map(|v| v.0.as_str()).collect(), Stmt::Fit { var, .. } => vec![var.as_str()], _ => vec![] };
+    let bound: Vec<&str> = match &st { Stmt::Func { params, .. } => params.iter().map(|p| p.as_str()).collect(), Stmt::Solve { var, .. } | Stmt::Plot { var, .. } => vec![var.as_str()], Stmt::SolveSys { vars, .. } => vars.iter().map(|v| v.0.as_str()).collect(), Stmt::Fit { var, .. } | Stmt::Ode { var, .. } => vec![var.as_str()], _ => vec![] };
     o.latex = latex::stmt_with(&st, &|v| imag_unit(env, v).filter(|_| !bound.contains(&v)));
     // simplify, expand and factor give an exact expression, not a value.
     let sym_call = |e: &Node| match &e.e { E::Call(fname, args) if crate::sym::OPS.contains(&fname.as_str()) && args.len() == 1 => Some((fname.clone(), args[0].clone())), _ => None };
@@ -1276,6 +1311,140 @@ fn region(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>, subst: bo
     let res: R<()> = (|| {
         match &st {
             Stmt::Empty => {}
+            Stmt::Ode { eqs, var, lo, hi, inits } => {
+                let (a, b) = (env.eval(lo)?, env.eval(hi)?);
+                real(&a, "The range", lo.at)?;
+                real(&b, "The range", hi.at)?;
+                if a.vec || b.vec { return fail("The range goes between single values.", (lo.at.0, hi.at.1)); }
+                // A bare 0 at the start takes the unit of the end: for t in 0 .. 10 s.
+                let a = if a.x() == 0.0 && units::is_none(&a.dim) { Val { dim: b.dim, abs: b.abs, ..a } } else { a };
+                same_or(&a, &b, "use", hi.at)?;
+                if b.x().partial_cmp(&a.x()) != Some(std::cmp::Ordering::Greater) || !(b.x() - a.x()).is_finite() { return fail("The range must go from a smaller to a larger value.", (lo.at.0, hi.at.1)); }
+                let tdim = a.dim;
+                // The states: each equation's name and its lower derivatives (x'' gives x and x'), in order.
+                let span = (eqs[0].1.at.0, eqs[eqs.len() - 1].1.at.1);
+                let mut states: Vec<(String, usize, Option<usize>)> = vec![]; // name, equation, index of the next state
+                for (k, (n, _)) in eqs.iter().enumerate() {
+                    let base = n.trim_end_matches('\'');
+                    let order = n.len() - base.len();
+                    if order > 4 { return fail("At most a fourth derivative.", span); }
+                    for j in 0..order {
+                        let s = format!("{base}{}", "'".repeat(j));
+                        if states.iter().any(|x| x.0 == s) { return fail(format!("{} has two equations.", show(&canon(&s))), span); }
+                        let next = (j + 1 < order).then_some(states.len() + 1);
+                        states.push((s, k, next));
+                    }
+                }
+                if states.len() > 20 { return fail("At most 20 states.", span); }
+                for (n, x) in inits { if !states.iter().any(|s| canon(&s.0) == canon(n)) { return fail(format!("{} is not one of these equations' states: they are {}.", show(&canon(n)), states.iter().map(|s| show(&canon(&s.0))).collect::<Vec<_>>().join(", ")), x.at); } }
+                // Starting values give the units: each derivative is its state's units per unit of time (a bare 0 takes them).
+                let mut y0 = vec![];
+                let mut vals: Vec<Val> = vec![];
+                for (k, (s, _, _)) in states.iter().enumerate() {
+                    let Some((_, x)) = inits.iter().find(|(n, _)| canon(n) == canon(s)) else { return fail(format!("Give a starting value for {}: … from {} = …", show(&canon(s)), s), span) };
+                    let mut v = env.eval(x)?;
+                    real(&v, "A starting value", x.at)?;
+                    if v.vec { return fail("A starting value is one value.", x.at); }
+                    let lower = (k > 0 && states[k - 1].2 == Some(k)).then(|| vals[k - 1].dim);
+                    if let Some(d) = lower {
+                        let want = units::div(&d, &tdim);
+                        if v.x() == 0.0 && units::is_none(&v.dim) { v.dim = want; }
+                        if !units::same(&v.dim, &want) { return fail(format!("{} is the rate of {}, so it is in {} per {}; this is {}.", show(&canon(s)), show(&canon(&states[k - 1].0)), dim_name(&d), dim_name(&tdim), dim_name(&v.dim)), x.at); }
+                        v.abs = false;
+                    }
+                    y0.push(v.x());
+                    vals.push(v);
+                }
+                let keys: Vec<String> = states.iter().map(|s| canon(&s.0)).chain([canon(var)]).collect();
+                let saved: Vec<Option<Val>> = keys.iter().map(|k| env.vars.get(k).cloned()).collect();
+                let restore = |env: &mut Env| for (k, s) in keys.iter().zip(&saved) { match s { Some(v) => { env.vars.insert(k.clone(), v.clone()); } None => { env.vars.remove(k); } } };
+                let checked = std::cell::Cell::new(false);
+                let mut rhs = |t: f64, y: &[f64]| -> R<Vec<f64>> {
+                    env.vars.insert(canon(var), Val { v: vec![t], dim: tdim, abs: a.abs, ..Default::default() });
+                    for (k, s) in states.iter().enumerate() { env.vars.insert(canon(&s.0), Val { v: vec![y[k]], ..vals[k].clone() }); }
+                    let mut d = vec![0.0; states.len()];
+                    for (k, s) in states.iter().enumerate() {
+                        d[k] = match s.2 {
+                            Some(next) => y[next],
+                            None => {
+                                let e = &eqs[s.1].1;
+                                let v = env.eval(e)?;
+                                real(&v, "A derivative", e.at)?;
+                                if v.vec { return fail("A derivative is one value at each time.", e.at); }
+                                if !checked.get() {
+                                    let want = units::div(&vals[k].dim, &tdim);
+                                    if !units::same(&v.dim, &want) { return fail(format!("{} must be in {} per {} (the units of {} over time); this is {}.", show(&canon(&eqs[s.1].0)), dim_name(&vals[k].dim), dim_name(&tdim), show(&canon(&s.0)), dim_name(&v.dim)), e.at); }
+                                }
+                                v.x()
+                            }
+                        };
+                    }
+                    checked.set(true);
+                    Ok(d)
+                };
+                let f0 = match rhs(a.x(), &y0) { Ok(v) => v, Err(e) => { restore(env); return Err(e); } };
+                let scale: Vec<f64> = y0.iter().zip(&f0).map(|(y, d)| y.abs().max(d.abs() * (b.x() - a.x())).max(1e-300)).collect();
+                let solved = crate::ode::solve(&mut rhs, a.x(), b.x(), y0, &scale);
+                restore(env);
+                let path = match solved {
+                    Ok(p) => p,
+                    Err(Some(e)) => return Err(e),
+                    Err(None) => return fail("The solution changes too fast to follow over this range (the equations may be stiff, or blow up): try a shorter range or other values.", span),
+                };
+                let sol = std::sync::Arc::new(crate::ode::Solved { path, dims: vals.iter().map(|v| v.dim).collect(), abs: vals.iter().map(|v| v.abs).collect(), tdim, tabs: a.abs });
+                // Each state is a function of time for the lines below; the line shows the values at the end.
+                let (end, _, _, _) = show_val(&b, "", f);
+                let (mut texts, mut texes) = (vec![], vec![]);
+                let last = sol.path.ys.last().cloned().unwrap_or_default();
+                for (k, (s, _, _)) in states.iter().enumerate() {
+                    let key = canon(s);
+                    env.funcs.remove(&key);
+                    env.progs.remove(&key);
+                    env.fitted.remove(&key);
+                    env.odes.insert(key.clone(), (sol.clone(), k, false));
+                    let (t, tx, _, _) = show_val(&Val { v: vec![last[k]], ..vals[k].clone() }, "", f);
+                    texts.push(format!("{key} = {t}"));
+                    texes.push(format!("{} = {tx}", latex::name(s)));
+                    known.push(s.clone());
+                }
+                // Each equation's own derivative (h' for h' = …, y'' for y'' = …) is a function too.
+                for (n, _) in eqs {
+                    let base = n.trim_end_matches('\'');
+                    let last = format!("{base}{}", "'".repeat(n.len() - base.len() - 1));
+                    if let Some(k) = states.iter().position(|s| s.0 == last) {
+                        let key = canon(n);
+                        env.funcs.remove(&key);
+                        env.progs.remove(&key);
+                        env.fitted.remove(&key);
+                        env.odes.insert(key, (sol.clone(), k, true));
+                        known.push(n.clone());
+                    }
+                }
+                o.name = canon(&states[0].0);
+                o.result = format!("at {} = {end}: {}", show(&canon(var)), texts.join(", "));
+                o.result_tex = format!("\\text{{at }} {} = {}:\\; {}", latex::name(var), show_val(&b, "", f).1, texes.join(",\\; "));
+                // A plot of the states themselves (not their derivatives) that share the first one's units.
+                let base: Vec<usize> = (0..states.len()).filter(|k| *k == 0 || states[k - 1].2 != Some(*k)).filter(|k| units::same(&vals[*k].dim, &vals[0].dim)).collect();
+                let n = 121;
+                let xs: Vec<f64> = (0..n).map(|i| a.x() + (b.x() - a.x()) * i as f64 / (n - 1) as f64).collect();
+                let mut p = PlotOut::default();
+                // The time axis in the unit of the end of the range (0 .. 10 min reads in min, not ms).
+                let (_, _, _, xu) = show_val(&b, "", f);
+                let (xk, xo, _) = units::display(b.x(), &shown_dim(&b), b.abs, &xu, f.us);
+                p.xs = xs.iter().map(|x| (x - xo) / xk).collect();
+                p.xlabel = show(&canon(var));
+                p.xunit = xu;
+                let mut big = 0.0f64;
+                for k in &base {
+                    let ys: Vec<f64> = xs.iter().map(|x| sol.path.at(*k, *x)).collect();
+                    big = ys.iter().fold(big, |m, v| m.max(v.abs()));
+                    p.series.push(Series { label: show(&canon(&states[*k].0)), ys, ..Default::default() });
+                }
+                let (yk, yo, yl) = units::display(big, &shown_dim(&vals[0]), vals[0].abs, &r.unit, f.us);
+                for s in &mut p.series { for v in &mut s.ys { *v = (*v - yo) / yk; } }
+                p.yunit = yl;
+                o.plot = Some(p);
+            }
             Stmt::Fit { name, var, model, xs, ys, params } => {
                 let (xv, yv) = (env.eval(xs)?, env.eval(ys)?);
                 for (v, n) in [(&xv, xs), (&yv, ys)] {
@@ -1483,6 +1652,7 @@ fn region(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>, subst: bo
                 o.name = canon(name);
                 env.exprs.remove(&canon(name));
                 env.progs.remove(&canon(name));
+                env.odes.remove(&canon(name));
                 env.funcs.insert(canon(name), (vec![var.clone()], model.clone()));
                 env.fitted.insert(canon(name), names.iter().cloned().zip(vals.iter().cloned()).collect());
                 known.push(name.clone());
@@ -1506,6 +1676,7 @@ fn region(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>, subst: bo
                 env.exprs.remove(&canon(name));
                 env.progs.remove(&canon(name));
                 env.fitted.remove(&canon(name));
+                env.odes.remove(&canon(name));
                 env.funcs.insert(canon(name), (params.clone(), e.clone()));
                 known.push(name.clone());
             }

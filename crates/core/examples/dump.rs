@@ -71,7 +71,8 @@ fn main() {
     fit.regions.push(datum_core::Region { id: 1, kind: Kind::Table, text: "Pump curve".into(), data: serde_json::json!({ "cols": tab["cols"], "rows": tab["rows"] }), ..Default::default() });
     fit.regions.push(datum_core::Region { id: 2, kind: Kind::Math, text: "fit H_f(q) = a + b*q + c*q^2 to Q, H".into(), ..Default::default() });
     fit.regions.push(datum_core::Region { id: 3, kind: Kind::Plot, text: "plot H_f(q), points(Q, H) for q in 0 m^3/h .. 170 m^3/h".into(), ..Default::default() });
-    fit.next_id = 4;
+    fit.regions.push(datum_core::Region { id: 4, kind: Kind::Math, text: "ode y'' = -y/(0.01 s^2) for t in 0 .. 1 s from y = 1 cm, y' = 0".into(), ..Default::default() });
+    fit.next_id = 5;
     let fit = serde_json::json!({ "sheet": fit, "calc": eval::run(&fit), "path": null, "dirty": false, "undo": false, "redo": false, "rev": 1 });
     let mut tabin = tab.clone();
     tabin["caption"] = "pump".into();

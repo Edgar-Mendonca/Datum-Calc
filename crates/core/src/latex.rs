@@ -5,6 +5,9 @@ use crate::parse::{Node, Stmt, E};
 
 /// A name: `sigma_allow` → σ_{allow}; one letter is italic, longer words upright.
 pub fn name(n: &str) -> String {
+    // Primes (x', y'' for derivatives) after the drawn name: an italic x with its primes, x_1'.
+    let core = n.trim_end_matches('\'');
+    if core.len() < n.len() && !core.is_empty() { return format!("{}{}", name(core), &n[core.len()..]); }
     let c = canon(n);
     let mut parts = c.split('_');
     let base = parts.next().unwrap_or("");
@@ -178,6 +181,12 @@ pub fn stmt_with(s: &Stmt, sub: &Sub) -> String {
             vars.iter().map(|v| format!("{} = {}", name(&v.0), node(&v.1))).collect::<Vec<_>>().join(",\\; ")),
         Stmt::Solve { lhs, rhs, var, lo, hi } => format!("{} = {} \\quad \\text{{for }} {} \\in \\left[{}, {}\\right]", node(lhs), node(rhs), name(var), node(lo), node(hi)),
         Stmt::Plot { ys, var, lo, hi, log } => format!("{} \\quad \\text{{for }} {} \\in \\left[{}, {}\\right]{}", ys.iter().map(&node).collect::<Vec<_>>().join(",\\; "), name(var), node(lo), node(hi), if *log { "\\;\\text{(log scale)}" } else { "" }),
+        Stmt::Ode { eqs, var, lo, hi, inits } => {
+            let e: Vec<String> = eqs.iter().map(|(n, x)| format!("{} = {}", name(n), node(x))).collect();
+            format!("{} \\quad \\text{{for }} {} \\in \\left[{}, {}\\right] \\quad \\text{{from }} {}",
+                if e.len() > 1 { format!("\\begin{{cases}} {} \\end{{cases}}", e.join(" \\\\ ")) } else { e.join("") },
+                name(var), node(lo), node(hi), inits.iter().map(|(n, x)| format!("{} = {}", name(n), node(x))).collect::<Vec<_>>().join(",\\; "))
+        }
         Stmt::Fit { name: n, var, model, xs, ys, params } => format!("{}\\left({}\\right) = {} \\quad \\text{{fitted to }} \\left({}, {}\\right){}", name(n), name(var), node(model), node(xs), node(ys),
             if params.iter().any(|p| p.1.is_some()) { format!(" \\quad \\text{{from }} {}", params.iter().filter_map(|p| p.1.as_ref().map(|g| format!("{} = {}", name(&p.0), node(g)))).collect::<Vec<_>>().join(",\\; ")) } else { String::new() }),
         Stmt::Show { e } => node(e),

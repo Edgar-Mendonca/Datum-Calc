@@ -52,6 +52,7 @@ const GLOSSARY: [string, [string, string][]][] = [
     ["Torque and energy", "Both are a force times a length. A force times a length, or a power over a speed, shows in N·m (lbf·ft); a power times a time shows in J (BTU). Either can be chosen in the unit menu."],
     ["Complex number", "A value with a real and an imaginary part, used for AC circuits: (3 + 4j) Ω, or 5 Ω∠53.13°. Shown as 3 + 4j, or as magnitude and angle with View › Polar."],
     ["Property functions", "water_…(two of T, p, h, s, x) for water and steam by IAPWS-IF97, and gas_…(gas, T) for air and common gases as ideal gases, with units."],
+    ["ode", "Differential equations in time (or any variable), solved with units from starting values; each state becomes a function of time, such as x(2 s)."],
     ["Fit", "fit f(x) = model to xs, ys: the model's parameters found by least squares from data, with units and R²; f is defined for the lines below."],
     ["Program region", "A region of several lines with if, else, for, while and break; the names it sets are defined below, or, with a first line such as f(x) =, it is a function that returns a value."],
     ["Material region", "A region that picks a material from the library and defines its properties as names with units (ρ_steel, E_steel, σ_y,steel), with their ranges and sources."],

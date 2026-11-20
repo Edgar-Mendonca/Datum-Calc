@@ -491,7 +491,7 @@ mod packs {
     #[test]
     fn all_packs_open_and_list() {
         let cards = crate::packs::cards();
-        assert_eq!(cards.len(), 29);
+        assert_eq!(cards.len(), 30);
         for c in &cards { assert!(!c.name.is_empty() && !c.desc.is_empty() && !c.field.is_empty() && c.checks > 0, "{}", c.id); }
     }
 
@@ -720,6 +720,18 @@ mod packs {
         assert!(close(v(&e, "Q_1") * 3600.0, 58.099_058_17, 1e-8) && close(v(&e, "Q_2") * 3600.0, 41.900_941_83, 1e-8));
         assert!(close(v(&e, "dp_12"), 21_069.487_2, 1e-8) && close(v(&e, "v_2"), 2.315_535_421, 1e-8));
         assert!(o.regions.iter().any(|r| r.result == "Q_1 = 58.1 m³/h, Q_2 = 41.9 m³/h") && checks(&o)[0].0);
+    }
+
+    #[test]
+    fn tank_drain() {
+        // Exact: √h = √h₀ − (C_d A_o/A_t) √(2g)/2 · t; A_o = 1.9635e-3 m²; empties at t_e = 786.94 s; after 10 min
+        // h = 0.112859 m ≥ 0.1 m; the outflow then is C_d A_o √(2gh) = 1.8104 L/s.
+        let (o, e) = run("tank-drain");
+        assert!(close(v(&e, "h_10"), 0.112_859_097_128_226, 1e-8) && close(v(&e, "h_x"), 0.112_859_097_128_226, 1e-12));
+        assert!(close(v(&e, "t_e"), 786.935_862_178, 1e-12) && checks(&o)[0].0);
+        let q = 0.62 * 0.001_963_495_408_49 * (2.0 * 9.80665 * 0.112_859_097_128f64).sqrt();
+        assert!(close(v(&e, "Q_10"), q, 1e-7) && o.regions.iter().all(|r| r.error.is_none()));
+        assert!(o.regions.iter().any(|r| r.plot.is_some()));
     }
 
     #[test]
@@ -1650,4 +1662,40 @@ fn reading_data_review() {
     assert_eq!(rows("Q,H\r1,2\r3,4", false).1, serde_json::json!([["1", "2"], ["3", "4"]]));
     let (c, r, _) = rows("Q (m3/h);H [m]", false);
     assert!(c == ["Q", "H"] && r == serde_json::json!([["", ""]]), "{c:?} {r}");
+}
+
+#[test]
+fn differential_equations() {
+    // Against exact solutions: decay x = e^(−t/τ); a spring y = A cos ωt, y' = −Aω sin ωt (ω = √(k/m) = 10 rad/s);
+    // cooling T = T_a + (T₀ − T_a) e^(−t/τ); a = e^t and b = e^t − 1 together (b' = a).
+    let close = |lines: &[&str], want: f64| {
+        let (o, env) = eval::run_env(&sheet(lines), &eval::Fmt { digits: 4, eng: false, us: false, polar: false, exact: false });
+        assert!(o.regions.iter().all(|r| r.error.is_none()), "{lines:?}: {:?}", o.regions.iter().filter_map(|r| r.error.clone()).collect::<Vec<_>>());
+        let got = env.vars.get("got").map(|v| v.x()).unwrap();
+        assert!(((got - want) / want).abs() < 1e-7, "{lines:?}: {got} against {want}");
+    };
+    close(&["tau = 2 s", "ode x' = -x/tau for t in 0 s .. 10 s from x = 1 m", "got = x(3.7 s)"], (-3.7f64 / 2.0).exp());
+    let spring = ["k = 100 N/m", "m_1 = 1 kg", "ode y'' = -k/m_1*y for t in 0 .. 1 s from y = 1 cm, y' = 0"];
+    close(&[spring[0], spring[1], spring[2], "got = y(0.73 s)"], 0.01 * (10.0f64 * 0.73).cos());
+    close(&[spring[0], spring[1], spring[2], "got = y'(0.05 s)"], -0.1 * (0.5f64).sin());
+    close(&["T_a = 20 °C", "ode T' = (T_a - T)/(600 s) for t in 0 .. 1 h from T = 80 °C", "got = T(10 min)"], 293.15 + 60.0 * (-1.0f64).exp());
+    close(&["ode a' = a/(1 s), b' = a for t in 0 .. 3 s from a = 1 m, b = 0 m*s", "got = b(3 s)"], 3f64.exp() - 1.0);
+    // What the line shows: the values at the end, and a plot of the states.
+    let o = run(&["T_a = 20 °C", "ode T' = (T_a - T)/(600 s) for t in 0 .. 1 h from T = 80 °C", "T(10 min)"]);
+    assert_eq!(o.regions[1].result, "at t = 1 h: T = 20.15 °C");
+    assert_eq!(o.regions[2].result, "42.07 °C", "an absolute temperature stays absolute");
+    assert!(o.regions[1].plot.as_ref().is_some_and(|p| p.series.len() == 1 && p.yunit == "°C" && p.xs.len() == 121));
+    assert_eq!(result(&[spring[0], spring[1], spring[2]]), "at t = 1 s: y = -8.391 mm, y' = 0.0544 m/s");
+    for (lines, msg) in [
+        (&["ode z' = z^2 for t in 0 .. 2 s from z = 1 Hz"][..], "The solution changes too fast to follow"),
+        (&["ode q' = 3 for t in 0 .. 1 s from q = 1 m"][..], "q' must be in a length per a time"),
+        (&["ode q'' = -q/(1 s^2) for t in 0 .. 1 s from q = 1 m"][..], "Give a starting value for q'"),
+        (&["ode u' = -u/(1 s) for t in 0 .. 1 s from u = 1 m, w = 2"][..], "w is not one of these equations' states: they are u."),
+        (&["ode u = -u for t in 0 .. 1 s from u = 1 m"][..], "Write each equation for a derivative"),
+        (&["ode u' = -u/(1 s) for t in 1 s .. 0 s from u = 1 m"][..], "The range must go from a smaller to a larger value."),
+        (&["ode u' = -u/(1 s) for t in 0 .. 1 s"][..], "Give the starting values after the range"),
+        (&["ode u'' = -u/(1 s^2) for t in 0 .. 1 s from u = 1 m, u' = 1 m"][..], "u' is the rate of u, so it is in a length per a time"),
+        (&["ode x' = -x/(2 s) for t in 0 s .. 10 s from x = 1 m", "x(20 s)"][..], "x is solved from 0 s to 10 s only."),
+        (&["ode x' = -x/(2 s) for t in 0 s .. 10 s from x = 1 m", "x(2 m)"][..], "x takes a time, not a length."),
+    ] { assert!(error(lines).starts_with(msg), "{lines:?}: {}", error(lines)); }
 }

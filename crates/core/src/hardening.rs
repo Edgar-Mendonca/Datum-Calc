@@ -223,6 +223,7 @@ fn random_expressions_never_panic() {
             let text = match r.below(6) {
                 0 => format!("check {e} <= {}", random_expr(&mut r, 2)),
                 1 if r.below(2) == 0 => format!("solve {e} = {}, x - y = {} for x = {}, y = {}", random_expr(&mut r, 2), random_expr(&mut r, 1), random_expr(&mut r, 1), random_expr(&mut r, 1)),
+                1 if r.below(4) == 0 => format!("ode x' = {} for t in {} .. {} from x = {}", ["-x/(2 s)", "x^2/(1 m*s)", "-x*b/(1 s)", "a/(1 s)", "sin(x/(1 m))*1 m/s"][r.below(5)], ["0", "1 s", "a"][r.below(3)], ["5 s", "1e9 s", "0 s", "b"][r.below(4)], random_expr(&mut r, 1)),
                 1 if r.below(3) == 0 => format!("fit ff(x) = {e} to {}, {}{}", ["v", "[1, 2, 3] m", "a", "[0, 1, 2]"][r.below(4)], ["[3, 2, 1]", "v", "[1, 2] s", "v*2"][r.below(4)], [" for a = 1 m, zz = 2", " for zz", ""][r.below(3)]),
                 1 => format!("solve {e} = {} for x in {} .. {}", random_expr(&mut r, 2), random_expr(&mut r, 1), random_expr(&mut r, 1)),
                 2 => format!("plot {e} for x in {} .. {}{}", ["0", "1 Hz", "a"][r.below(3)], random_expr(&mut r, 1), [" log", ""][r.below(2)]),

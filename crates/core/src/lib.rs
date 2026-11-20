@@ -3,6 +3,7 @@ pub mod eval;
 pub mod fluids;
 pub mod latex;
 pub mod materials;
+pub mod ode;
 pub mod packs;
 pub mod parse;
 pub mod prog;

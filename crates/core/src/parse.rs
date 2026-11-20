@@ -106,6 +106,9 @@ pub enum Stmt {
     /// A model fitted to data by least squares (0.2.7): `fit H(Q) = a + b*Q + c*Q^2 to Q_d, H_d`, its parameters
     /// found by name or listed after `for`, with starting guesses when the model is not linear in them.
     Fit { name: String, var: String, model: Node, xs: Node, ys: Node, params: Vec<(String, Option<Node>)> },
+    /// Differential equations (0.2.8): `ode x'' = -k/m*x for t in 0 s .. 10 s from x = 1 cm, x' = 0 m/s`, each
+    /// equation for the highest derivative of a state, and a starting value for every state and lower derivative.
+    Ode { eqs: Vec<(String, Node)>, var: String, lo: Node, hi: Node, inits: Vec<(String, Node)> },
     /// `log` after the range: a logarithmic x axis (a frequency sweep for a Bode plot).
     Plot { ys: Vec<Node>, var: String, lo: Node, hi: Node, log: bool },
     Show { e: Node },
@@ -197,7 +200,7 @@ impl P<'_> {
             let Some(Tok::Op(op)) = self.peek().cloned() else {
                 if let Some(t) = self.peek() {
                     let log_scale = matches!(t, Tok::Id(w) if w == "log") && !matches!(self.t.get(self.i + 1), Some((Tok::Op("("), _)));
-                    if !log_scale && (matches!(t, Tok::Num(_)) || matches!(t, Tok::Id(w) if w != "for" && w != "in" && w != "to")) {
+                    if !log_scale && (matches!(t, Tok::Num(_)) || matches!(t, Tok::Id(w) if w != "for" && w != "in" && w != "to" && w != "from")) {
                         let a = self.at();
                         let what = match t { Tok::Id(s) if lhs_is_num(&lhs) => format!("“{s}” is not a unit. Put * before it to multiply."), Tok::Id(s) => format!("Put an operator (such as *) before “{s}”."), _ => "Put an operator (such as *) before this number.".into() };
                         return err(what, a);
@@ -397,11 +400,25 @@ pub fn statement(s: &str, known: &[String]) -> Result<Stmt, Error> {
         if let Some((Tok::Id(n), _)) = t.get(k + 1) { names.push(n.clone()); }
         for j in k + 1..t.len() { if let (Tok::Id(n), Some((Tok::Op("="), _))) = (&t[j].0, t.get(j + 1)) { names.push(n.clone()); } }
     }
+    // Words written as units after a number (1 s, 2 kN*m) stay units; the other words are names.
+    let unit_at = {
+        let mut u = vec![false; t.len()];
+        for j in 1..t.len() {
+            if let Tok::Id(_) = t[j].0 {
+                u[j] = matches!(t[j - 1].0, Tok::Num(_)) || (j >= 2 && matches!(t[j - 1].0, Tok::Op("*" | "/")) && u[j - 2]);
+            }
+        }
+        u
+    };
+    if matches!(t.first().map(|x| &x.0), Some(Tok::Id(w)) if w == "ode") {
+        let to = t.iter().position(|x| x.0 == Tok::Id("for".into())).unwrap_or(t.len());
+        for (j, x) in t.iter().enumerate().take(to).skip(1) { if let Tok::Id(n) = &x.0 { if t.get(j + 1).map(|y| &y.0) != Some(&Tok::Op("(")) && !unit_at[j] { names.push(n.clone()); } } }
+    }
     // On a fit line the names in the model (a, h, t would otherwise read as units), its variable and the parameters
     // after "for" are names; the data and the guesses keep their units.
     if matches!(t.first().map(|x| &x.0), Some(Tok::Id(w)) if w == "fit") {
         let to = t.iter().position(|x| x.0 == Tok::Id("to".into())).unwrap_or(t.len());
-        for (j, x) in t.iter().enumerate().take(to).skip(2) { if let Tok::Id(n) = &x.0 { if t.get(j + 1).map(|y| &y.0) != Some(&Tok::Op("(")) { names.push(n.clone()); } } }
+        for (j, x) in t.iter().enumerate().take(to).skip(2) { if let Tok::Id(n) = &x.0 { if t.get(j + 1).map(|y| &y.0) != Some(&Tok::Op("(")) && !unit_at[j] { names.push(n.clone()); } } }
         if let Some(k) = t.iter().position(|x| x.0 == Tok::Id("for".into())) {
             for j in k + 1..t.len() { if let (Tok::Id(n), Some(prev)) = (&t[j].0, t.get(j - 1)) { if matches!(&prev.0, Tok::Op(",")) || j == k + 1 { names.push(n.clone()); } } }
         }
@@ -437,6 +454,28 @@ pub fn statement(s: &str, known: &[String]) -> Result<Stmt, Error> {
                 let (var, lo, hi) = p.for_in()?;
                 Stmt::Solve { lhs, rhs, var, lo, hi }
             }
+        }
+        (Tok::Id(w), Some(_)) if w == "ode" => {
+            p.i = 1;
+            let mut eqs = vec![];
+            loop {
+                let (n, at) = p.name()?;
+                if !n.ends_with('\'') { return err("Write each equation for a derivative: x' = … (or x'' = … for a second derivative).", at); }
+                p.eat("=")?;
+                eqs.push((n, p.expr(1)?));
+                if p.is(",") { p.i += 1; } else { break; }
+            }
+            let (var, lo, hi) = p.for_in()?;
+            if !p.word("from") { return err("Give the starting values after the range: … from x = 1 m, x' = 0 m/s.", p.at()); }
+            p.i += 1;
+            let mut inits = vec![];
+            loop {
+                let (n, _) = p.name()?;
+                p.eat("=")?;
+                inits.push((n, p.expr(1)?));
+                if p.is(",") { p.i += 1; } else { break; }
+            }
+            Stmt::Ode { eqs, var, lo, hi, inits }
         }
         (Tok::Id(w), Some(_)) if w == "fit" => {
             p.i = 1;
@@ -500,6 +539,7 @@ pub fn statement(s: &str, known: &[String]) -> Result<Stmt, Error> {
         Stmt::Solve { lhs, rhs, lo, hi, .. } => vec![lhs, rhs, lo, hi],
         Stmt::SolveSys { eqs, vars } => eqs.iter().flat_map(|(a, b)| [a, b]).chain(vars.iter().map(|v| &v.1)).collect(),
         Stmt::Plot { ys, lo, hi, .. } => ys.iter().chain([lo, hi]).collect(),
+        Stmt::Ode { eqs, lo, hi, inits, .. } => eqs.iter().map(|e| &e.1).chain([lo, hi]).chain(inits.iter().map(|i| &i.1)).collect(),
         Stmt::Fit { model, xs, ys, params, .. } => [model, xs, ys].into_iter().chain(params.iter().filter_map(|p| p.1.as_ref())).collect(),
         Stmt::Empty => vec![],
     };
