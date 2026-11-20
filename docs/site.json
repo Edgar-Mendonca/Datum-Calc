@@ -33,7 +33,8 @@
     "Vectors and matrices with units: a stiffness matrix in kN/m and loads in kN give displacements in m; multiply, transpose, inverse, determinant and linear systems.",
     "Small programs in a region: if, else, for, while and break with units, or a function that returns a value, such as a friction factor for any flow regime.",
     "Water and steam properties by IAPWS-IF97, and air and common gases, as functions with units: water_h(400 °C, 40 bar), water_x(0.1 bar, h), gas_cp(air, T).",
-    "Twenty-eight ready calc packs, each with its reference and a test against a worked example.",
+    "Data in and curve fitting: paste cells from a spreadsheet or read a CSV file into a table, fit a model to it by least squares with units, and plot the curve with the measured points.",
+    "Twenty-nine ready calc packs, each with its reference and a test against a worked example.",
     "Complex numbers for AC circuits in the frequency domain: impedances such as (8 + 9.42j) Ω, phasors as 230 V∠-30°, impedances in parallel, complex power, and Bode plots on a log frequency axis.",
     "Each equation can be shown again with its numbers put in, as on a hand calculation.",
     "Exact maths: fractions that stay fractions, and simplify, expand and factor on expressions.",
@@ -47,21 +48,21 @@
   ],
   "roadmap": [
     {
-      "v": "0.2.7",
-      "title": "Data in and curve fitting",
-      "when": "Next",
-      "items": [
-        "Paste or import CSV into tables",
-        "Linear, polynomial and exponential fits"
-      ]
-    },
-    {
       "v": "0.2.8",
       "title": "Differential equations",
-      "when": "Soon",
+      "when": "Next",
       "items": [
         "Equations in time with units",
         "Plotted over time"
+      ]
+    },
+    {
+      "v": "0.2.9–0.2.10",
+      "title": "Templates and export",
+      "when": "Soon",
+      "items": [
+        "Custom units, templates and a company title block",
+        "Export to Word and HTML"
       ]
     },
     {

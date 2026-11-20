@@ -223,6 +223,7 @@ fn random_expressions_never_panic() {
             let text = match r.below(6) {
                 0 => format!("check {e} <= {}", random_expr(&mut r, 2)),
                 1 if r.below(2) == 0 => format!("solve {e} = {}, x - y = {} for x = {}, y = {}", random_expr(&mut r, 2), random_expr(&mut r, 1), random_expr(&mut r, 1), random_expr(&mut r, 1)),
+                1 if r.below(3) == 0 => format!("fit ff(x) = {e} to {}, {}{}", ["v", "[1, 2, 3] m", "a", "[0, 1, 2]"][r.below(4)], ["[3, 2, 1]", "v", "[1, 2] s", "v*2"][r.below(4)], [" for a = 1 m, zz = 2", " for zz", ""][r.below(3)]),
                 1 => format!("solve {e} = {} for x in {} .. {}", random_expr(&mut r, 2), random_expr(&mut r, 1), random_expr(&mut r, 1)),
                 2 => format!("plot {e} for x in {} .. {}{}", ["0", "1 Hz", "a"][r.below(3)], random_expr(&mut r, 1), [" log", ""][r.below(2)]),
                 3 if r.below(3) == 0 => format!("w{} = {}((x + {e})^{} / (x - 1))", r.below(5), ["simplify", "expand", "factor"][r.below(3)], r.below(5)),
@@ -368,4 +369,20 @@ fn water_properties_never_panic_or_hang() {
     }
     let limit = if cfg!(debug_assertions) { 30.0 } else { 3.0 };
     assert!(t0.elapsed().as_secs_f64() < limit, "{:?}", t0.elapsed());
+}
+
+#[test]
+fn pasted_text_never_panics() {
+    // Random cells, separators, quotes, units and line ends through the table reader: a table or a message.
+    let mut r = Rng(0x7AB1_E1A5_0007);
+    let bits = ["1", "-2,5", "3.25e3", "\"a,b\"", "\"\"", "Q (m3/h)", "H [m]", "x (furlongs)", "é", "∞", "", " ", "1e999", "(", "]", "m3", "kg/m3", "NaN", "\u{feff}"];
+    let seps = ["\t", ";", ",", " ", "\"", "\r\n", "\n", "\r"];
+    for _ in 0..3000 {
+        let n = r.below(60);
+        let t: String = (0..n).map(|_| if r.below(3) == 0 { seps[r.below(8)] } else { bits[r.below(19)] }).collect();
+        if let Ok(v) = crate::tabin::parse(&t) {
+            let w = v["cols"].as_array().unwrap().len();
+            assert!(w <= 50 && v["rows"].as_array().unwrap().iter().all(|row| row.as_array().unwrap().len() == w), "{t:?}");
+        }
+    }
 }

@@ -65,5 +65,15 @@ fn main() {
     }
     mat.next_id = 5;
     let mat = serde_json::json!({ "sheet": mat, "calc": eval::run(&mat), "path": null, "dirty": false, "undo": false, "redo": false, "rev": 1 });
-    println!("{}", serde_json::json!({ "state": state, "packs": datum_core::packs::cards(), "ac": ac, "rc": rc, "alg": alg, "mat": mat }));
+    // Data in and a fit (0.2.7): a table read from text, a fitted curve and the measured points on one plot.
+    let tab = datum_core::tabin::parse("Q (m3/h)\tH [m]\n0\t50.3\n40\t46.5\n80\t37.4\n120\t20.9\n160\t-1\n").unwrap_or_default();
+    let mut fit = Sheet::new("Fit");
+    fit.regions.push(datum_core::Region { id: 1, kind: Kind::Table, text: "Pump curve".into(), data: serde_json::json!({ "cols": tab["cols"], "rows": tab["rows"] }), ..Default::default() });
+    fit.regions.push(datum_core::Region { id: 2, kind: Kind::Math, text: "fit H_f(q) = a + b*q + c*q^2 to Q, H".into(), ..Default::default() });
+    fit.regions.push(datum_core::Region { id: 3, kind: Kind::Plot, text: "plot H_f(q), points(Q, H) for q in 0 m^3/h .. 170 m^3/h".into(), ..Default::default() });
+    fit.next_id = 4;
+    let fit = serde_json::json!({ "sheet": fit, "calc": eval::run(&fit), "path": null, "dirty": false, "undo": false, "redo": false, "rev": 1 });
+    let mut tabin = tab.clone();
+    tabin["caption"] = "pump".into();
+    println!("{}", serde_json::json!({ "state": state, "packs": datum_core::packs::cards(), "ac": ac, "rc": rc, "alg": alg, "mat": mat, "fit": fit, "tabin": tabin }));
 }

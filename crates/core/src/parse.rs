@@ -103,6 +103,9 @@ pub enum Stmt {
     /// Several equations for as many unknowns, each from a starting guess (which gives its unit):
     /// `solve x + y = 3, x - y = 1 for x = 0, y = 0`.
     SolveSys { eqs: Vec<(Node, Node)>, vars: Vec<(String, Node)> },
+    /// A model fitted to data by least squares (0.2.7): `fit H(Q) = a + b*Q + c*Q^2 to Q_d, H_d`, its parameters
+    /// found by name or listed after `for`, with starting guesses when the model is not linear in them.
+    Fit { name: String, var: String, model: Node, xs: Node, ys: Node, params: Vec<(String, Option<Node>)> },
     /// `log` after the range: a logarithmic x axis (a frequency sweep for a Bode plot).
     Plot { ys: Vec<Node>, var: String, lo: Node, hi: Node, log: bool },
     Show { e: Node },
@@ -194,7 +197,7 @@ impl P<'_> {
             let Some(Tok::Op(op)) = self.peek().cloned() else {
                 if let Some(t) = self.peek() {
                     let log_scale = matches!(t, Tok::Id(w) if w == "log") && !matches!(self.t.get(self.i + 1), Some((Tok::Op("("), _)));
-                    if !log_scale && (matches!(t, Tok::Num(_)) || matches!(t, Tok::Id(w) if w != "for" && w != "in")) {
+                    if !log_scale && (matches!(t, Tok::Num(_)) || matches!(t, Tok::Id(w) if w != "for" && w != "in" && w != "to")) {
                         let a = self.at();
                         let what = match t { Tok::Id(s) if lhs_is_num(&lhs) => format!("“{s}” is not a unit. Put * before it to multiply."), Tok::Id(s) => format!("Put an operator (such as *) before “{s}”."), _ => "Put an operator (such as *) before this number.".into() };
                         return err(what, a);
@@ -385,6 +388,15 @@ pub fn statement(s: &str, known: &[String]) -> Result<Stmt, Error> {
         if let Some((Tok::Id(n), _)) = t.get(k + 1) { names.push(n.clone()); }
         for j in k + 1..t.len() { if let (Tok::Id(n), Some((Tok::Op("="), _))) = (&t[j].0, t.get(j + 1)) { names.push(n.clone()); } }
     }
+    // On a fit line the names in the model (a, h, t would otherwise read as units), its variable and the parameters
+    // after "for" are names; the data and the guesses keep their units.
+    if matches!(t.first().map(|x| &x.0), Some(Tok::Id(w)) if w == "fit") {
+        let to = t.iter().position(|x| x.0 == Tok::Id("to".into())).unwrap_or(t.len());
+        for (j, x) in t.iter().enumerate().take(to).skip(2) { if let Tok::Id(n) = &x.0 { if t.get(j + 1).map(|y| &y.0) != Some(&Tok::Op("(")) { names.push(n.clone()); } } }
+        if let Some(k) = t.iter().position(|x| x.0 == Tok::Id("for".into())) {
+            for j in k + 1..t.len() { if let (Tok::Id(n), Some(prev)) = (&t[j].0, t.get(j - 1)) { if matches!(&prev.0, Tok::Op(",")) || j == k + 1 { names.push(n.clone()); } } }
+        }
+    }
     if t.len() > MAX_TOKENS { return err(format!("This line is too long (more than {MAX_TOKENS} symbols): split it over several lines."), (0, s2.chars().count())); }
     let mut p = P { end: s2.chars().count(), t, i: 0, known: &names, depth: 0 };
     let st = match (&p.t[0].0, p.t.get(1).map(|x| &x.0)) {
@@ -416,6 +428,31 @@ pub fn statement(s: &str, known: &[String]) -> Result<Stmt, Error> {
                 let (var, lo, hi) = p.for_in()?;
                 Stmt::Solve { lhs, rhs, var, lo, hi }
             }
+        }
+        (Tok::Id(w), Some(_)) if w == "fit" => {
+            p.i = 1;
+            let (name, _) = p.name()?;
+            p.eat("(")?;
+            let (var, _) = p.name()?;
+            p.eat(")")?;
+            p.eat("=")?;
+            let model = p.expr(1)?;
+            if !p.word("to") { return err("Give the data after the model: fit H(Q) = a + b*Q to Q_d, H_d.", p.at()); }
+            p.i += 1;
+            let xs = p.expr(1)?;
+            p.eat(",")?;
+            let ys = p.expr(1)?;
+            let mut params = vec![];
+            if p.word("for") {
+                p.i += 1;
+                loop {
+                    let (n, _) = p.name()?;
+                    let g = if p.is("=") { p.i += 1; Some(p.expr(2)?) } else { None };
+                    params.push((n, g));
+                    if p.is(",") { p.i += 1; } else { break; }
+                }
+            }
+            Stmt::Fit { name, var, model, xs, ys, params }
         }
         (Tok::Id(w), Some(_)) if w == "plot" => {
             p.i = 1;
@@ -454,6 +491,7 @@ pub fn statement(s: &str, known: &[String]) -> Result<Stmt, Error> {
         Stmt::Solve { lhs, rhs, lo, hi, .. } => vec![lhs, rhs, lo, hi],
         Stmt::SolveSys { eqs, vars } => eqs.iter().flat_map(|(a, b)| [a, b]).chain(vars.iter().map(|v| &v.1)).collect(),
         Stmt::Plot { ys, lo, hi, .. } => ys.iter().chain([lo, hi]).collect(),
+        Stmt::Fit { model, xs, ys, params, .. } => [model, xs, ys].into_iter().chain(params.iter().filter_map(|p| p.1.as_ref())).collect(),
         Stmt::Empty => vec![],
     };
     if nodes.iter().any(|n| depth(n) > MAX_DEPTH) { return err("This line is too long to work out: split it over several lines.", (0, p.end)); }

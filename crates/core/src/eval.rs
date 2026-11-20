@@ -91,7 +91,7 @@ pub const FLUID_FUNCTIONS: [(&str, &str); 27] = [
 /// A built-in function's name (not one of the sheet's own).
 pub fn builtin_name(k: &str) -> bool { FUNCTIONS.iter().chain(FLUID_FUNCTIONS.iter()).any(|f| f.0.split('(').next() == Some(k)) || ["gas_M", "gas_R", "gas_nu"].contains(&k) }
 
-pub const FUNCTIONS: [(&str, &str); 47] = [
+pub const FUNCTIONS: [(&str, &str); 48] = [
     ("sqrt(x)", "square root"), ("cbrt(x)", "cube root"), ("abs(x)", "absolute value"), ("exp(x)", "e to the power x"), ("ln(x)", "natural logarithm"), ("log(x)", "logarithm base 10"),
     ("sin(x)", "sine (x in rad, or with deg)"), ("cos(x)", "cosine"), ("tan(x)", "tangent"), ("asin(x)", "inverse sine (an angle)"), ("acos(x)", "inverse cosine"), ("atan(x)", "inverse tangent"),
     ("atan2(y, x)", "angle of the point (x, y)"), ("sinh(x)", "hyperbolic sine"), ("cosh(x)", "hyperbolic cosine"), ("tanh(x)", "hyperbolic tangent"),
@@ -105,6 +105,7 @@ pub const FUNCTIONS: [(&str, &str); 47] = [
     ("factor(e)", "an expression as a product: x² − 1 → (x − 1)(x + 1)"),
     ("transpose(M)", "rows and columns swapped"), ("inv(M)", "inverse of a square matrix (also M^-1)"), ("det(M)", "determinant of a square matrix"),
     ("lsolve(A, b)", "x with A x = b, a linear system"), ("identity(n)", "the n × n identity matrix"), ("dot(a, b)", "dot product of two vectors"),
+    ("points(xs, ys)", "measured points on a plot, beside the curves: plot H(Q), points(Q_d, H_d) for Q in …"),
     ("cross(a, b)", "cross product of two 3-vectors"), ("norm(v)", "length of a vector (Frobenius norm of a matrix)"), ("rows(M)", "number of rows"), ("cols(M)", "number of columns"),
 ];
 
@@ -273,6 +274,7 @@ impl Env {
         }
         let n = args.len();
         let want = |m: usize| -> R<()> { if n == m { Ok(()) } else { fail(format!("{f} takes {m} value{}.", if m == 1 { "" } else { "s" }), at) } };
+        if f == "points" { return fail("points(xs, ys) marks measured values on a plot: plot H(Q), points(Q_d, H_d) for Q in 0 .. 150 m^3/h.", at); }
         if crate::sym::OPS.contains(&f) { return fail(format!("{f} gives an expression, not a value: write it on its own line, such as {f}((x + 1)^2) or y = {f}(…)."), at); }
         if f == "if" {
             want(3)?;
@@ -771,7 +773,15 @@ fn builtin(f: &str, a: Vec<Val>, at: Span) -> R<Val> {
 pub struct CheckOut { pub pass: bool, pub ratio: Option<f64>, pub lhs: String, pub rhs: String, pub op: String }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Default)]
-pub struct Series { pub label: String, pub ys: Vec<f64> }
+pub struct Series {
+    pub label: String,
+    pub ys: Vec<f64>,
+    /// Measured points (points(xs, ys)): their own x values, drawn as markers without a line.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub xs: Vec<f64>,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub points: bool,
+}
 
 #[derive(Debug, Clone, Serialize, PartialEq, Default)]
 pub struct PlotOut { pub xs: Vec<f64>, pub xlabel: String, pub xunit: String, pub series: Vec<Series>, pub yunit: String, pub logx: bool }
@@ -1085,9 +1095,62 @@ fn program(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>, o: &mut 
     }
 }
 
+/// Every name in an expression.
+fn names_in(n: &Node, out: &mut Vec<String>) {
+    match &n.e {
+        E::Var(v) => out.push(v.clone()),
+        E::Neg(a) | E::Group(a) | E::Unit(a, _) | E::Im(_, a) => names_in(a, out),
+        E::Bin(_, a, b) => { names_in(a, out); names_in(b, out); }
+        E::Call(_, a) => a.iter().for_each(|x| names_in(x, out)),
+        E::Mat(_, rows) => rows.iter().flatten().for_each(|x| names_in(x, out)),
+        E::Index(a, i) => { names_in(a, out); i.iter().for_each(|x| names_in(x, out)); }
+        E::Num(..) => {}
+    }
+}
+
+/// A model as a sum of signed terms: a + b*Q − c*Q^2 → (+, a), (+, b*Q), (−, c*Q^2).
+fn terms<'a>(n: &'a Node, sign: f64, out: &mut Vec<(f64, &'a Node)>) {
+    match &n.e {
+        E::Bin("+", a, b) => { terms(a, sign, out); terms(b, sign, out); }
+        E::Bin("-", a, b) => { terms(a, sign, out); terms(b, -sign, out); }
+        E::Neg(a) => terms(a, -sign, out),
+        E::Group(a) => terms(a, sign, out),
+        _ => out.push((sign, n)),
+    }
+}
+
+/// Which parameter a term is proportional to: Some(None) for a term with none, Some(Some(j)) when parameter j
+/// appears once as a factor (b, b*Q, Q^2*c, b*Q/D), None when the term is not linear in the parameters.
+fn factor_of(t: &Node, names: &[String]) -> Option<Option<usize>> {
+    let mut all = vec![];
+    names_in(t, &mut all);
+    let used: Vec<usize> = all.iter().filter_map(|n| names.iter().position(|p| *p == canon(n))).collect();
+    if used.is_empty() { return Some(None); }
+    if used.len() != 1 { return None; }
+    let p = &names[used[0]];
+    fn has(n: &Node, p: &str) -> bool { let mut a = vec![]; names_in(n, &mut a); a.iter().any(|x| canon(x) == p) }
+    fn factor(n: &Node, p: &str) -> bool {
+        match &n.e {
+            E::Var(v) => canon(v) == p,
+            E::Group(a) | E::Neg(a) => factor(a, p),
+            E::Bin("*", a, b) => (factor(a, p) && !has(b, p)) || (factor(b, p) && !has(a, p)),
+            E::Bin("/", a, b) => factor(a, p) && !has(b, p),
+            _ => false,
+        }
+    }
+    factor(t, p).then_some(Some(used[0]))
+}
+
 /// Every name a line defines: one, or the unknowns of `solve … for x = g, y = g`.
 fn defined_names(t: &str) -> Vec<String> {
     let Ok(toks) = parse::lex(t) else { return vec![] };
+    if matches!(toks.first().map(|x| &x.0), Some(parse::Tok::Id(w)) if w == "fit") {
+        let mut out: Vec<String> = toks.get(1).and_then(|x| if let parse::Tok::Id(n) = &x.0 { Some(n.clone()) } else { None }).into_iter().collect();
+        if let Some(k) = toks.iter().position(|x| x.0 == parse::Tok::Id("for".into())) {
+            for j in k + 1..toks.len() { if let (parse::Tok::Id(n), Some(prev)) = (&toks[j].0, toks.get(j - 1)) { if matches!(&prev.0, parse::Tok::Op(",")) || prev.0 == parse::Tok::Id("for".into()) { out.push(n.clone()); } } }
+        }
+        return out;
+    }
     if matches!(toks.first().map(|x| &x.0), Some(parse::Tok::Id(w)) if w == "solve") {
         if let Some(k) = toks.iter().position(|x| x.0 == parse::Tok::Id("for".into())) {
             let sys: Vec<String> = (k + 1..toks.len()).filter_map(|j| match (&toks[j].0, toks.get(j + 1).map(|x| &x.0)) { (parse::Tok::Id(n), Some(parse::Tok::Op("="))) => Some(n.clone()), _ => None }).collect();
@@ -1170,7 +1233,7 @@ fn region(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>, subst: bo
         return o;
     }
     // j and i, when they are the imaginary unit rather than a name of the sheet, are drawn upright like a unit.
-    let bound: Vec<&str> = match &st { Stmt::Func { params, .. } => params.iter().map(|p| p.as_str()).collect(), Stmt::Solve { var, .. } | Stmt::Plot { var, .. } => vec![var.as_str()], Stmt::SolveSys { vars, .. } => vars.iter().map(|v| v.0.as_str()).collect(), _ => vec![] };
+    let bound: Vec<&str> = match &st { Stmt::Func { params, .. } => params.iter().map(|p| p.as_str()).collect(), Stmt::Solve { var, .. } | Stmt::Plot { var, .. } => vec![var.as_str()], Stmt::SolveSys { vars, .. } => vars.iter().map(|v| v.0.as_str()).collect(), Stmt::Fit { var, .. } => vec![var.as_str()], _ => vec![] };
     o.latex = latex::stmt_with(&st, &|v| imag_unit(env, v).filter(|_| !bound.contains(&v)));
     // simplify, expand and factor give an exact expression, not a value.
     let sym_call = |e: &Node| match &e.e { E::Call(fname, args) if crate::sym::OPS.contains(&fname.as_str()) && args.len() == 1 => Some((fname.clone(), args[0].clone())), _ => None };
@@ -1206,6 +1269,172 @@ fn region(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>, subst: bo
     let res: R<()> = (|| {
         match &st {
             Stmt::Empty => {}
+            Stmt::Fit { name, var, model, xs, ys, params } => {
+                let (xv, yv) = (env.eval(xs)?, env.eval(ys)?);
+                for (v, n) in [(&xv, xs), (&yv, ys)] {
+                    real(v, "fit", n.at)?;
+                    if !v.vec || v.mat() { return fail("The data are two vectors of the same length, such as two columns of a table.", n.at); }
+                }
+                let m = xv.v.len();
+                if yv.v.len() != m { return fail(format!("The data have {m} x values and {} y values: they need the same number.", yv.v.len()), (xs.at.0, ys.at.1)); }
+                // The parameters: as listed, or every name in the model the sheet does not define (not the variable, not a constant).
+                let names: Vec<String> = if params.is_empty() {
+                    let mut all = vec![];
+                    names_in(model, &mut all);
+                    let mut ps: Vec<String> = vec![];
+                    for n in all { let k = canon(&n); if k != canon(var) && !env.vars.contains_key(&k) && constant(&k).is_none() && imag_unit(env, &n).is_none() && !ps.contains(&k) { ps.push(k); } }
+                    ps
+                } else { params.iter().map(|p| canon(&p.0)).collect() };
+                if names.is_empty() {
+                    let mut all = vec![];
+                    names_in(model, &mut all);
+                    let mut taken: Vec<String> = all.iter().map(|n| canon(n)).filter(|k| *k != canon(var) && env.vars.contains_key(k)).collect();
+                    taken.dedup();
+                    return fail(if taken.is_empty() { "This model has nothing to fit: name its parameters, such as a + b*Q.".to_string() } else { format!("Every name in this model is defined on the sheet already: list the parameters to fit after for, such as … for {}.", taken.join(", ")) }, model.at);
+                }
+                if names.len() > 10 { return fail("A fit has at most 10 parameters.", model.at); }
+                if m < names.len() { return fail(format!("{} parameters need at least {} data points; there are {m}.", names.len(), names.len()), (xs.at.0, ys.at.1)); }
+                if m > 100_000 { return fail("A fit takes at most 100,000 points.", (xs.at.0, ys.at.1)); }
+                let mut keys: Vec<String> = names.clone();
+                keys.push(canon(var));
+                let saved: Vec<Option<Val>> = keys.iter().map(|k| env.vars.get(k).cloned()).collect();
+                let restore = |env: &mut Env| for (k, s) in keys.iter().zip(&saved) { match s { Some(v) => { env.vars.insert(k.clone(), v.clone()); } None => { env.vars.remove(k); } } };
+                let xi = |i: usize| Val { v: vec![xv.v[i]], dim: xv.dim, abs: xv.abs, ..Default::default() };
+                let units_out: std::cell::RefCell<Vec<String>> = Default::default();
+                let found: R<(Vec<Val>, f64)> = (|| {
+                    let mut ts = vec![];
+                    terms(model, 1.0, &mut ts);
+                    let lin: Option<Vec<Option<usize>>> = ts.iter().map(|(_, t)| factor_of(t, &names)).collect();
+                    let guesses = params.iter().all(|p| p.1.is_some()) && !params.is_empty();
+                    match lin {
+                        // Linear in its parameters: y − (known terms) = Σ p_j g_j(x), solved at once; each p_j takes y's units over g_j's.
+                        Some(which) if !guesses => {
+                            let (mut a, mut b) = (vec![vec![0.0; names.len()]; m], vec![0.0; m]);
+                            let mut gdim: Vec<Option<Dim>> = vec![None; names.len()];
+                            for i in 0..m {
+                                env.vars.insert(canon(var), xi(i));
+                                let mut rest = yv.v[i];
+                                for ((sign, t), w) in ts.iter().zip(&which) {
+                                    if let Some(j) = w { env.vars.insert(names[*j].clone(), Val::plain(1.0)); }
+                                    let g = env.eval(t)?;
+                                    real(&g, "fit", t.at)?;
+                                    if g.vec { return fail("Each term of the model is one value at each point.", t.at); }
+                                    match w {
+                                        Some(j) => {
+                                            if gdim[*j].is_some_and(|d| !units::same(&d, &g.dim)) { return fail(format!("{} multiplies terms in different units, so it cannot have one unit.", show(&names[*j])), t.at); }
+                                            gdim[*j] = Some(g.dim);
+                                            a[i][*j] += sign * g.x();
+                                        }
+                                        None => { same_or(&yv, &g, "subtract", t.at)?; rest -= sign * g.x(); }
+                                    }
+                                }
+                                b[i] = rest;
+                            }
+                            let p = crate::solve::lstsq(&a, &b).ok_or_else(|| Error { msg: "The data do not fix every parameter (they are not independent here): check the model, or give more points with different x values.".into(), at: model.at })?;
+                            let vals: Vec<Val> = p.iter().zip(&gdim).map(|(v, d)| Val::num(*v, units::div(&yv.dim, &d.unwrap_or(NONE)))).collect();
+                            {
+                                    let shown = |n: &Node, v: &Val| match &n.e { E::Var(k) => env.shown.get(&canon(k)).cloned(), _ => None }.unwrap_or_else(|| show_val(v, "", f).3);
+                                    let (yu, xu) = (shown(ys, &yv), shown(xs, &xv));
+                                    *units_out.borrow_mut() = gdim.iter().map(|d| {
+                                        let d = d.unwrap_or(NONE);
+                                        if units::is_none(&d) { return yu.clone(); }
+                                        (-4i8..=4).filter(|k| *k != 0).find(|k| units::same(&units::pow(&xv.dim, *k), &d)).map(|k| {
+                                            let yy = if yu.is_empty() { "1".to_string() } else { yu.clone() };
+                                            // Brackets only around a compound unit: m/s, m/(m³/h).
+                                            let xu = if xu.contains(['/', '·', '*', ' ']) { format!("({xu})") } else { xu.clone() };
+                                            match k { 1 => format!("{yy}/{xu}"), -1 => format!("{yy}*{xu}"), k if k > 0 => format!("{yy}/{xu}^{k}"), k => format!("{yy}*{xu}^{}", -k) }
+                                        }).unwrap_or_default()
+                                    }).collect();
+                            }
+                            Ok((vals, 0.0))
+                        }
+                        // Not linear (or guesses given): Levenberg–Marquardt from the guesses, which give the units.
+                        _ => {
+                            let gs: Vec<Val> = names.iter().map(|n| params.iter().find(|p| canon(&p.0) == *n).and_then(|p| p.1.as_ref())).map(|g| g.map(|g| env.eval(g))).collect::<Option<R<Vec<Val>>>>().ok_or_else(|| Error { msg: format!("This model is not linear in its parameters: give each a starting guess, such as fit {name}({var}) = … to …, … for {} = 1, …", names[0]), at: model.at })??;
+                            for (g, p) in gs.iter().zip(params) { real(g, "A starting guess", p.1.as_ref().map(|n| n.at).unwrap_or(model.at))?; if g.vec { return fail("A starting guess is one value.", model.at); } }
+                            let cs: Vec<f64> = gs.iter().map(|g| if g.x() != 0.0 { g.x().abs() } else { 1.0 }).collect();
+                            let ys_scale = (yv.v.iter().map(|v| v * v).sum::<f64>() / m as f64).sqrt().max(1e-300);
+                            let resid = |env: &mut Env, p: &[f64]| -> R<Vec<f64>> {
+                                for (k, (n, g)) in names.iter().zip(&gs).enumerate() { env.vars.insert(n.clone(), Val { v: vec![p[k]], ..g.clone() }); }
+                                (0..m).map(|i| {
+                                    env.vars.insert(canon(var), xi(i));
+                                    let f = env.eval(model)?;
+                                    real(&f, "fit", model.at)?;
+                                    if f.vec { return fail("The model is one value at each point.", model.at); }
+                                    same_or(&yv, &f, "compare", model.at)?;
+                                    Ok((f.x() - yv.v[i]) / ys_scale)
+                                }).collect()
+                            };
+                            let mut p: Vec<f64> = gs.iter().map(|g| g.x()).collect();
+                            let mut r = resid(env, &p)?;
+                            if r.iter().any(|v| !v.is_finite()) { return fail("The model cannot be worked out at every point from these guesses.", model.at); }
+                            let ss = |r: &[f64]| r.iter().map(|v| v * v).sum::<f64>();
+                            let mut lam: f64 = 1e-3;
+                            for _ in 0..300 {
+                                // The Jacobian in relative parameters, then a damped step, the damping eased when a step helps.
+                                let mut jac = vec![vec![0.0; p.len()]; m];
+                                for j in 0..p.len() {
+                                    let h = 1e-7 * if p[j] != 0.0 { p[j].abs() } else { cs[j] };
+                                    let mut ph = p.clone();
+                                    ph[j] += h;
+                                    let rh = resid(env, &ph)?;
+                                    for i in 0..m { jac[i][j] = (rh[i] - r[i]) / h * cs[j]; }
+                                }
+                                let mut improved = false;
+                                for _ in 0..30 {
+                                    let mut aug = jac.clone();
+                                    let mut rhs: Vec<f64> = r.iter().map(|v| -v).collect();
+                                    for j in 0..p.len() { let d = (jac.iter().map(|row| row[j] * row[j]).sum::<f64>()).sqrt().max(1e-12); let mut row = vec![0.0; p.len()]; row[j] = lam.sqrt() * d; aug.push(row); rhs.push(0.0); }
+                                    let Some(dy) = crate::solve::lstsq(&aug, &rhs) else { lam *= 10.0; continue };
+                                    let pn: Vec<f64> = p.iter().zip(&dy).zip(&cs).map(|((a, d), c)| a + d * c).collect();
+                                    match resid(env, &pn) {
+                                        Ok(rn) if rn.iter().all(|v| v.is_finite()) && ss(&rn) < ss(&r) => {
+                                            let small = dy.iter().all(|d| d.abs() < 1e-12) || (ss(&r) - ss(&rn)) <= 1e-15 * ss(&r).max(1e-300);
+                                            p = pn; r = rn; lam = (lam / 10.0).max(1e-12); improved = !small;
+                                            break;
+                                        }
+                                        _ => lam *= 10.0,
+                                    }
+                                }
+                                if !improved { break; }
+                            }
+                            Ok((p.iter().zip(&gs).map(|(v, g)| Val { v: vec![*v], ..g.clone() }).collect(), 0.0))
+                        }
+                    }
+                })();
+                let (vals, _) = match found { Ok(x) => x, Err(e) => { restore(env); return Err(e); } };
+                // How well it fits: R² = 1 − Σ(y − f)²/Σ(y − ȳ)².
+                for (n, v) in names.iter().zip(&vals) { env.vars.insert(n.clone(), v.clone()); }
+                let mut sse = 0.0;
+                for i in 0..m {
+                    env.vars.insert(canon(var), xi(i));
+                    match env.eval(model) { Ok(f) => sse += (f.x() - yv.v[i]).powi(2), Err(e) => { restore(env); return Err(e); } }
+                }
+                let mean = yv.v.iter().sum::<f64>() / m as f64;
+                let sst: f64 = yv.v.iter().map(|y| (y - mean).powi(2)).sum();
+                match saved.last().cloned().flatten() { Some(v) => { env.vars.insert(canon(var), v); } None => { env.vars.remove(&canon(var)); } }
+                let (mut texts, mut texes) = (vec![], vec![]);
+                let want = units_out.into_inner();
+                for (k, (n, v)) in names.iter().zip(&vals).enumerate() {
+                    let w = want.get(k).filter(|u| !u.is_empty() && units::parse(u).is_ok_and(|x| units::same(&x.dim, &v.dim))).map(|u| u.as_str()).unwrap_or("");
+                    let (t, tx, value, unit) = show_val(v, w, f);
+                    texts.push(format!("{n} = {t}"));
+                    texes.push(format!("{} = {tx}", latex::name(n)));
+                    o.defs.push(VarOut { name: n.clone(), tex: latex::name(n), value, unit: unit.clone(), id: r.id });
+                    if !unit.is_empty() { env.shown.insert(n.clone(), unit); }
+                    env.exprs.remove(n);
+                    known.push(n.clone());
+                }
+                let r2 = if sst > 0.0 { 1.0 - sse / sst } else { 1.0 };
+                let r2t = format!("{:.4}", r2);
+                o.result = format!("{}; R² = {r2t}", texts.join(", "));
+                o.result_tex = format!("\\Rightarrow\\; {},\\quad R^2 = {r2t}", texes.join(",\\; "));
+                o.name = canon(name);
+                env.exprs.remove(&canon(name));
+                env.progs.remove(&canon(name));
+                env.funcs.insert(canon(name), (vec![var.clone()], model.clone()));
+                known.push(name.clone());
+            }
             Stmt::Assign { name, e, .. } => {
                 o.name = canon(name);
                 let v = env.eval(e)?;
@@ -1400,6 +1629,19 @@ fn region(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>, subst: bo
                 // Each curve's angle tag as shown, so f (cycles) and ω (radians) on one plot share the axis' reading.
                 let mut tags: Vec<i8> = vec![];
                 for y in ys {
+                    // Measured points: two vectors drawn as markers, the x values in the plot's own unit.
+                    if let E::Call(fname, args) = &y.e {
+                        if fname == "points" {
+                            if args.len() != 2 { res = fail("points takes two vectors: points(Q_d, H_d).", y.at); break; }
+                            let (px, py) = match (env.eval(&args[0]), env.eval(&args[1])) { (Ok(a), Ok(b)) => (a, b), (Err(e), _) | (_, Err(e)) => { res = Err(e); break; } };
+                            if px.cx() || py.cx() || px.mat() || py.mat() || px.v.len() != py.v.len() { res = fail("points takes two real vectors of the same length.", y.at); break; }
+                            if !units::same(&px.dim, &a.dim) { res = fail(format!("The points' x values are {}, the plot's x is {}.", dim_name(&px.dim), dim_name(&a.dim)), args[0].at); break; }
+                            if let Some((d, _)) = &ydim { if !units::same(d, &py.dim) { res = fail("Every curve on a plot must have the same units.", y.at); break; } } else { ydim = Some((shown_dim(&py), py.abs)); }
+                            p.series.push(Series { label: latex::plain(&args[1]), ys: py.v.clone(), xs: px.v.iter().map(|x| (x - xo) / xk).collect(), points: true });
+                            tags.push(shown_dim(&py)[7]);
+                            continue;
+                        }
+                    }
                     let mut vals = vec![];
                     let mut tag = 0;
                     for x in &xs {
@@ -1415,7 +1657,7 @@ fn region(env: &mut Env, r: &Region, f: &Fmt, known: &mut Vec<String>, subst: bo
                         }
                     }
                     if vals.iter().all(|v| v.is_nan()) { res = env.eval(y).map(|_| ()); if res.is_ok() { res = fail("This curve has no values in the range.", y.at); } }
-                    p.series.push(Series { label: latex::plain(y), ys: vals });
+                    p.series.push(Series { label: latex::plain(y), ys: vals, ..Default::default() });
                     tags.push(tag);
                     if res.is_err() { break; }
                 }

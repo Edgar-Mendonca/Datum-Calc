@@ -94,3 +94,40 @@ pub fn linear(a: Vec<Vec<f64>>, b: Vec<f64>) -> Option<Vec<f64>> {
     if a.len() != b.len() { return None; }
     Lu::new(a)?.solve(&b)
 }
+
+/// The least-squares x for an m × n system A x ≈ b (m ≥ n), by Householder QR with each column scaled to unit
+/// length first; None when the columns are not independent (a diagonal of R negligible beside the largest).
+// The column index j reaches into every row below the diagonal, so a range reads clearer than an iterator here.
+#[allow(clippy::needless_range_loop)]
+pub fn lstsq(a: &[Vec<f64>], b: &[f64]) -> Option<Vec<f64>> {
+    let (m, n) = (a.len(), a.first()?.len());
+    if m < n || n == 0 || b.len() != m { return None; }
+    let sc: Vec<f64> = (0..n).map(|j| a.iter().map(|r| r[j] * r[j]).sum::<f64>().sqrt()).collect();
+    if !sc.iter().all(|s| s.is_finite() && *s > 0.0) { return None; }
+    let mut q: Vec<Vec<f64>> = a.iter().map(|r| r.iter().zip(&sc).map(|(v, s)| v / s).collect()).collect();
+    let mut y = b.to_vec();
+    let mut rmax = 0.0f64;
+    for k in 0..n {
+        // The reflection that zeroes column k below the diagonal, applied to the rest and to y.
+        let norm = (k..m).map(|i| q[i][k] * q[i][k]).sum::<f64>().sqrt();
+        if norm == 0.0 { return None; }
+        let alpha = if q[k][k] > 0.0 { -norm } else { norm };
+        let mut v: Vec<f64> = (k..m).map(|i| q[i][k]).collect();
+        v[0] -= alpha;
+        let vv: f64 = v.iter().map(|x| x * x).sum();
+        if vv > 0.0 {
+            for j in k..n {
+                let d = 2.0 * (k..m).map(|i| v[i - k] * q[i][j]).sum::<f64>() / vv;
+                for i in k..m { q[i][j] -= d * v[i - k]; }
+            }
+            let d = 2.0 * (k..m).map(|i| v[i - k] * y[i]).sum::<f64>() / vv;
+            for i in k..m { y[i] -= d * v[i - k]; }
+        }
+        rmax = rmax.max(q[k][k].abs());
+    }
+    if (0..n).any(|k| q[k][k].abs() <= 1e-10 * rmax) { return None; }
+    let mut x = vec![0.0; n];
+    for k in (0..n).rev() { x[k] = (y[k] - (k + 1..n).map(|j| q[k][j] * x[j]).sum::<f64>()) / q[k][k]; }
+    let x: Vec<f64> = x.iter().zip(&sc).map(|(v, s)| v / s).collect();
+    x.iter().all(|v| v.is_finite()).then_some(x)
+}

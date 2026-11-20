@@ -2,7 +2,7 @@
 // Click selects a region; double-click or Enter edits it; Esc or a click outside finishes.
 import { ErrorBoundary, For, Index, Show, createEffect, createMemo, createResource, createSignal, onMount } from "solid-js";
 import { MatLibrary, Material, Region, TableData } from "./api";
-import { act, call, out, S, selId, setSelId, editId, setEditId, zoom, openMenu } from "./store";
+import { act, call, out, S, selId, setSelId, editId, setEditId, zoom, openMenu, toast } from "./store";
 import { C, setField } from "./cmds";
 import * as D from "./dialogs";
 import { Help } from "./help";
@@ -71,6 +71,24 @@ const TableEditor = (p: { r: Region }) => {
   const delRow = () => d().rows.length > 1 && setD({ ...d(), rows: d().rows.slice(0, -1) });
   const delCol = () => d().cols.length > 1 && setD({ cols: d().cols.slice(0, -1), rows: d().rows.map(r => r.slice(0, -1)) });
   onMount(() => (el.querySelector("input") as HTMLInputElement | null)?.focus());
+  const paste = async (e: ClipboardEvent) => {
+    const text = e.clipboardData?.getData("text/plain") ?? "";
+    const t = e.target as HTMLInputElement;
+    if (!/[\t\n]/.test(text.trim()) || t.dataset.r === undefined) return;
+    e.preventDefault();
+    const v = await call<{ cols: { name: string; unit: string; formula: string }[]; rows: string[][]; notes: string[] }>("table_text", { text });
+    if (!v) return;
+    const empty = d().rows.every(r => r.every(c => !c.trim()));
+    if (empty && v.cols.some(c => !/^c\d+$/.test(c.name))) { setD({ cols: v.cols, rows: v.rows }); }
+    else {
+      const i0 = +(t.dataset.r ?? 0), j0 = +(t.dataset.c ?? 0);
+      const w = Math.max(d().cols.length, j0 + (v.rows[0]?.length ?? 0)), h = Math.max(d().rows.length, i0 + v.rows.length);
+      const cols = [...d().cols, ...Array.from({ length: w - d().cols.length }, (_, k) => ({ name: `c${d().cols.length + k + 1}`, unit: "", formula: "" }))];
+      const rows = Array.from({ length: h }, (_, i) => Array.from({ length: w }, (_, j) => v.rows[i - i0]?.[j - j0] ?? d().rows[i]?.[j] ?? ""));
+      setD({ cols, rows });
+    }
+    if (v.notes.length) toast(v.notes.join(" "));
+  };
   const key = (e: KeyboardEvent) => {
     e.stopPropagation();
     if (e.key === "Escape") { e.preventDefault(); commit(); }
@@ -84,7 +102,7 @@ const TableEditor = (p: { r: Region }) => {
     }
   };
   return (
-    <div class="teditor" ref={el} onKeyDown={key} onFocusOut={e => { const t = e.relatedTarget as HTMLElement | null; if (!t || (!el.contains(t) && !t.closest(".top, .ribbon"))) commit(); }}>
+    <div class="teditor" ref={el} onKeyDown={key} onPaste={paste} onFocusOut={e => { const t = e.relatedTarget as HTMLElement | null; if (!t || (!el.contains(t) && !t.closest(".top, .ribbon"))) commit(); }}>
       <input class="tcapin" placeholder="Caption (optional), such as Pump curve from the data sheet" value={cap()} onInput={e => setCap(e.currentTarget.value)} />
       <table class="ctable edit">
         <thead>

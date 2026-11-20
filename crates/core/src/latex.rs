@@ -57,7 +57,7 @@ pub fn unit(label: &str) -> String {
 
 fn unit_of(u: &crate::units::UnitExpr) -> String { unit(&crate::units::pretty(&u.text)) }
 
-const FUNCS: [&str; 37] = ["lsolve", "identity", "dot", "cross", "rows", "cols", "simplify", "expand", "factor", "db", "par", "sin", "cos", "tan", "sinh", "cosh", "tanh", "ln", "log", "exp", "min", "max", "asin", "acos", "atan", "atan2", "abs", "round", "floor", "ceil", "sum", "mean", "len", "re", "im", "arg", "conj"];
+const FUNCS: [&str; 38] = ["points", "lsolve", "identity", "dot", "cross", "rows", "cols", "simplify", "expand", "factor", "db", "par", "sin", "cos", "tan", "sinh", "cosh", "tanh", "ln", "log", "exp", "min", "max", "asin", "acos", "atan", "atan2", "abs", "round", "floor", "ceil", "sum", "mean", "len", "re", "im", "arg", "conj"];
 
 /// A property function as a symbol with the fluid below: h_water(T, p), c_p,CO₂(T).
 fn fluid(f: &str, args: &[Node], a: &[String]) -> String {
@@ -151,7 +151,7 @@ fn nd(n: &Node, s: &Sub) -> String {
                 "if" if a.len() == 3 => format!("\\begin{{cases}} {} & \\text{{if }} {} \\\\ {} & \\text{{otherwise}} \\end{{cases}}", a[1], a[0], a[2]),
                 "log" if a.len() == 1 => format!("\\log_{{10}}\\left({}\\right)", a[0]),
                 f if (f.starts_with("water_") || f.starts_with("gas_")) && crate::eval::builtin_name(f) => fluid(f, args, &a),
-                f if FUNCS.contains(&f) => format!("\\{}\\left({}\\right)", if matches!(f, "atan2" | "round" | "floor" | "ceil" | "sum" | "mean" | "len" | "asin" | "acos" | "atan" | "abs" | "re" | "im" | "arg" | "conj" | "db" | "par" | "simplify" | "expand" | "factor" | "lsolve" | "identity" | "dot" | "cross" | "rows" | "cols") { format!("operatorname{{{f}}}") } else { f.to_string() }, a.join(", ")),
+                f if FUNCS.contains(&f) => format!("\\{}\\left({}\\right)", if matches!(f, "atan2" | "round" | "floor" | "ceil" | "sum" | "mean" | "len" | "asin" | "acos" | "atan" | "abs" | "re" | "im" | "arg" | "conj" | "db" | "par" | "simplify" | "expand" | "factor" | "lsolve" | "identity" | "dot" | "cross" | "rows" | "cols" | "points") { format!("operatorname{{{f}}}") } else { f.to_string() }, a.join(", ")),
                 f => format!("{}\\left({}\\right)", name(f), a.join(", ")),
             }
         }
@@ -178,6 +178,8 @@ pub fn stmt_with(s: &Stmt, sub: &Sub) -> String {
             vars.iter().map(|v| format!("{} = {}", name(&v.0), node(&v.1))).collect::<Vec<_>>().join(",\\; ")),
         Stmt::Solve { lhs, rhs, var, lo, hi } => format!("{} = {} \\quad \\text{{for }} {} \\in \\left[{}, {}\\right]", node(lhs), node(rhs), name(var), node(lo), node(hi)),
         Stmt::Plot { ys, var, lo, hi, log } => format!("{} \\quad \\text{{for }} {} \\in \\left[{}, {}\\right]{}", ys.iter().map(&node).collect::<Vec<_>>().join(",\\; "), name(var), node(lo), node(hi), if *log { "\\;\\text{(log scale)}" } else { "" }),
+        Stmt::Fit { name: n, var, model, xs, ys, params } => format!("{}\\left({}\\right) = {} \\quad \\text{{fitted to }} \\left({}, {}\\right){}", name(n), name(var), node(model), node(xs), node(ys),
+            if params.iter().any(|p| p.1.is_some()) { format!(" \\quad \\text{{from }} {}", params.iter().filter_map(|p| p.1.as_ref().map(|g| format!("{} = {}", name(&p.0), node(g)))).collect::<Vec<_>>().join(",\\; ")) } else { String::new() }),
         Stmt::Show { e } => node(e),
         Stmt::Empty => String::new(),
     }

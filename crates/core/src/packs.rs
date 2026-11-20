@@ -5,7 +5,7 @@ use serde::Serialize;
 
 pub struct Pack { pub id: &'static str, pub json: &'static str }
 
-pub static PACKS: [Pack; 28] = [
+pub static PACKS: [Pack; 29] = [
     Pack { id: "pump-power", json: include_str!("../packs/pump-power.dcalc") },
     Pack { id: "npsh", json: include_str!("../packs/npsh.dcalc") },
     Pack { id: "pipe-dp", json: include_str!("../packs/pipe-dp.dcalc") },
@@ -34,6 +34,7 @@ pub static PACKS: [Pack; 28] = [
     Pack { id: "parallel-pipes", json: include_str!("../packs/parallel-pipes.dcalc") },
     Pack { id: "pipe-regimes", json: include_str!("../packs/pipe-regimes.dcalc") },
     Pack { id: "rankine", json: include_str!("../packs/rankine.dcalc") },
+    Pack { id: "pump-test", json: include_str!("../packs/pump-test.dcalc") },
 ];
 
 /// A pack card for File › New from pack.

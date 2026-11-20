@@ -89,10 +89,13 @@ export const PlotView = (p: { p: PlotOut; id: number; paper?: boolean }) => {
   onMount(() => {
     chart = new Chart(cv, {
       type: "line",
-      data: { datasets: p.p.series.map((s, k) => ({ label: s.label, data: p.p.xs.map((x, i) => ({ x, y: Number.isFinite(s.ys[i]) ? s.ys[i] : null })) as any, borderColor: COLORS[k % 8], backgroundColor: COLORS[k % 8], borderWidth: 1.8, pointRadius: 0, spanGaps: false })) },
+      // Measured points (points(xs, ys)) are markers with their own x values; curves are lines.
+      data: { datasets: p.p.series.map((s, k) => s.points
+        ? { label: s.label, data: (s.xs ?? []).map((x, i) => ({ x, y: Number.isFinite(s.ys[i]) ? s.ys[i] : null })) as any, borderColor: COLORS[k % 8], backgroundColor: "#FFFFFF", borderWidth: 1.6, pointRadius: 3.5, pointHoverRadius: 5, showLine: false }
+        : { label: s.label, data: p.p.xs.map((x, i) => ({ x, y: Number.isFinite(s.ys[i]) ? s.ys[i] : null })) as any, borderColor: COLORS[k % 8], backgroundColor: COLORS[k % 8], borderWidth: 1.8, pointRadius: 0, spanGaps: false }) },
       options: {
         animation: false, responsive: true, maintainAspectRatio: false, parsing: false, normalized: true,
-        interaction: { mode: "index", intersect: false },
+        interaction: p.p.series.some(s => s.points) ? { mode: "nearest", intersect: false, axis: "x" } : { mode: "index", intersect: false },
         plugins: { legend: { display: p.p.series.length > 1, position: "top", labels: { boxWidth: 14, font: { family: "IBM Plex Sans", size: 11 }, color: "#1B2733" } },
           tooltip: { enabled: !p.paper, callbacks: { title: it => `${p.p.xlabel} = ${(it[0]?.parsed.x ?? 0).toPrecision(4)} ${p.p.xunit}`, label: it => `${it.dataset.label}: ${(it.parsed.y ?? 0).toPrecision(4)} ${p.p.yunit}` } } },
         scales: {

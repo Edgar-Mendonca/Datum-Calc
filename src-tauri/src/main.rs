@@ -215,6 +215,23 @@ fn base64_decode(s: &str) -> R<Vec<u8>> {
     Ok(out)
 }
 
+/// A table from pasted text: cells copied from a spreadsheet (tabs) or CSV.
+#[tauri::command]
+fn table_text(text: String) -> R<serde_json::Value> { datum_core::tabin::parse(&text) }
+
+/// A table from a CSV or text file, its name as the caption.
+#[tauri::command]
+async fn import_table(app: AppHandle) -> R<Option<serde_json::Value>> {
+    let Some(path) = pick(&app, "Data", &["csv", "txt", "tsv"]) else { return Ok(None) };
+    let bytes = std::fs::read(&path).map_err(|e| e.to_string())?;
+    if bytes.len() > 5_000_000 { return Err("Choose a file smaller than 5 MB.".into()); }
+    // UTF-8, or else a one-byte code page (as many instruments write), read byte by byte.
+    let text = String::from_utf8(bytes).unwrap_or_else(|e| e.into_bytes().iter().map(|&b| b as char).collect());
+    let mut v = datum_core::tabin::parse(&text)?;
+    v["caption"] = serde_json::Value::String(path.file_stem().and_then(|s| s.to_str()).unwrap_or("Data").to_string());
+    Ok(Some(v))
+}
+
 /// Reads a picture (logo or image region) and returns it as a data URL.
 #[tauri::command]
 async fn pick_image(app: AppHandle) -> R<Option<String>> {
@@ -482,7 +499,7 @@ fn main() {
             }
         })
         .invoke_handler(tauri::generate_handler![
-            state, apply, history, new_sheet, packs, new_from_pack, open, save, save_file, pick_image,
+            state, apply, history, new_sheet, packs, new_from_pack, open, save, save_file, pick_image, table_text, import_table,
             lists, materials, options, set_options, autosave, recovery, recover, recent, startup_file, version, open_url, quit, check_update, install_update
         ])
         .run(tauri::generate_context!())

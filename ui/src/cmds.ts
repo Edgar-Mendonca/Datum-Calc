@@ -8,6 +8,8 @@ const GH = "https://github.com/Edgar-Mendonca/Datum-Calc";
 /** Runs `then` once unsaved changes are saved or let go: New, Open, a pack or an update replaces the sheet. */
 export const keep = (then: (discarded?: boolean) => void) => out()?.dirty ? D.confirmClose(then) : then();
 /** Where a new region goes: below the selected one, or at the end. */
+/** A table read from text or a file by the engine (tabin.rs). */
+type TableIn = { cols: { name: string; unit: string; formula: string }[]; rows: string[][]; notes: string[]; caption?: string };
 const below = () => { const i = out()?.sheet.regions.findIndex(r => r.id === selId()) ?? -1; return i >= 0 ? i + 1 : out()?.sheet.regions.length ?? 0; };
 const STARTER: Record<Kind, string> = { math: "", text: "", check: "check ", solve: "solve x^2 = 2 for x in 0 .. 10", plot: "plot sin(x), cos(x) for x in 0 .. 2*pi", table: "", image: "", material: "", program: "s = 0\nfor i in 1 .. 10\n  s = s + i\nend" };
 
@@ -58,10 +60,22 @@ export const C = {
   paste: async (given?: string) => {
     const t = given ?? await navigator.clipboard?.readText().catch(() => "");
     if (!t) return toast("The clipboard has no text.");
+    // Cells copied from a spreadsheet (tabs over several lines) become a table.
+    if (/\t/.test(t) && t.trim().split(/\r?\n/).length > 1) return C.tableFrom(await call<TableIn>("table_text", { text: t }));
     const lines = t.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
     const at = below();
     if (await act({ Batch: lines.map((l, k) => ({ Insert: { at: at + k, kind: /^check\b/.test(l) ? "check" : /[=]/.test(l) ? "math" : "text", text: l } })) })) setSelId(S().regions[at + lines.length - 1]?.id ?? 0);
   },
+  /** A table region from parsed data, below the selection; what could not be read is said. */
+  tableFrom: async (v: TableIn | null | undefined) => {
+    if (!v) return;
+    const at = below();
+    if (await act({ Insert: { at, kind: "table", text: v.caption ?? "", data: { cols: v.cols, rows: v.rows } } })) {
+      setSelId(S().regions[at]?.id ?? 0);
+      toast(v.notes.length ? v.notes.join(" ") : `Read ${v.rows.length} row${v.rows.length === 1 ? "" : "s"} into a table.`, !v.notes.length);
+    }
+  },
+  importTable: async () => C.tableFrom(await call<TableIn | null>("import_table")),
   undo: async () => setOut(await call<Out>("history", { redo: false })),
   redo: async () => setOut(await call<Out>("history", { redo: true })),
   save: async (asNew = false) => { const o = await call<Out | null>("save", { asNew }); if (o) { setOut(o); toast("Saved.", true); } },
@@ -104,7 +118,7 @@ export const C = {
 
 /** Every command with a name, for Tell Me and the shortcut list. */
 export const ALL_CMDS: [string, () => void, string?][] = [
-  ["Insert math region", () => C.insert("math"), "Ctrl+M"], ["Insert text region", () => C.insert("text"), "Ctrl+T"], ["Insert check", () => C.insert("check")], ["Insert table", () => C.insert("table")], ["Insert material (properties from the library)", () => C.insert("material")], ["Insert program (if, for, while)", () => C.insert("program")], ["Insert picture", () => C.picture()], ["Units list", () => D.unitsList()], ["Functions and constants", () => D.unitsList("functions")], ["Insert solve", () => C.insert("solve")], ["Insert plot", () => C.insert("plot")],
+  ["Insert math region", () => C.insert("math"), "Ctrl+M"], ["Insert text region", () => C.insert("text"), "Ctrl+T"], ["Insert check", () => C.insert("check")], ["Insert table", () => C.insert("table")], ["Table from a CSV file…", () => C.importTable()], ["Insert material (properties from the library)", () => C.insert("material")], ["Insert program (if, for, while)", () => C.insert("program")], ["Insert picture", () => C.picture()], ["Units list", () => D.unitsList()], ["Functions and constants", () => D.unitsList("functions")], ["Insert solve", () => C.insert("solve")], ["Insert plot", () => C.insert("plot")],
   ["Delete region", C.del, "Delete"], ["Duplicate region", C.duplicate, "Ctrl+D"], ["Insert above", C.insertAbove, "Ctrl+Shift+M"], ["3 significant figures", () => C.figures(3)], ["4 significant figures", () => C.figures(4)], ["5 significant figures", () => C.figures(5)], ["Move region up", () => C.move(true), "Alt+↑"], ["Move region down", () => C.move(false), "Alt+↓"],
   ["Copy", C.copy, "Ctrl+C"], ["Copy result", C.copyResult], ["Copy as LaTeX", C.copyLatex], ["Export CSV (inputs and results)", C.csv], ["Show numbers in equations", () => act({ SheetSet: { field: "subst", value: !out()?.sheet.subst } })], ["Polar form for complex values", () => act({ SheetSet: { field: "polar", value: !out()?.sheet.polar } })], ["Fractions (exact results)", () => act({ SheetSet: { field: "exact", value: !out()?.sheet.exact } })], ["Simplify, expand or factor an expression", () => typeText("simplify()", 1)], ["New from pack", () => C.file("new")], ["Paste", () => C.paste(), "Ctrl+V"], ["Undo", C.undo, "Ctrl+Z"], ["Redo", C.redo, "Ctrl+Y"],
   ["Save", () => C.save(), "Ctrl+S"], ["Save as", () => C.save(true)], ["Open", () => C.open(), "Ctrl+O"], ["New sheet", C.newSheet, "Ctrl+N"], ["Print / PDF", C.print, "Ctrl+P"],

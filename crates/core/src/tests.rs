@@ -491,7 +491,7 @@ mod packs {
     #[test]
     fn all_packs_open_and_list() {
         let cards = crate::packs::cards();
-        assert_eq!(cards.len(), 28);
+        assert_eq!(cards.len(), 29);
         for c in &cards { assert!(!c.name.is_empty() && !c.desc.is_empty() && !c.field.is_empty() && c.checks > 0, "{}", c.id); }
     }
 
@@ -720,6 +720,19 @@ mod packs {
         assert!(close(v(&e, "Q_1") * 3600.0, 58.099_058_17, 1e-8) && close(v(&e, "Q_2") * 3600.0, 41.900_941_83, 1e-8));
         assert!(close(v(&e, "dp_12"), 21_069.487_2, 1e-8) && close(v(&e, "v_2"), 2.315_535_421, 1e-8));
         assert!(o.regions.iter().any(|r| r.result == "Q_1 = 58.1 m³/h, Q_2 = 41.9 m³/h") && checks(&o)[0].0);
+    }
+
+    #[test]
+    fn pump_test() {
+        // Least squares (numpy.polyfit) through the six test points: a = 61.992857 m, b = 0.0094 m/(m³/h),
+        // c = −0.00178857 m/(m³/h)², R² = 0.999991; k = 23/90² = 0.00283951 m/(m³/h)²; the curves meet at
+        // Q = 101.787 m³/h, H = 44.419 m (scipy brentq).
+        let (o, e) = run("pump-test");
+        let h = 3600.0;
+        assert!(close(v(&e, "a"), 61.992_857_142_86, 1e-9) && close(v(&e, "b") / h, 0.0094, 1e-8) && close(v(&e, "c") / (h * h), -0.001_788_571_428_57, 1e-9));
+        assert!(close(v(&e, "Q_op") * h, 101.787_026_624_8, 1e-9) && close(v(&e, "H_op"), 44.418_984_216, 1e-9) && checks(&o)[0].0);
+        assert!(o.regions.iter().all(|r| r.error.is_none()) && o.regions.iter().any(|r| r.result.ends_with("R² = 1.0000")));
+        assert!(o.regions.iter().any(|r| r.plot.as_ref().is_some_and(|p| p.series.len() == 3 && p.series[2].points && p.series[2].xs.len() == 6)));
     }
 
     #[test]
@@ -1514,4 +1527,77 @@ fn properties_review() {
         (&["water_cp(373.946 °C, 220.64 bar)"][..], "cp goes to infinity at the critical point"),
         (&["gas_mu(CH4, 100 K)"][..], "Methane: viscosity and conductivity are given from 200 K to 625 K (−73 °C"),
     ] { assert!(error(lines).starts_with(msg), "{lines:?}: {}", error(lines)); }
+}
+
+#[test]
+fn data_into_tables() {
+    use crate::tabin::parse;
+    let t = |v: &serde_json::Value| (v["cols"].as_array().unwrap().iter().map(|c| format!("{}|{}", c["name"].as_str().unwrap(), c["unit"].as_str().unwrap())).collect::<Vec<_>>(), v["rows"].clone(), v["notes"].as_array().unwrap().len());
+    // Copied from a spreadsheet: tabs, a heading with units in brackets (m3 is m^3).
+    let (c, r, n) = t(&parse("Q (m3/h)\tH [m]\n0\t50.3\n40\t46.5\n80\t37.4\n").unwrap());
+    assert_eq!(c, ["Q|m^3/h", "H|m"]);
+    assert_eq!(r, serde_json::json!([["0", "50.3"], ["40", "46.5"], ["80", "37.4"]]));
+    assert_eq!(n, 0);
+    // A European CSV: semicolons and a decimal comma; a second row of units; quotes; a byte-order mark.
+    let (c, r, _) = t(&parse("\u{feff}\"Flow rate\";Head\r\nm3/h;m\r\n1,5;20,25\r\n2;\"19,5\"\r\n").unwrap());
+    assert_eq!(c, ["Flow_rate|m^3/h", "Head|m"]);
+    assert_eq!(r, serde_json::json!([["1.5", "20.25"], ["2", "19.5"]]));
+    // A plain CSV with commas, names made valid and kept apart, an unknown unit noted, a short row padded.
+    let (c, r, n) = t(&parse("T (degC),T (degC),3rd col (furlongs)\n1,2,3\n4,5\n").unwrap());
+    assert_eq!(c, ["T|degC", "T_2|degC", "c3rd_col|"]);
+    assert_eq!(r[1], serde_json::json!(["4", "5", ""]));
+    assert_eq!(n, 1);
+    // Numbers only: columns c1, c2.
+    let (c, _, _) = t(&parse("1\t2\n3\t4").unwrap());
+    assert_eq!(c, ["c1|", "c2|"]);
+    assert!(parse("\n  \n").is_err());
+    let big: String = (0..2500).map(|i| format!("{i}\n")).collect();
+    assert_eq!(parse(&big).unwrap()["rows"].as_array().unwrap().len(), 2000);
+    // A parsed table on a sheet: its columns are vectors with their units.
+    let v = parse("Q (m3/h)\tH [m]\n0\t50.3\n40\t46.5\n80\t37.4\n120\t20.9\n160\t-1\n").unwrap();
+    let mut s = sheet(&["fit H_f(q) = a + b*q + c*q^2 to Q, H", "H_f(100 m^3/h)"]);
+    s.regions.insert(0, Region { id: 99, kind: Kind::Table, text: "Pump curve".into(), data: serde_json::json!({ "cols": v["cols"], "rows": v["rows"] }), ..Default::default() });
+    let o = eval::run(&s);
+    assert!(o.regions.iter().all(|r| r.error.is_none()), "{:?}", o.regions.iter().filter_map(|r| r.error.clone()).collect::<Vec<_>>());
+    assert_eq!(o.regions[1].result, "a = 50.23 m, b = -0.009071 m/(m³/h), c = -0.001946 m/(m³/h)²; R² = 0.9999");
+}
+
+#[test]
+fn curve_fitting() {
+    // A name's SI value after the whole sheet is worked out.
+    let val = |lines: &[&str]| -> f64 {
+        let (name, rest) = lines.split_last().unwrap();
+        let s = sheet(rest);
+        let (o, env) = eval::run_env(&s, &eval::Fmt { digits: 4, eng: false, us: false, polar: false, exact: false });
+        assert!(o.regions.iter().all(|r| r.error.is_none()), "{rest:?}");
+        env.vars.get(&eval::canon(name)).map(|v| v.x()).unwrap_or(f64::NAN)
+    };
+    // Least squares against numpy.polyfit (a, b, c) and scipy curve_fit (A, τ; k, n).
+    let q = ["Q_d = [0, 40, 80, 120, 160] m^3/h", "H_d = [50.3, 46.5, 37.4, 20.9, -1.0] m", "fit H(Q) = a + b*Q + c*Q^2 to Q_d, H_d"];
+    assert_eq!(result(&q), "a = 50.23 m, b = -0.009071 m/(m³/h), c = -0.001946 m/(m³/h)²; R² = 0.9999");
+    assert!((val(&[q[0], q[1], q[2], "a"]) - 50.231_428_571_428_6).abs() < 1e-9);
+    assert!((val(&[q[0], q[1], q[2], "c"]) / -0.001_946_428_571_428_6 * 3600f64.powi(-2) - 1.0).abs() < 1e-9);
+    assert_eq!(result(&[q[0], q[1], q[2], "H(100 m^3/h)"]), "29.86 m", "the fit defines its function");
+    let t = ["t_d = [0, 1, 2, 3, 4, 5] s", "y_d = [10, 6.2, 3.5, 2.3, 1.3, 0.9] mm"];
+    let e = [t[0], t[1], "fit y(t) = A*exp(-t/tau) to t_d, y_d for A = 5 mm, tau = 1 s"];
+    assert_eq!(result(&e), "A = 10.03 mm, τ = 1.995 s; R² = 0.9990");
+    assert!((val(&[e[0], e[1], e[2], "A"]) / 0.010_026_959_247_719_6 - 1.0).abs() < 1e-7 && (val(&[e[0], e[1], e[2], "tau"]) / 1.994_649_891_514_43 - 1.0).abs() < 1e-7);
+    let p = ["x = [10, 20, 40, 80]", "y = [1.1, 4.1, 15.8, 62.5]", "fit f(z) = k*z^n to x, y for k = 0.01, n = 2"];
+    assert!((val(&[p[0], p[1], p[2], "k"]) / 0.010_716_427_912_555 - 1.0).abs() < 1e-6 && (val(&[p[0], p[1], p[2], "n"]) / 1.978_769_928_007_445 - 1.0).abs() < 1e-7);
+    // Listed parameters, a known term (no parameter) subtracted, a straight line through exact points.
+    assert_eq!(result(&["L = 2 m", "x = [0, 1, 2] s", "y = [2, 4, 6] m", "fit s(t) = L + v*t to x, y for v"]), "v = 2 m/s; R² = 1.0000");
+    assert_eq!(result(&["x = [1, 2, 4] m", "y = [3, 2, 1.5] N", "fit F(r) = a + b/r to x, y"]), "a = 1 N, b = 2 N·m; R² = 1.0000");
+    for (lines, msg) in [
+        (&["x = [1, 2, 3]", "y = [1, 2]", "fit f(z) = a + b*z to x, y"][..], "The data have 3 x values and 2 y values"),
+        (&["x = [1, 2]", "y = [1, 2]", "fit f(z) = a + b*z + c*z^2 to x, y"][..], "3 parameters need at least 3 data points"),
+        (&["x = [1, 1, 1]", "y = [1, 2, 3]", "fit f(z) = a + b*z to x, y"][..], "The data do not fix every parameter"),
+        (&["x = [1, 2, 3]", "y = [1, 2, 3]", "fit f(z) = a*exp(b*z) to x, y"][..], "This model is not linear in its parameters: give each a starting guess"),
+        (&["x = [1, 2, 3]", "y = [1, 2, 3]", "a = 1", "fit f(z) = a*z to x, y"][..], "Every name in this model is defined on the sheet already"),
+        (&["x = [1, 2, 3] m", "y = [1, 2, 3] s", "fit f(z) = a + b*z to x, 3"][..], "The data are two vectors"),
+        (&["x = [1, 2, 3] m", "y = [1, 2, 3] s", "fit f(z) = a + a*z to x, y"][..], "a multiplies terms in different units"),
+        (&["x = [1, 2, 3] m", "y = [1, 2, 3] s", "fit f(z) = a + b*z to x, y"][..], ""),
+        (&["x = [1, 2, 3]", "y = [1, 2, 3]", "fit f(z) = a + b*z"][..], "Give the data after the model"),
+        (&["points([1, 2], [3, 4])"][..], "points(xs, ys) marks measured values on a plot"),
+        (&["x = [1, 2] m", "y = [3, 4] s", "plot 2*q, points(x, y) for q in 0 .. 3"][..], "The points' x values are a length, the plot's x is a pure number."),
+    ] { let got = error(lines); assert!(if msg.is_empty() { got.is_empty() } else { got.starts_with(msg) }, "{lines:?}: {got}"); }
 }
