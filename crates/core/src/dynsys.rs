@@ -159,11 +159,13 @@ fn tf(env: &mut Env, f: &str, arg: &Node) -> R<Tf> {
         return fail(format!("{name} is not a transfer function: define it above as {name}(s) = …, then use {f}({name})."), at);
     };
     if params.len() != 1 { return fail(format!("{name} takes {} values: a transfer function takes s alone.", params.len()), at); }
-    // s is in 1/s; a transfer function written in plain numbers alone (1/(s + 1)) reads s in 1/s and times in seconds.
+    // s is in 1/s.
     let q = canon(&params[0]);
     let mut cx = Ctx { p: &q, s: FREQ, united: false };
     let r = match rat(env, &body, &mut cx, 0) {
-        Err(e) if !cx.united && e.msg.starts_with("Terms with different units") => { let mut plain = Ctx { p: &q, s: NONE, united: false }; rat(env, &body, &mut plain, 0) }
+        // A transfer function in plain numbers alone has none: s in 1/s and times in seconds, G a plain ratio.
+        Err(e) if !cx.united && !e.msg.starts_with("Terms with different units") => Err(e),
+        _ if !cx.united => { let mut plain = Ctx { p: &q, s: NONE, united: false }; rat(env, &body, &mut plain, 0) }
         r => r,
     };
     // Inside a function of s, s is the variable: kg/s there is kg over s, and 0.5 s is half a second.
@@ -186,16 +188,15 @@ fn tf(env: &mut Env, f: &str, arg: &Node) -> R<Tf> {
     let lead = *den.last().unwrap();
     for x in num.iter_mut().chain(den.iter_mut()) { *x /= lead; }
     if num.iter().chain(&den).any(|x| !x.is_finite()) { return fail(format!("{name} has coefficients too large or too small to work with."), at); }
-    // Factors common to both cancel: G/(1 + G) keeps only the closed loop's own poles.
-    if num.len() > 1 && den.len() > 1 {
-        let (mut zs, mut ps) = (roots(&num), roots(&den));
-        let mut cut = false;
-        zs.retain(|z| match ps.iter().position(|p| cabs((z.0 - p.0, z.1 - p.1)) <= 1e-6 * cabs(*z).max(cabs(*p)).max(1e-300)) { Some(i) => { ps.remove(i); cut = true; false } None => true });
-        if cut {
-            let k = *num.last().unwrap();
-            num = from_roots(&zs).iter().map(|x| x * k).collect();
-            den = from_roots(&ps);
-        }
+    // Factors common to both cancel: G/(1 + G) keeps only the closed loop's own poles. A root of the top that is also
+    // one of the bottom (to round-off) is divided out of both, one at a time, a complex pair as a quadratic.
+    while num.len() > 1 && den.len() > 1 {
+        let size = |c: &[f64], z: C| c.iter().enumerate().map(|(k, x)| x.abs() * cabs(z).powi(k as i32)).sum::<f64>();
+        let Some(z) = roots(&num).into_iter().find(|z| cabs(horner(&den, *z)) <= 1e-9 * size(&den, *z)) else { break };
+        let d = if z.1 != 0.0 { vec![z.0 * z.0 + z.1 * z.1, -2.0 * z.0, 1.0] } else { vec![-z.0, 1.0] };
+        if d.len() > num.len() || d.len() > den.len() { break; }
+        num = divide(&num, &d);
+        den = divide(&den, &d);
     }
     Ok(Tf { num, den, dim, name })
 }
@@ -235,45 +236,93 @@ fn roots(c: &[f64]) -> Vec<C> {
         if moved < 1e-15 { break; }
     }
     let dc: Vec<f64> = c.iter().enumerate().skip(1).map(|(k, x)| x * k as f64).collect();
-    for r in z {
+    let mut z: Vec<C> = z.into_iter().map(|r| {
         let mut s = (r.0 * sigma, r.1 * sigma);
         for _ in 0..3 {
             let w = cdiv(horner(&c, s), horner(&dc, s));
             if w.0.is_finite() && w.1.is_finite() && cabs(w) < 1e-6 * cabs(s).max(1e-300) { s = (s.0 - w.0, s.1 - w.1); }
         }
-        if s.1.abs() <= 1e-9 * cabs(s) { s.1 = 0.0; }
-        if s.0.abs() <= 1e-12 * cabs(s) { s.0 = 0.0; }
-        out.push(s);
+        s
+    }).collect();
+    // A k-fold root comes out as k roots close together, each off by about the k-th root of round-off; their mean is
+    // accurate, so each cluster is put at its mean.
+    let mut seen = vec![false; n];
+    for i in 0..n {
+        if seen[i] { continue; }
+        let g: Vec<usize> = (i..n).filter(|&j| !seen[j] && cabs((z[j].0 - z[i].0, z[j].1 - z[i].1)) <= 1e-3 * cabs(z[i]).max(1e-300)).collect();
+        let m = g.iter().fold((0.0, 0.0), |a, &j| (a.0 + z[j].0 / g.len() as f64, a.1 + z[j].1 / g.len() as f64));
+        for j in g { seen[j] = true; z[j] = m; }
     }
-    // Complex roots come in exact conjugate pairs: the upper one first.
-    out.sort_by(|a, b| cabs(*a).total_cmp(&cabs(*b)).then(b.1.total_cmp(&a.1)));
-    let mut i = 0;
-    while i + 1 < out.len() {
-        if out[i].1 != 0.0 && (out[i + 1].1 + out[i].1).abs() < 1e-6 * cabs(out[i]) && (out[i + 1].0 - out[i].0).abs() < 1e-6 * cabs(out[i]) {
-            let (re, im) = ((out[i].0 + out[i + 1].0) / 2.0, (out[i].1 - out[i + 1].1).abs() / 2.0);
-            out[i] = (re, im);
-            out[i + 1] = (re, -im);
-            i += 2;
-        } else { i += 1; }
+    for s in z.iter_mut() {
+        if s.1.abs() <= 1e-9 * cabs(*s) { s.1 = 0.0; }
+        if s.0.abs() <= 1e-12 * cabs(*s) { s.0 = 0.0; }
     }
+    // Complex roots in exact conjugate pairs, the upper one first; then by size.
+    let mut used = vec![false; n];
+    let mut items: Vec<Vec<C>> = vec![];
+    for i in 0..n {
+        if used[i] { continue; }
+        used[i] = true;
+        if z[i].1 == 0.0 { items.push(vec![z[i]]); continue; }
+        let gap = |j: usize| cabs((z[j].0 - z[i].0, z[j].1 + z[i].1));
+        match (0..n).filter(|&j| !used[j] && z[j].1 * z[i].1 < 0.0).min_by(|a, b| gap(*a).total_cmp(&gap(*b))) {
+            Some(j) if gap(j) <= 1e-6 * cabs(z[i]) => {
+                used[j] = true;
+                let (re, im) = ((z[i].0 + z[j].0) / 2.0, (z[i].1.abs() + z[j].1.abs()) / 2.0);
+                items.push(vec![(re, im), (re, -im)]);
+            }
+            _ => items.push(vec![z[i]]),
+        }
+    }
+    items.sort_by(|a, b| cabs(a[0]).total_cmp(&cabs(b[0])).then(b[0].0.total_cmp(&a[0].0)));
+    out.extend(items.into_iter().flatten());
     out
 }
 
-/// The monic polynomial with these roots (complex ones in conjugate pairs), coefficients of s⁰, s¹, ….
-fn from_roots(r: &[C]) -> Vec<f64> {
-    let mut c: Vec<C> = vec![(1.0, 0.0)];
-    for z in r {
-        let mut n = vec![(0.0, 0.0); c.len() + 1];
-        for (i, a) in c.iter().enumerate() { n[i + 1].0 += a.0; n[i + 1].1 += a.1; let m = cmul(*a, *z); n[i].0 -= m.0; n[i].1 -= m.1; }
-        c = n;
+/// The quotient of a by a monic divisor d (coefficients of s⁰, s¹, …); the remainder, round-off, is dropped.
+fn divide(a: &[f64], d: &[f64]) -> Vec<f64> {
+    let (n, m) = (a.len() - 1, d.len() - 1);
+    let mut r = a.to_vec();
+    let mut q = vec![0.0; n - m + 1];
+    for k in (0..=n - m).rev() {
+        let c = r[k + m];
+        q[k] = c;
+        for j in 0..=m { r[k + j] -= c * d[j]; }
     }
-    c.into_iter().map(|x| x.0).collect()
+    q
 }
 
-/// e^M for an n × n matrix (row by row), by scaling and squaring with a Taylor series.
-fn expm(m: &[f64], n: usize) -> Vec<f64> {
+/// Balances a matrix (Parlett and Reinsch, by powers of 2): D⁻¹AD with rows and columns of like size, so e^A keeps
+/// its accuracy for a companion matrix with coefficients of very different sizes. Gives the scales D.
+fn balance(a: &mut [f64], n: usize) -> Vec<f64> {
+    let mut d = vec![1.0; n];
+    for _ in 0..100 {
+        let mut done = true;
+        for i in 0..n {
+            let (mut c, mut r) = (0.0, 0.0);
+            for j in 0..n { if j != i { c += a[j * n + i].abs(); r += a[i * n + j].abs(); } }
+            if c == 0.0 || r == 0.0 || !c.is_finite() || !r.is_finite() { continue; }
+            let (s, mut f, mut cc) = (c + r, 1.0, c);
+            while cc < r / 2.0 { f *= 2.0; cc *= 4.0; }
+            while cc >= r * 2.0 { f /= 2.0; cc /= 4.0; }
+            if c * f + r / f < 0.95 * s {
+                done = false;
+                d[i] *= f;
+                for j in 0..n { a[i * n + j] /= f; a[j * n + i] *= f; }
+            }
+        }
+        if done { break; }
+    }
+    d
+}
+
+/// e^M for an n × n matrix (row by row), by scaling and squaring with a Taylor series; None when it overflows.
+fn expm(m: &[f64], n: usize) -> Option<Vec<f64>> {
     let norm = (0..n).map(|i| (0..n).map(|j| m[i * n + j].abs()).sum::<f64>()).fold(0.0, f64::max);
+    if !norm.is_finite() { return None; }
     let sq = if norm > 0.5 { (norm / 0.5).log2().ceil() as i32 } else { 0 };
+    // e^(norm) beyond the largest number there is: no use squaring 2,000 times to find out.
+    if sq > 1100 { return None; }
     let k = 0.5f64.powi(sq);
     let a: Vec<f64> = m.iter().map(|x| x * k).collect();
     let mul = |x: &[f64], y: &[f64]| -> Vec<f64> { let mut r = vec![0.0; n * n]; for i in 0..n { for l in 0..n { let xv = x[i * n + l]; if xv != 0.0 { for j in 0..n { r[i * n + j] += xv * y[l * n + j]; } } } } r };
@@ -283,8 +332,8 @@ fn expm(m: &[f64], n: usize) -> Vec<f64> {
         term = mul(&term, &a).iter().map(|x| x / t as f64).collect();
         for (x, y) in e.iter_mut().zip(&term) { *x += y; }
     }
-    for _ in 0..sq { e = mul(&e, &e); }
-    e
+    for _ in 0..sq { e = mul(&e, &e); if e.iter().any(|x| !x.is_finite()) { return None; } }
+    Some(e)
 }
 
 impl Tf {
@@ -308,19 +357,27 @@ impl Tf {
         if self.num.len() > self.den.len() { return fail(format!("{} has more zeros than poles: its {what} is not finite (add poles, a filter for instance).", self.name), at); }
         Ok(())
     }
+    /// e^(Mt) of the augmented matrix, worked out balanced; None when it overflows.
+    fn exp_at(&self, t: f64) -> Option<Vec<f64>> {
+        let m = self.order() + 1;
+        let mut a: Vec<f64> = self.aug().iter().map(|x| x * t).collect();
+        let d = balance(&mut a, m);
+        let e = expm(&a, m)?;
+        Some((0..m * m).map(|k| e[k] * d[k / m] / d[k % m]).collect())
+    }
     /// The unit step response at time t (seconds).
-    fn step(&self, t: f64) -> f64 {
+    fn step(&self, t: f64) -> Option<f64> {
         let n = self.order();
         let (d, c) = self.dc();
-        if n == 0 { return d; }
-        let e = expm(&self.aug().iter().map(|x| x * t).collect::<Vec<_>>(), n + 1);
-        d + (0..n).map(|i| c[i] * e[i * (n + 1) + n]).sum::<f64>()
+        if n == 0 { return Some(d); }
+        let e = self.exp_at(t)?;
+        Some(d + (0..n).map(|i| c[i] * e[i * (n + 1) + n]).sum::<f64>()).filter(|y| y.is_finite())
     }
-    fn impulse(&self, t: f64) -> f64 {
+    fn impulse(&self, t: f64) -> Option<f64> {
         let n = self.order();
         let (_, c) = self.dc();
-        let e = expm(&self.aug().iter().map(|x| x * t).collect::<Vec<_>>(), n + 1);
-        (0..n).map(|i| c[i] * e[i * (n + 1) + n - 1]).sum()
+        let e = self.exp_at(t)?;
+        Some((0..n).map(|i| c[i] * e[i * (n + 1) + n - 1]).sum::<f64>()).filter(|y| y.is_finite())
     }
     fn at(&self, s: C) -> C { cdiv(horner(&self.num, s), horner(&self.den, s)) }
     fn poles(&self) -> Vec<C> { roots(&self.den) }
@@ -333,40 +390,57 @@ impl Tf {
         }
         Ok(p)
     }
-    /// The step response sampled to well past settling: times, values over the final value.
+    /// The step response sampled to well past settling: times, values over the final value, and the final value.
+    /// The horizon is 12 + 2n slowest time constants, doubled until the last tenth stays within 2 %; the samples only
+    /// bracket the figures, which are then found on the exact response.
     fn step_samples(&self, at: Span, what: &str) -> R<(Vec<f64>, Vec<f64>, f64)> {
         self.proper("step response", at)?;
+        let n = self.order();
+        if n == 0 { return fail(format!("{} is a constant gain: its step response jumps at once, so it has no {what}.", self.name), at); }
         let p = self.stable(what, at)?;
         let fin = self.num[0] / self.den[0];
         if fin == 0.0 || !fin.is_finite() { return fail(format!("{}'s step response ends at zero, so it has no {what}.", self.name), at); }
         let slow = p.iter().map(|z| -z.0).fold(f64::INFINITY, f64::min);
         let fast = p.iter().map(|z| cabs(*z)).fold(0.0, f64::max);
-        let horizon = 12.0 / slow;
-        let steps = ((horizon * fast / 0.05).ceil() as usize).clamp(4000, 200_000);
-        let dt = horizon / steps as f64;
-        let n = self.order();
+        let budget = (30_000_000 / ((n + 1) * (n + 1))).max(4000);
+        let mut horizon = (12.0 + 2.0 * n as f64) / slow;
         let (d, c) = self.dc();
-        let phi = expm(&self.aug().iter().map(|x| x * dt).collect::<Vec<_>>(), n + 1);
-        let mut z = vec![0.0; n + 1];
-        z[n] = 1.0;
-        let (mut ts, mut ys) = (Vec::with_capacity(steps + 1), Vec::with_capacity(steps + 1));
-        for k in 0..=steps {
-            ts.push(k as f64 * dt);
-            ys.push((d + (0..n).map(|i| c[i] * z[i]).sum::<f64>()) / fin);
-            z = (0..=n).map(|i| (0..=n).map(|j| phi[i * (n + 1) + j] * z[j]).sum()).collect();
+        let bad = || fail(format!("{}'s step response cannot be worked out accurately: its poles are too far apart or too many.", self.name), at);
+        for attempt in 0..6 {
+            let steps = ((horizon * fast / 0.05).ceil() as usize).clamp(4000, budget);
+            let dt = horizon / steps as f64;
+            let Some(phi) = self.exp_at(dt) else { return bad() };
+            let mut z = vec![0.0; n + 1];
+            z[n] = 1.0;
+            let (mut ts, mut ys) = (Vec::with_capacity(steps + 1), Vec::with_capacity(steps + 1));
+            for k in 0..=steps {
+                ts.push(k as f64 * dt);
+                ys.push((d + (0..n).map(|i| c[i] * z[i]).sum::<f64>()) / fin);
+                z = (0..=n).map(|i| (0..=n).map(|j| phi[i * (n + 1) + j] * z[j]).sum()).collect();
+            }
+            if ys.iter().any(|y| !y.is_finite() || y.abs() > 1e6) { return bad(); }
+            if attempt == 5 || ys[ys.len() * 9 / 10..].iter().all(|y| (y - 1.0).abs() <= 0.02) { return Ok((ts, ys, fin)); }
+            horizon *= 2.0;
         }
-        Ok((ts, ys, dt))
+        unreachable!()
     }
     /// The dominant poles: those nearest the imaginary axis (not at 0).
     fn dominant(&self, at: Span) -> R<C> {
         let p: Vec<C> = self.poles().into_iter().filter(|z| cabs(*z) > 0.0).collect();
         p.into_iter().min_by(|a, b| a.0.abs().total_cmp(&b.0.abs()).then(b.1.total_cmp(&a.1))).map_or_else(|| fail(format!("{} has no poles away from 0.", self.name), at), Ok)
     }
-    /// The frequency band to search: a hundred times beyond the poles and zeros.
+    /// The frequency band to search: a hundred times beyond the poles and zeros, then widened until |G(jω)| is on
+    /// the side of 1 its asymptote is at each end (a gain of 1000/(s + 1) crosses 1 near 1000 rad/s).
     fn band(&self) -> (f64, f64) {
         let mags: Vec<f64> = roots(&self.num).into_iter().chain(self.poles()).map(cabs).filter(|m| *m > 0.0).collect();
-        if mags.is_empty() { return (1e-3, 1e3); }
-        (mags.iter().cloned().fold(f64::INFINITY, f64::min) / 100.0, mags.iter().cloned().fold(0.0, f64::max) * 100.0)
+        let (mut lo, mut hi) = if mags.is_empty() { (1e-3, 1e3) } else { (mags.iter().cloned().fold(f64::INFINITY, f64::min) / 100.0, mags.iter().cloned().fold(0.0, f64::max) * 100.0) };
+        let mag = |w: f64| cabs(self.at((0.0, w)));
+        let (z0, p0) = (self.num.iter().take_while(|x| **x == 0.0).count(), self.den.iter().take_while(|x| **x == 0.0).count());
+        let low_big = if p0 != z0 { p0 > z0 } else { (self.num[z0] / self.den[p0]).abs() > 1.0 };
+        let high_big = self.num.len() == self.den.len() && self.num.last().unwrap().abs() > 1.0;
+        for _ in 0..12 { if (mag(lo) > 1.0) == low_big { break; } lo /= 10.0; }
+        for _ in 0..12 { if (mag(hi) > 1.0) == high_big { break; } hi *= 10.0; }
+        (lo, hi)
     }
     /// Frequencies where g changes sign over the band, each found by bisection in log ω.
     fn crossings(&self, g: impl Fn(C) -> f64) -> Vec<f64> {
@@ -409,8 +483,13 @@ impl Tf {
     }
 }
 
-fn first_cross(ts: &[f64], ys: &[f64], level: f64) -> Option<f64> {
-    (1..ys.len()).find(|&k| ys[k] >= level).map(|k| if k == 0 { ts[0] } else { ts[k - 1] + (level - ys[k - 1]) / (ys[k] - ys[k - 1]) * (ts[k] - ts[k - 1]) })
+/// The first time the response reaches a level: bracketed by the samples, then bisected on the exact response.
+fn first_cross(ts: &[f64], ys: &[f64], level: f64, y: &dyn Fn(f64) -> f64) -> Option<f64> {
+    if ys[0] >= level { return Some(ts[0]); }
+    let k = (1..ys.len()).find(|&k| ys[k] >= level)?;
+    let (mut a, mut b) = (ts[k - 1], ts[k]);
+    for _ in 0..60 { let m = (a + b) / 2.0; if y(m) >= level { b = m; } else { a = m; } }
+    Some((a + b) / 2.0)
 }
 
 fn vals(v: Vec<C>, dim: Dim) -> Val {
@@ -452,43 +531,50 @@ pub fn call(env: &mut Env, f: &str, args: &[Node], at: Span) -> R<Val> {
                 Some(a) => { let u = env.eval(a)?; if u.vec || u.cx() || u.abs { return fail("The size of the step is one real value (a difference for temperatures).", a.at); } (u.x(), u.dim) }
                 None => (1.0, NONE),
             };
-            let y: Vec<f64> = t.v.iter().map(|x| k * if f == "step" { g.step(*x) } else { g.impulse(*x) }).collect();
-            if y.iter().any(|x| !x.is_finite()) { return fail(format!("{}'s response grows too large to give by that time.", g.name), at); }
+            let Some(y) = t.v.iter().map(|x| if f == "step" { g.step(*x) } else { g.impulse(*x) }.map(|y| k * y)).collect::<Option<Vec<f64>>>() else {
+                return fail(format!("{}'s response grows too large to give by that time.", g.name), at);
+            };
             let dim = units::mul(&g.dim, &kdim);
             Ok(Val { v: y, dim: if f == "step" { dim } else { units::div(&dim, &TIME) }, vec: t.vec, ..Default::default() })
         }
         "overshoot" | "risetime" | "settling" | "peaktime" => {
             let what = match f { "overshoot" => "overshoot", "risetime" => "rise time", "settling" => "settling time", _ => "peak time" };
-            let (ts, ys, dt) = g.step_samples(at, what)?;
-            let (k, peak) = ys.iter().enumerate().fold((0, f64::NEG_INFINITY), |m, (i, y)| if *y > m.1 { (i, *y) } else { m });
-            // The peak between samples: a parabola through the three around it.
-            let (tp, yp) = if k > 0 && k + 1 < ys.len() {
-                let (a, b, c) = (ys[k - 1], ys[k], ys[k + 1]);
-                let den = a - 2.0 * b + c;
-                let x = if den != 0.0 { (0.5 * (a - c) / den).clamp(-1.0, 1.0) } else { 0.0 };
-                (ts[k] + x * dt, b - 0.25 * (a - c) * x)
-            } else { (ts[k], peak) };
+            let (ts, ys, fin) = g.step_samples(at, what)?;
+            let y = |t: f64| g.step(t).map_or(f64::NAN, |v| v / fin);
             match f {
-                "overshoot" => Ok(Val::plain((yp - 1.0).max(0.0))),
-                "peaktime" => {
-                    if yp <= 1.0 + 1e-9 { return fail(format!("{}'s step response rises without overshoot: its highest value is the final one.", g.name), at); }
-                    Ok(Val::num(tp, TIME))
+                "overshoot" | "peaktime" => {
+                    // The highest peaks of the samples, each found exactly by a golden-section search.
+                    let last = ys.len() - 1;
+                    let mut cand: Vec<usize> = (0..=last).filter(|&k| ys[k] > 1.0 && (k == 0 || ys[k] >= ys[k - 1]) && (k == last || ys[k] >= ys[k + 1])).collect();
+                    cand.sort_by(|a, b| ys[*b].total_cmp(&ys[*a]));
+                    cand.truncate(8);
+                    let best = cand.into_iter().map(|k| {
+                        let (mut a, mut b) = (ts[k.saturating_sub(1)], ts[(k + 1).min(last)]);
+                        let r = (5f64.sqrt() - 1.0) / 2.0;
+                        for _ in 0..80 { let (x1, x2) = (b - r * (b - a), a + r * (b - a)); if y(x1) >= y(x2) { b = x2; } else { a = x1; } }
+                        let t = (a + b) / 2.0;
+                        let (t, v) = if ys[k] > y(t) { (ts[k], ys[k]) } else { (t, y(t)) };
+                        (t, v)
+                    }).fold(None, |m: Option<(f64, f64)>, x| if m.is_none_or(|m| x.1 > m.1) { Some(x) } else { m });
+                    match (f, best) {
+                        ("overshoot", b) => Ok(Val::plain(b.map_or(0.0, |b| b.1 - 1.0))),
+                        (_, Some(b)) if b.1 > 1.0 + 1e-9 => Ok(Val::num(b.0, TIME)),
+                        _ => fail(format!("{}'s step response rises without overshoot: its highest value is the final one.", g.name), at),
+                    }
                 }
-                "risetime" => match (first_cross(&ts, &ys, 0.1), first_cross(&ts, &ys, 0.9)) {
-                    (Some(a), Some(b)) => Ok(Val::num(b - a, TIME)),
+                "risetime" => match (first_cross(&ts, &ys, 0.1, &y), first_cross(&ts, &ys, 0.9, &y)) {
+                    (Some(a), Some(b)) if b >= a => Ok(Val::num(b - a, TIME)),
                     _ => fail(format!("{}'s step response does not rise from 10 % to 90 % of its final value.", g.name), at),
                 },
-                _ => {
-                    let last = ys.iter().rposition(|y| (y - 1.0).abs() > 0.02);
-                    Ok(Val::num(match last {
-                        None => 0.0,
-                        Some(k) if k + 1 < ys.len() => {
-                            let lvl = if ys[k] > 1.0 { 1.02 } else { 0.98 };
-                            ts[k] + (lvl - ys[k]) / (ys[k + 1] - ys[k]) * dt
-                        }
-                        Some(_) => return fail(format!("{}'s step response does not settle within 2 %.", g.name), at),
-                    }, TIME))
-                }
+                _ => match ys.iter().rposition(|v| (v - 1.0).abs() > 0.02) {
+                    None => Ok(Val::num(0.0, TIME)),
+                    Some(k) if k + 1 < ys.len() => {
+                        let (mut a, mut b) = (ts[k], ts[k + 1]);
+                        for _ in 0..60 { let m = (a + b) / 2.0; if (y(m) - 1.0).abs() > 0.02 { a = m; } else { b = m; } }
+                        Ok(Val::num((a + b) / 2.0, TIME))
+                    }
+                    Some(_) => fail(format!("{}'s step response does not settle within 2 %.", g.name), at),
+                },
             }
         }
         "wn" => Ok(scalar(cabs(g.dominant(at)?), FREQ)),
@@ -511,9 +597,9 @@ mod tests {
         let want = [(-1.0, 0.0), (-2.0, 0.0), (-1.0, 2.0), (-1.0, -2.0)];
         for w in want { assert!(r.iter().any(|z| cabs((z.0 - w.0, z.1 - w.1)) < 1e-10), "{r:?}"); }
         // e^(diag(1, 2)) and a rotation.
-        let e = expm(&[0.0, 1.0, -1.0, 0.0], 2);
+        let e = expm(&[0.0, 1.0, -1.0, 0.0], 2).unwrap();
         assert!((e[0] - 1f64.cos()).abs() < 1e-14 && (e[1] - 1f64.sin()).abs() < 1e-14);
-        let e = expm(&[30.0, 0.0, 0.0, -30.0], 2);
+        let e = expm(&[30.0, 0.0, 0.0, -30.0], 2).unwrap();
         assert!((e[0] / 30f64.exp() - 1.0).abs() < 1e-12 && (e[3] / (-30f64).exp() - 1.0).abs() < 1e-9);
     }
 }

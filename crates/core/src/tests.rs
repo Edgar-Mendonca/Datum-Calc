@@ -1827,6 +1827,38 @@ fn dynamic_systems() {
 }
 
 #[test]
+fn dynamic_systems_hard_cases() {
+    // From the 0.2.11 review, each against an exact answer: a 20th-order lag (20!/((s+1)…(s+20)) at 3 s = 0.36014),
+    // eight poles a decade apart (partial fractions in exact arithmetic: 5.86663e-21 at 1 s), repeated poles that settle
+    // late ((s+1)^-8 settles at 14.82 s; (s+1)^-20 rises in 11.38 s and settles at 30.22 s), a lightly damped pair (peak
+    // at π s, overshoot e^(−πζ/√(1−ζ²)) = 0.99969), loops crossing far from their poles (1000/(s+1): 999.9995 rad/s and
+    // 90.057°), plain-number transfer functions with no units, and factors that cancel when repeated.
+    let o = run(&[
+        "W(s) = 2432902008176640000/((s+1)*(s+2)*(s+3)*(s+4)*(s+5)*(s+6)*(s+7)*(s+8)*(s+9)*(s+10)*(s+11)*(s+12)*(s+13)*(s+14)*(s+15)*(s+16)*(s+17)*(s+18)*(s+19)*(s+20))",
+        "a = step(W, 3 s)",
+        "F(s) = 1e8/((s+1)*(s+10)*(s+100)*(s+1000)*(s+10000)*(s+100000)*(s+1000000)*(s+10000000))", "b = step(F, 1 s)",
+        "A(s) = 1/(s + 1)^8", "c = settling(A)", "B(s) = 1/(s + 1)^20", "d = risetime(B)", "e2 = settling(B)",
+        "Z(s) = 1/(s^2 + 2e-4*s + 1)", "f = peaktime(Z)", "h = overshoot(Z)",
+        "L(s) = 1000/(s + 1)", "k = pm(L)", "m2 = wgc(L)", "M(s) = 0.001/(s*(s + 1))", "n = wgc(M)",
+        "I(s) = 1/s", "q = step(I, 2 s)", "K(s) = 10/s", "r = pm(K)",
+        "Y(s) = (s + 1)^3/((s + 1)^3*(s + 2))", "u = poles(Y)", "V(s) = 1/(s^4 + 2.6131*s^3 + 3.4142*s^2 + 2.6131*s + 1)", "w = poles(V)",
+        "G(s) = 1/(s + 1e9)", "step(G, 1e300 s)", "Q(s) = (s + 1)/(s + 2)", "x = risetime(Q)", "C(s) = 5", "risetime(C)",
+    ]);
+    let res = |n: &str| o.regions.iter().find(|r| r.name == n).map(|r| r.result.clone()).unwrap_or_else(|| panic!("{n}"));
+    assert_eq!((res("a"), res("b")), ("0.3601".into(), "5.867×10⁻²¹".into()));
+    assert_eq!((res("c"), res("d"), res("e2")), ("14.82 s".into(), "11.38 s".into(), "30.22 s".into()));
+    assert_eq!((res("f"), res("h")), ("3.142 s".into(), "0.9997".into()));
+    assert_eq!((res("k"), res("m2"), res("n")), ("90.06°".into(), "1000 rad/s".into(), "1×10⁻³ rad/s".into()));
+    assert_eq!((res("q"), res("r")), ("2".into(), "90°".into()));
+    assert_eq!(res("u"), "[-2] rad/s");
+    assert_eq!(res("w"), "[-0.3827 + 0.9239j, -0.3827 − 0.9239j, -0.9239 + 0.3827j, -0.9239 − 0.3827j] rad/s");
+    assert_eq!(res("x"), "0 ms");
+    let errs: Vec<String> = o.regions.iter().filter_map(|r| r.error.as_ref().map(|e| e.msg.clone())).collect();
+    assert!(errs.iter().any(|e| e.contains("grows too large")) && errs.iter().any(|e| e.contains("constant gain")), "{errs:?}");
+    assert_eq!(errs.len(), 2, "{errs:?}");
+}
+
+#[test]
 fn word_export() {
     // The parts of a .docx, read back from our own zip: names, sizes and CRC-32 as stored.
     fn parts(z: &[u8]) -> Vec<(String, Vec<u8>)> {

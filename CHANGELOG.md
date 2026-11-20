@@ -10,16 +10,16 @@ Dynamic systems: transfer functions with units, their responses and their stabil
 
 **What follows from one**
 - poles(G) and zeros(G) in rad/s (complex in pairs), dcgain(G) with its units, wn(G) and zeta(G) of the dominant poles.
-- step(G, t) and impulse(G, t) in time, exact for any order up to 20; step(G, t, 10 V) for a step of a given size. plot step(G, t) for t in 0 s .. 2 s draws the response.
-- overshoot(G), risetime(G) (10 % to 90 %), settling(G) (to within 2 %) and peaktime(G).
-- For a loop gain L(s): pm(L) and gm(L), the phase and gain margins, at the crossovers wgc(L) and wpc(L).
+- step(G, t) and impulse(G, t) in time, worked out through the matrix exponential (no step size to choose) for any order up to 20; step(G, t, 10 V) for a step of a given size. plot step(G, t) for t in 0 s .. 2 s draws the response.
+- overshoot(G), risetime(G) (10 % to 90 %), settling(G) (to within 2 %) and peaktime(G), found on the exact response: right for repeated poles, poles decades apart and light damping.
+- For a loop gain L(s): pm(L) and gm(L), the phase and gain margins, at the crossovers wgc(L) and wpc(L), wherever they are (the search widens to the gain's asymptotes). The phase margin is given between −180° and 180°.
 - Math › Dynamics keys, a help card, and the transfer function in the glossary.
 
 **Calc pack 31: DC motor speed control**
 - A DC motor's speed held by a PI controller: the motor's transfer function from its equations with units, the closed loop's poles, overshoot, rise and settling times, the loop's phase margin, the step response and the Bode magnitude, checked against the requirements.
 
 **Checks**
-- Every figure checked against scipy.signal and the textbook formulas (overshoot e^(−πζ/√(1−ζ²)), peak time π/ω_d, the margins of 5/(s(s + 1)(s + 2))); the pack against its own design worked in scipy. 101 engine tests, with transfer functions in the grammar fuzz, and 122 UI tests.
+- Every figure checked against scipy.signal and the textbook formulas (overshoot e^(−πζ/√(1−ζ²)), peak time π/ω_d, the margins of 5/(s(s + 1)(s + 2))); the pack against its own design worked in scipy; an independent review's hard cases (20th order, poles eight decades apart, repeated and lightly damped poles, crossovers far from the poles) against exact answers. 102 engine tests, with transfer functions in the grammar fuzz, and 122 UI tests.
 
 ## 0.2.10 — 2026-11-20
 
